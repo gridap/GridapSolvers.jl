@@ -1,6 +1,6 @@
 name = "GridapSolvers"
 uuid = "6d3209ee-5e3c-4db7-a716-942eb12ed534"
-authors = ["Santiago Badia <santiago.badia@monash.edu>", "Jordi Manyer <jordi.manyer@monash.edu>", "Alberto F. Martin <alberto.martin@monash.edu>"]
+authors = ["Santiago Badia <santiago.badia@monash.edu>", "Jordi Manyer <jordi.manyer@monash.edu>", "Alberto F. Martin <alberto.martin@monash.edu>", "Javier Principe <principe@cimne.upc.edu>"]
 version = "0.1.0"
 
 [compat]
