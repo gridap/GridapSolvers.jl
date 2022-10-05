@@ -47,16 +47,25 @@ end
 num_levels(a::ModelHierarchy)= length(a.levels)
 get_level(a::ModelHierarchy,level::Integer) = a.levels[level]
 
-get_level_model(a::ModelHierarchy,level::Integer)=get_level_model(get_level(a,level))
-get_level_model(a::ModelHierarchyLevel{A,B,Nothing}) where {A,B}=a.model
-get_level_model(a::ModelHierarchyLevel{A,B,C}) where {A,B,C}=a.model_red
+get_level_model(a::ModelHierarchy,level::Integer) = get_level_model(get_level(a,level))
+get_level_model(a::ModelHierarchyLevel{A,B,Nothing}) where {A,B} = a.model
+get_level_model(a::ModelHierarchyLevel{A,B,C}) where {A,B,C} = a.model_red
 
-get_level_model_before_redist(a::ModelHierarchy,level::Integer)=
+get_level_model_before_redist(a::ModelHierarchy,level::Integer) =
       get_level_model_before_redist(get_level(a,level))
-get_level_model_before_redist(a::ModelHierarchyLevel) where {A,B}=a.model
+get_level_model_before_redist(a::ModelHierarchyLevel) = a.model
 
-# TODO: Implement support for num_refs_x_level? (future work)
-function ModelHierarchy(parts,model::GridapDistributed.AbstractDistributedDiscreteModel,num_procs_x_level; num_refs_coarse_model=0, num_refs_x_level=nothing)
+"""
+  ModelHierarchy(parts,model,num_procs_x_level;num_refs_x_level)
+
+  - `model`: Initial refinable distributed model. Will be set as coarsest level. 
+
+  - `num_procs_x_level`: Vector containing the number of processors we want to distribute
+                         each level into. We need `num_procs_x_level[end]` to be equal to 
+                         the number of parts of `model`.
+"""
+function ModelHierarchy(parts,model::GridapDistributed.AbstractDistributedDiscreteModel,num_procs_x_level::Vector{Int}; num_refs_x_level=nothing)
+  # TODO: Implement support for num_refs_x_level? (future work)
   num_levels  = length(num_procs_x_level)
   level_parts = generate_level_parts(parts,num_procs_x_level)
 
