@@ -218,8 +218,8 @@ version = "0.2.6"
 
 [[deps.GridapP4est]]
 deps = ["ArgParse", "FillArrays", "Gridap", "GridapDistributed", "IterativeSolvers", "Libdl", "LinearAlgebra", "MPI", "P4est_wrapper", "PartitionedArrays", "Printf", "Test"]
-git-tree-sha1 = "7448e5e64569db6138ddee945e223746195b4504"
-repo-rev = "generate_mesh_hierarchy"
+git-tree-sha1 = "29dd610eb64c974e29d1f80dcc797eb40daaa6fa"
+repo-rev = "p4est-migration"
 repo-url = "https://github.com/gridap/GridapP4est.jl.git"
 uuid = "c2c8e14b-f5fd-423d-9666-1dd9ad120af9"
 version = "0.1.3"
