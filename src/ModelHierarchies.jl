@@ -18,7 +18,7 @@ end
 # COMMENT: We could have free_model! be a method that can be implemented by the different types 
 #          AbstractDistributedDiscreteModel instances. 
 function free_model!(model::GridapDistributed.AbstractDistributedDiscreteModel)
-  @abstract_method
+  @abstractmethod
 end
 
 function model_hierarchy_level_free!(a::ModelHierarchyLevel{A,B,Nothing,Nothing}) where {A,B}
@@ -56,7 +56,7 @@ get_level_model_before_redist(a::ModelHierarchy,level::Integer)=
 get_level_model_before_redist(a::ModelHierarchyLevel) where {A,B}=a.model
 
 # TODO: Implement support for num_refs_x_level? (future work)
-function ModelHierarchy(parts,model::AbstractDistributedDiscreteModel,num_procs_x_level; num_refs_coarse_model=0, num_refs_x_level=nothing)
+function ModelHierarchy(parts,model::GridapDistributed.AbstractDistributedDiscreteModel,num_procs_x_level; num_refs_coarse_model=0, num_refs_x_level=nothing)
   num_levels  = length(num_procs_x_level)
   level_parts = generate_level_parts(parts,num_procs_x_level)
 
