@@ -15,12 +15,6 @@ struct ModelHierarchyLevel{A,B,C,D}
   red_glue  :: D
 end
 
-# COMMENT: We could have free_model! be a method that can be implemented by the different types 
-#          AbstractDistributedDiscreteModel instances. 
-function free_model!(model::GridapDistributed.AbstractDistributedDiscreteModel)
-  @abstractmethod
-end
-
 function model_hierarchy_level_free!(a::ModelHierarchyLevel{A,B,Nothing,Nothing}) where {A,B}
   free_model!(a.model)
 end
@@ -30,6 +24,15 @@ function model_hierarchy_level_free!(a::ModelHierarchyLevel{A,B,C,D}) where {A,B
   free_model!(a.model_red)
 end
 
+# COMMENT: We could have free_model! be a method that can be implemented by the different types 
+#          AbstractDistributedDiscreteModel instances. 
+function free_model!(model::GridapDistributed.AbstractDistributedDiscreteModel)
+  @abstractmethod
+end
+
+function free_model!(model::OctreeDistributedDiscreteModel)
+  octree_distributed_discrete_model_free!(model)
+end
 
 """
 """

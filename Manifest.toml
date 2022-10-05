@@ -2,7 +2,7 @@
 
 julia_version = "1.8.1"
 manifest_format = "2.0"
-project_hash = "5ac9e17a19d8ac73982456bbee25de06e349e104"
+project_hash = "b04342400b43974a6b57ec92c1d69804f8b5dc91"
 
 [[deps.AbstractFFTs]]
 deps = ["ChainRulesCore", "LinearAlgebra"]
@@ -218,7 +218,7 @@ version = "0.2.6"
 
 [[deps.GridapP4est]]
 deps = ["ArgParse", "FillArrays", "Gridap", "GridapDistributed", "IterativeSolvers", "Libdl", "LinearAlgebra", "MPI", "P4est_wrapper", "PartitionedArrays", "Printf", "Test"]
-git-tree-sha1 = "29dd610eb64c974e29d1f80dcc797eb40daaa6fa"
+git-tree-sha1 = "107dc7701cde83db6ee33cad6426acaeee92eba5"
 repo-rev = "p4est-migration"
 repo-url = "https://github.com/gridap/GridapP4est.jl.git"
 uuid = "c2c8e14b-f5fd-423d-9666-1dd9ad120af9"
@@ -358,9 +358,9 @@ version = "5.0.2+1"
 
 [[deps.MacroTools]]
 deps = ["Markdown", "Random"]
-git-tree-sha1 = "3d3e902b31198a27340d0bf00d6ac452866021cf"
+git-tree-sha1 = "42324d08725e200c23d4dfb549e0d5d89dede2d2"
 uuid = "1914dd2f-81c6-5fcd-8719-6d5c9610ff09"
-version = "0.5.9"
+version = "0.5.10"
 
 [[deps.Markdown]]
 deps = ["Base64"]
@@ -465,9 +465,9 @@ version = "2.4.0"
 
 [[deps.PartitionedArrays]]
 deps = ["Distances", "IterativeSolvers", "LinearAlgebra", "MPI", "Printf", "SparseArrays", "SparseMatricesCSR"]
-git-tree-sha1 = "88ff2293fd57089a4036a3056ba058ae9806111b"
+git-tree-sha1 = "94291b7ddeac39816572660383055870b41bca64"
 uuid = "5a9dfac6-5c52-46f7-8278-5e2210713be9"
-version = "0.2.10"
+version = "0.2.11"
 
 [[deps.Pkg]]
 deps = ["Artifacts", "Dates", "Downloads", "LibGit2", "Libdl", "Logging", "Markdown", "Printf", "REPL", "Random", "SHA", "Serialization", "TOML", "Tar", "UUIDs", "p7zip_jll"]
