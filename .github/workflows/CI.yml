@@ -14,29 +14,68 @@ jobs:
   test:
     name: Julia ${{ matrix.version }} - ${{ matrix.os }} - ${{ matrix.arch }} - ${{ github.event_name }}
     runs-on: ${{ matrix.os }}
+    env:
+      JULIA_MPI_BINARY: "system"
+      P4EST_ROOT_DIR: "/opt/p4est/2.2/"
     strategy:
       fail-fast: false
       matrix:
         version:
           - '1.7'
-          - 'nightly'
         os:
           - ubuntu-latest
         arch:
           - x64
     steps:
       - uses: actions/checkout@v2
+      - name: Cache p4est
+        id: cache-p4est
+        uses: actions/cache@v2
+        with:
+         path: ${{env.P4EST_ROOT_DIR}}
+         key: ${{ runner.os }}-build-${{ env.P4EST_ROOT_DIR }}-
+         restore-keys: |
+           ${{ runner.os }}-build-${{ env.P4EST_ROOT_DIR }}-
+           ${{ runner.os }}-build-
+           ${{ runner.os }}-
       - uses: julia-actions/setup-julia@v1
         with:
           version: ${{ matrix.version }}
           arch: ${{ matrix.arch }}
-      - uses: julia-actions/cache@v1
-      - uses: julia-actions/julia-buildpkg@v1
-      - uses: julia-actions/julia-runtest@v1
-      - uses: julia-actions/julia-processcoverage@v1
-      - uses: codecov/codecov-action@v2
+      - name: Install p4est/petsc dependencies
+        run: |
+           sudo apt-get update 
+           sudo apt-get install -y wget gfortran g++ openmpi-bin libopenmpi-dev 
+      - name: Install p4est
+        if: steps.cache-p4est.outputs.cache-hit != 'true'
+        run: |
+          # Install p4est 2.2 from sources
+          CURR_DIR=$(pwd)
+          PACKAGE=p4est
+          VERSION=2.2
+          INSTALL_ROOT=/opt
+          P4EST_INSTALL=$INSTALL_ROOT/$PACKAGE/$VERSION
+          TAR_FILE=$PACKAGE-$VERSION.tar.gz
+          URL="https://github.com/p4est/p4est.github.io/raw/master/release"
+          ROOT_DIR=/tmp
+          SOURCES_DIR=$ROOT_DIR/$PACKAGE-$VERSION
+          BUILD_DIR=$SOURCES_DIR/build
+          wget -q $URL/$TAR_FILE -O $ROOT_DIR/$TAR_FILE
+          mkdir -p $SOURCES_DIR
+          tar xzf $ROOT_DIR/$TAR_FILE -C $SOURCES_DIR --strip-components=1
+          cd $SOURCES_DIR
+          ./configure --prefix=$P4EST_INSTALL --without-blas --without-lapack --enable-mpi -disable-dependency-tracking
+          make --quiet
+          make --quiet install
+          rm -rf $ROOT_DIR/$TAR_FILE $SOURCES_DIR
+          cd $CURR_DIR         
+      - uses: julia-actions/julia-buildpkg@latest
+      - run: echo $PWD  
+      - run: julia --project=. --color=yes -e 'using Pkg; Pkg.instantiate()'
+      - run: julia --project=. --color=yes --check-bounds=yes test/runtests.jl
+      - uses: codecov/codecov-action@v1
         with:
-          files: lcov.info
+          file: lcov.info
   docs:
     name: Documentation
     runs-on: ubuntu-latest
