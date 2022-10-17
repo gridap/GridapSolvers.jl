@@ -42,9 +42,7 @@ struct ModelHierarchy
 end
 
 function model_hierarchy_free!(a::ModelHierarchy)
-  for level in a.levels
-    model_hierarchy_level_free!(level)
-  end
+  map(model_hierarchy_level_free!,a.levels)
 end
 
 num_levels(a::ModelHierarchy)= length(a.levels)
@@ -67,15 +65,15 @@ get_level_model_before_redist(a::ModelHierarchyLevel) = a.model
                          each level into. We need `num_procs_x_level[end]` to be equal to 
                          the number of parts of `model`.
 """
-function ModelHierarchy(parts,model::GridapDistributed.AbstractDistributedDiscreteModel,num_procs_x_level::Vector{Int}; num_refs_x_level=nothing)
+function ModelHierarchy(parts,coarsest_model::GridapDistributed.AbstractDistributedDiscreteModel,num_procs_x_level::Vector{Int}; num_refs_x_level=nothing)
   # TODO: Implement support for num_refs_x_level? (future work)
   num_levels  = length(num_procs_x_level)
   level_parts = generate_level_parts(parts,num_procs_x_level)
 
   meshes = Vector{ModelHierarchyLevel}(undef,num_levels)
-  meshes[num_levels] = ModelHierarchyLevel(num_levels,model,nothing,nothing,nothing)
+  meshes[num_levels] = ModelHierarchyLevel(num_levels,coarsest_model,nothing,nothing,nothing)
 
-  for i=num_levels-1:-1:1
+  for i = num_levels-1:-1:1
     modelH = get_level_model(meshes[i+1])
     if (num_procs_x_level[i]!=num_procs_x_level[i+1])
       # meshes[i+1].model is distributed among P processors
