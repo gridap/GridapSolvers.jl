@@ -37,7 +37,7 @@ end
 """
 """
 struct ModelHierarchy
-  level_parts :: Vector{PartitionedArrays.MPIData}
+  level_parts :: Vector{PartitionedArrays.AbstractPData}
   levels      :: Vector{ModelHierarchyLevel}
 end
 
