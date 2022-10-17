@@ -10,7 +10,6 @@ module GridapSolvers
 
 
   export ModelHierarchy
-  export model_hierarchy_free!
 
   include("PartitionedArraysExtensions.jl")
   include("ModelHierarchies.jl")
