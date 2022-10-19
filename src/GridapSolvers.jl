@@ -1,6 +1,7 @@
 module GridapSolvers
 
   using MPI
+  using LinearAlgebra
   using Gridap
   using Gridap.Helpers
   using PartitionedArrays
