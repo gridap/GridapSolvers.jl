@@ -61,7 +61,7 @@ function ModelHierarchy(parts,coarsest_model::GridapDistributed.AbstractDistribu
   meshes[num_levels] = ModelHierarchyLevel(num_levels,coarsest_model,nothing,nothing,nothing)
 
   for i = num_levels-1:-1:1
-    modelH = get_level_model(meshes[i+1])
+    modelH = get_model(meshes[i+1])
     if (num_procs_x_level[i]!=num_procs_x_level[i+1])
       # meshes[i+1].model is distributed among P processors
       # model_ref is distributed among Q processors, with P!=Q

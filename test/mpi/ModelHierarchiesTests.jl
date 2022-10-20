@@ -7,6 +7,13 @@ using PartitionedArrays
 using GridapSolvers
 using GridapP4est
 
+function model_hierarchy_free!(mh::ModelHierarchy)
+  for lev in 1:num_levels(mh)
+    model = get_model(mh,lev)
+    octree_distributed_discrete_model_free!(model)
+  end
+end
+
 function main(parts,num_parts_x_level,num_trees,num_refs_coarse)
   domain    = (0,1,0,1)
   cmodel    = CartesianDiscreteModel(domain,num_trees)
@@ -17,9 +24,9 @@ function main(parts,num_parts_x_level,num_trees,num_refs_coarse)
   model_hierarchy_free!(mh)
 end
 
-num_parts_x_level = [4,2,2,2,2,2] # Procs in each refinement level
-num_trees = (1,1)                 # Number of initial P4est trees
-num_refs_coarse = 2               # Number of initial refinements
+num_parts_x_level = [4,4,2,2] # Procs in each refinement level
+num_trees = (1,1)             # Number of initial P4est trees
+num_refs_coarse = 2           # Number of initial refinements
 
 ranks = num_parts_x_level[1]
 prun(main,mpi,ranks,num_parts_x_level,num_trees,num_refs_coarse)
