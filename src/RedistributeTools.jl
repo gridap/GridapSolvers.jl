@@ -177,7 +177,7 @@ function redistribute_fe_function(uh_old::GridapDistributed.DistributedSingleFie
 end
 
 
-function Gridap.FESpaces.gather_free_and_dirichlet_values(f::Gridap.Distributed.AbstractDistributedFESpace,cv)
+function Gridap.FESpaces.gather_free_and_dirichlet_values(f::GridapDistributed.DistributedFESpace,cv)
   free_values, dirichlet_values = map_parts(local_views(f),cv) do f, cv
     Gridap.FESpaces.gather_free_and_dirichlet_values(f,cv)
   end
