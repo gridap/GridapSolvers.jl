@@ -10,6 +10,8 @@ module GridapSolvers
   using GridapDistributed
   using GridapP4est
 
+  import GridapDistributed: local_views
+
 
   export ModelHierarchy
   export num_levels, get_level, get_model, get_model_before_redist, has_refinement, has_redistribution

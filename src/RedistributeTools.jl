@@ -7,10 +7,10 @@ function _allocate_cell_wise_dofs(cell_to_ldofs)
       ldofs = getindex!(cache,cell_to_ldofs,cell)
       ptrs[cell+1] = length(ldofs)
     end
-    PArrays.length_to_ptrs!(ptrs)
+    PartitionedArrays.length_to_ptrs!(ptrs)
     ndata = ptrs[end]-1
     data  = Vector{Float64}(undef,ndata)
-    PArrays.Table(data,ptrs)
+    PartitionedArrays.Table(data,ptrs)
   end
 end
 
@@ -42,10 +42,10 @@ function allocate_comm_data(num_dofs_x_cell,lids)
         ptrs[i+1] = ptrs[i+1] + num_dofs_x_cell.data[j]
       end
     end
-    PArrays.length_to_ptrs!(ptrs)
+    PartitionedArrays.length_to_ptrs!(ptrs)
     ndata = ptrs[end]-1
     data  = Vector{Float64}(undef,ndata)
-    PArrays.Table(data,ptrs)
+    PartitionedArrays.Table(data,ptrs)
   end
 end
 
@@ -95,12 +95,12 @@ end
 function num_dofs_x_cell(cell_dofs_array,lids)
   map_parts(cell_dofs_array,lids) do cell_dofs_array, lids
      data = [length(cell_dofs_array[i]) for i = 1:length(cell_dofs_array) ]
-     PArrays.Table(data,lids.ptrs)
+     PartitionedArrays.Table(data,lids.ptrs)
   end
 end
 
 
-function redistribute_cell_dofs(cell_dof_values_old::GridapDistributed.DistributedCellDatum,
+function redistribute_cell_dofs(cell_dof_values_old,
                                 Uh_new::GridapDistributed.DistributedSingleFieldFESpace,
                                 model_new,
                                 glue::GridapDistributed.RedistributeGlue;
@@ -120,7 +120,7 @@ function redistribute_cell_dofs(cell_dof_values_old::GridapDistributed.Distribut
                         snd_data,
                         parts_rcv,
                         parts_snd,
-                        PArrays._empty_tasks(parts_rcv))
+                        PartitionedArrays._empty_tasks(parts_rcv))
   map_parts(schedule,tout)
 
   cell_dof_values_new = _allocate_cell_wise_dofs(cell_dof_ids_new)
@@ -170,7 +170,7 @@ function redistribute_fe_function(uh_old::GridapDistributed.DistributedSingleFie
   cell_dof_values_new = redistribute_cell_dofs(cell_dof_values_old,Uh_new,model_new,glue;reverse=reverse)
 
   # Assemble the new FEFunction
-  free_values, dirichlet_values = Gridap.FESpaces.gather_free_and_dirichlet_values(Uh_new.spaces,cell_dof_values_new)
+  free_values, dirichlet_values = Gridap.FESpaces.gather_free_and_dirichlet_values(Uh_new,cell_dof_values_new)
   free_values = PVector(free_values,Uh_new.gids)
   uh_new = FEFunction(Uh_new,free_values,dirichlet_values)
   return uh_new
