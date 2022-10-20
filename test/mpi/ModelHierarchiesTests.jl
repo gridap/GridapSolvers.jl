@@ -2,6 +2,7 @@ module ModelHierarchiesTests
 
 using MPI
 using Gridap
+using Gridap.FESpaces
 using GridapDistributed
 using PartitionedArrays
 using GridapSolvers
@@ -21,6 +22,12 @@ function main(parts,num_parts_x_level,num_trees,num_refs_coarse)
   num_levels = length(num_parts_x_level)
   coarse_model = OctreeDistributedDiscreteModel(parts,cmodel,num_refs_coarse)
   mh = ModelHierarchy(parts,coarse_model,num_parts_x_level)
+
+  sol(x) = x[1] + x[2]
+  reffe  = ReferenceFE(lagrangian,Float64,1)
+  tests  = TestFESpace(mh,reffe,conformity=:H1)
+  trials = TrialFESpace(sol,tests)
+
   model_hierarchy_free!(mh)
 end
 

@@ -36,14 +36,14 @@ end
 
 function Gridap.FESpaces.TestFESpace(
       mh::ModelHierarchyLevel{A,B,Nothing},args...;kwargs...) where {A,B}
-  Vh = TestFESpace(get_model(mh.model),args...;kwargs...)
+  Vh = TestFESpace(mh.model,args...;kwargs...)
   FESpaceHierarchyLevel(mh.level,Vh,nothing)
 end
 
 function Gridap.FESpaces.TestFESpace(
       mh::ModelHierarchyLevel{A,B,C},args...;kwargs...) where {A,B,C}
-  Vh     = TestFESpace(get_model(mh.model),args...;kwargs...)
-  Vh_red = TestFESpace(get_model(mh.model_red),args...;kwargs...)
+  Vh     = TestFESpace(mh.model,args...;kwargs...)
+  Vh_red = TestFESpace(mh.model_red,args...;kwargs...)
   FESpaceHierarchyLevel(mh.level,Vh,Vh_red)
 end
 
