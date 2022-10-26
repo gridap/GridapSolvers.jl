@@ -22,16 +22,24 @@ function num_levels(fh::FESpaceHierarchy)
   length(fh)
 end
 
-function get_space(a::FESpaceHierarchyLevel{A,Nothing}) where {A}
+function get_fe_space(a::FESpaceHierarchyLevel{A,Nothing}) where {A}
   a.fe_space
 end
 
-function get_space(a::FESpaceHierarchyLevel{A,B}) where {A,B}
+function get_fe_space(a::FESpaceHierarchyLevel{A,B}) where {A,B}
   a.fe_space_red
 end
 
-function get_space_before_redist(a::FESpaceHierarchyLevel)
+function get_fe_space(fh::FESpaceHierarchy,lev::Int)
+  get_space(fh[lev])
+end
+
+function get_fe_space_before_redist(a::FESpaceHierarchyLevel)
   a.fe_space
+end
+
+function get_fe_space_before_redist(fh::FESpaceHierarchy,lev::Int)
+  get_space_before_redist(fh[lev])
 end
 
 function Gridap.FESpaces.TestFESpace(
