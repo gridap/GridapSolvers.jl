@@ -14,6 +14,7 @@ module GridapSolvers
 
   import GridapDistributed: local_views
 
+  export DistributedRefinedDiscreteModel
 
   export ModelHierarchy
   export num_levels, get_level, get_model, get_model_before_redist, has_refinement, has_redistribution
@@ -26,6 +27,7 @@ module GridapSolvers
   export setup_transfer_operators
 
   include("PartitionedArraysExtensions.jl")
+  include("DistributedRefinedDiscreteModels.jl")
   include("ModelHierarchies.jl")
   include("FESpaceHierarchies.jl")
   include("RedistributeTools.jl")

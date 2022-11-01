@@ -12,6 +12,7 @@ module RedistributeToolsTests
   function model_hierarchy_free!(mh::ModelHierarchy)
     for lev in 1:num_levels(mh)
       model = get_model(mh,lev)
+      isa(model,DistributedRefinedDiscreteModel) && (model = model.model)
       octree_distributed_discrete_model_free!(model)
     end
   end

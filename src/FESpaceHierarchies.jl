@@ -43,15 +43,15 @@ function get_fe_space_before_redist(fh::FESpaceHierarchy,lev::Int)
 end
 
 function Gridap.FESpaces.TestFESpace(
-      mh::ModelHierarchyLevel{A,B,Nothing},args...;kwargs...) where {A,B}
-  Vh = TestFESpace(mh.model,args...;kwargs...)
+      mh::ModelHierarchyLevel{A,B,C,Nothing},args...;kwargs...) where {A,B,C}
+  Vh = TestFESpace(get_model(mh),args...;kwargs...)
   FESpaceHierarchyLevel(mh.level,Vh,nothing)
 end
 
 function Gridap.FESpaces.TestFESpace(
-      mh::ModelHierarchyLevel{A,B,C},args...;kwargs...) where {A,B,C}
-  Vh     = TestFESpace(mh.model,args...;kwargs...)
-  Vh_red = TestFESpace(mh.model_red,args...;kwargs...)
+      mh::ModelHierarchyLevel{A,B,C,D},args...;kwargs...) where {A,B,C,D}
+  Vh     = TestFESpace(get_model_before_redist(mh),args...;kwargs...)
+  Vh_red = TestFESpace(get_model(mh),args...;kwargs...)
   FESpaceHierarchyLevel(mh.level,Vh,Vh_red)
 end
 
