@@ -25,6 +25,8 @@ end
 num_levels(a::ModelHierarchy) = length(a.levels)
 get_level(a::ModelHierarchy,level::Integer) = a.levels[level]
 
+get_level_parts(a::ModelHierarchy,level::Integer) = a.level_parts[level]
+
 get_model(a::ModelHierarchy,level::Integer) = get_model(get_level(a,level))
 get_model(a::ModelHierarchyLevel{A,B,Nothing}) where {A,B} = a.model
 get_model(a::ModelHierarchyLevel{A,B,C}) where {A,B,C} = a.model_red
@@ -53,7 +55,7 @@ function ModelHierarchy(parts,coarsest_model::GridapDistributed.AbstractDistribu
 
   for i = num_levels-1:-1:1
     modelH = get_model(meshes[i+1])
-    if (num_procs_x_level[i]!=num_procs_x_level[i+1])
+    if (num_procs_x_level[i] != num_procs_x_level[i+1])
       # meshes[i+1].model is distributed among P processors
       # model_ref is distributed among Q processors, with P!=Q
       model_ref,ref_glue = Gridap.Refinement.refine(modelH,level_parts[i])
@@ -73,8 +75,10 @@ function convert_to_refined_models(mh::ModelHierarchy)
   nlevs  = num_levels(mh)
   levels = Vector{ModelHierarchyLevel}(undef,nlevs)
   for lev in 1:nlevs-1
+    model       = get_model_before_redist(mh,lev)
+    parent      = get_model(mh,lev+1)
     ref_glue    = mh.levels[lev].ref_glue
-    model_ref   = DistributedRefinedDiscreteModel(get_model_before_redist(mh,lev),get_model(mh,lev+1),ref_glue)
+    model_ref   = DistributedRefinedDiscreteModel(model,parent,ref_glue)
     levels[lev] = ModelHierarchyLevel(lev,model_ref,ref_glue,mh.levels[lev].model_red,mh.levels[lev].red_glue)
   end
   levels[nlevs] = mh.levels[nlevs]

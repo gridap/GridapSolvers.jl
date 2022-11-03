@@ -31,7 +31,7 @@ function get_fe_space(a::FESpaceHierarchyLevel{A,B}) where {A,B}
 end
 
 function get_fe_space(fh::FESpaceHierarchy,lev::Int)
-  get_space(fh[lev])
+  get_fe_space(fh[lev])
 end
 
 function get_fe_space_before_redist(a::FESpaceHierarchyLevel)
@@ -39,7 +39,7 @@ function get_fe_space_before_redist(a::FESpaceHierarchyLevel)
 end
 
 function get_fe_space_before_redist(fh::FESpaceHierarchy,lev::Int)
-  get_space_before_redist(fh[lev])
+  get_fe_space_before_redist(fh[lev])
 end
 
 function Gridap.FESpaces.TestFESpace(
@@ -69,8 +69,8 @@ end
 function Gridap.FESpaces.TestFESpace(mh::ModelHierarchy,args...;kwargs...) where {A,B}
   test_spaces = Vector{FESpaceHierarchyLevel}(undef,num_levels(mh))
   for i=1:num_levels(mh)
-    model = get_model(mh,i)
-    if (GridapP4est.i_am_in(model.parts))
+    parts = get_level_parts(mh,i)
+    if (GridapP4est.i_am_in(parts))
        Vh = TestFESpace(get_level(mh,i),args...;kwargs...)
        test_spaces[i]  = Vh
     end
@@ -81,8 +81,8 @@ end
 function Gridap.FESpaces.TrialFESpace(u,a::FESpaceHierarchy)
   trial_spaces = Vector{FESpaceHierarchyLevel}(undef,num_levels(a.mh))
   for i=1:num_levels(a.mh)
-    model = get_model(a.mh,i)
-    if (GridapP4est.i_am_in(model.parts))
+    parts = get_level_parts(a.mh,i)
+    if (GridapP4est.i_am_in(parts))
        Uh = TrialFESpace(u,a[i])
        trial_spaces[i]  = Uh
     end
@@ -93,8 +93,8 @@ end
 function Gridap.FESpaces.TrialFESpace(a::FESpaceHierarchy)
   trial_spaces = Vector{FESpaceHierarchyLevel}(undef,num_levels(a.mh))
   for i=1:num_levels(a.mh)
-    model = get_model(a.mh,i)
-    if (GridapP4est.i_am_in(model.parts))
+    parts = get_level_parts(a.mh,i)
+    if (GridapP4est.i_am_in(parts))
        Uh = TrialFESpace(a[i])
        trial_spaces[i]  = Uh
     end

@@ -11,7 +11,7 @@ struct DistributedGridTransferOperator{T,R,A,B,C} <: Gridap.Refinement.GridTrans
     A = typeof(sh)
     B = typeof(ref_op)
     C = typeof(cache)
-    new{T,R,A,B,C}(sh,cache)
+    new{T,R,A,B,C}(sh,ref_op,cache)
   end
 end
 
@@ -22,31 +22,41 @@ ProlongationOperator(lev::Int,sh::FESpaceHierarchy,qdegree::Int) = DistributedGr
 
 function DistributedGridTransferOperator(lev::Int,sh::FESpaceHierarchy,qdegree::Int,op_type::Symbol)
   mh = sh.mh
-  @check lev != num_levels(mh)
+  cparts = get_level_parts(mh,lev+1)
+  @check lev < num_levels(mh)
   @check op_type ∈ [:restriction, :prolongation]
-  
-  UH = get_space(sh,lev+1)
-  Uh = get_space_before_redist(sh,lev)
-  Uh_red = get_space(sh,lev)
 
+  Uh = get_fe_space_before_redist(sh,lev)
+  Ωh = get_triangulation(Uh,get_model_before_redist(mh,lev))
+  
   # Refinement
-  from, to = (op_type == :restriction) ? (Uh, UH) : (UH, Uh)
-  ref_op = ProjectionTransferOperator(from,to;qdegree=qdegree)
+  if GridapP4est.i_am_in(cparts)
+    UH = get_fe_space(sh,lev+1)
+    ΩH = get_triangulation(UH,get_model(mh,lev+1))
+
+    from,   to   = (op_type == :restriction) ? (Uh, UH) : (UH, Uh)
+    Ω_from, Ω_to = (op_type == :restriction) ? (Ωh, ΩH) : (ΩH, Ωh)
+    ref_op = ProjectionTransferOperator(from,Ω_from,to,Ω_to;qdegree=qdegree)
+  else 
+    ref_op = nothing
+  end
 
   # Redistribution
   redist = has_redistribution(mh,lev)
   if redist
+    Uh_red      = get_fe_space(sh,lev)
     model_h     = get_model_before_redist(mh,lev)
     model_h_red = get_model(mh,lev)
     fv_h        = PVector(0.0,Uh.gids)
     fv_h_red    = PVector(0.0,Uh_red.gids)
+    glue = mh.levels[lev].red_glue
 
     cache = fv_h, Uh, fv_h_red, Uh_red, model_h, model_h_red, glue
   else
     cache = nothing
   end
 
-  return DistributedGridTransferOperator(:op_type,redist,sh,ref_op,cache)
+  return DistributedGridTransferOperator(op_type,redist,sh,ref_op,cache)
 end
 
 function setup_transfer_operators(sh::FESpaceHierarchy, qdegree::Int)

@@ -1,5 +1,42 @@
 
-const DistributedRefinedTriangulation{Dc,Dp} = GridapDistributed.DistributedTriangulation{Dc,Dp,AbstractPData{<:RefinedTriangulation{Dc,Dp}}}
+# DistributedRefinedDiscreteModels
+
+const DistributedRefinedDiscreteModel{Dc,Dp} = GridapDistributed.DistributedDiscreteModel{Dc,Dp,<:AbstractPData{<:RefinedDiscreteModel{Dc,Dp}}}
+
+function DistributedRefinedDiscreteModel(model::GridapDistributed.AbstractDistributedDiscreteModel,
+                                         parent_models::AbstractPData{<:DiscreteModel},
+                                         glue::AbstractPData{<:RefinementGlue})
+                                         
+  models = map_parts(local_views(model),parent_models,glue) do model, parent, glue
+    RefinedDiscreteModel(model,parent,glue)
+  end
+  return GridapDistributed.DistributedDiscreteModel(models,get_cell_gids(model))
+end
+
+function DistributedRefinedDiscreteModel(model::GridapDistributed.AbstractDistributedDiscreteModel,
+                                         parent::GridapDistributed.AbstractDistributedDiscreteModel,
+                                         glue::AbstractPData{<:RefinementGlue})
+  if !(model.parts === parent.parts)
+    parent_models = map_parts(local_views(model)) do m
+      parent_models = local_views(parent)
+      if i_am_in(model.parts)
+        parent_models.part
+      else
+        nothing
+      end
+    end
+    return DistributedRefinedDiscreteModel(model,parent_models,glue)
+  else
+    return DistributedRefinedDiscreteModel(model,local_views(parent),glue)
+  end
+end
+
+# DistributedRefinedTriangulations
+
+const DistributedRefinedTriangulation{Dc,Dp} = GridapDistributed.DistributedTriangulation{Dc,Dp,<:AbstractPData{<:RefinedTriangulation{Dc,Dp}}}
+
+
+# DistributedFESpaces
 
 function get_test_space(U::GridapDistributed.DistributedSingleFieldFESpace)
   spaces = map_parts(local_views(U)) do U
@@ -10,15 +47,22 @@ function get_test_space(U::GridapDistributed.DistributedSingleFieldFESpace)
   return GridapDistributed.DistributedSingleFieldFESpace(spaces,gids,vector_type)
 end
 
+function FESpaces.get_triangulation(f::GridapDistributed.DistributedSingleFieldFESpace,model::GridapDistributed.AbstractDistributedDiscreteModel)
+  trians = map_parts(get_triangulation,local_views(f))
+  GridapDistributed.DistributedTriangulation(trians,model)
+end
+
+
+# Refinement Operators
+
 function Gridap.Refinement.ProjectionTransferOperator(from::GridapDistributed.DistributedFESpace,
-                                                      to::GridapDistributed.DistributedFESpace;
+                                                      Ω_from::GridapDistributed.DistributedTriangulation,
+                                                      to::GridapDistributed.DistributedFESpace,
+                                                      Ω_to::GridapDistributed.DistributedTriangulation;
                                                       solver::LinearSolver=BackslashSolver(),
                                                       Π=Gridap.Refinement.Π_l2, 
                                                       qdegree=3)
-  Ω_from = get_triangulation(from)
-  Ω_to   = get_triangulation(to)
-  @assert isa(Ω_from,DistributedRefinedTriangulation) || isa(Ω_to,DistributedRefinedTriangulation)
-  @assert is_change_possible(Ω_from,Ω_to)
+  #@assert is_change_possible(Ω_from,Ω_to)
 
   # Choose integration space
   Ω  = best_target(Ω_from,Ω_to)
@@ -26,7 +70,8 @@ function Gridap.Refinement.ProjectionTransferOperator(from::GridapDistributed.Di
   U  = (Ω === Ω_from) ? from : to
   V  = get_test_space(U)
   vh_to = get_fe_basis(to)
-  vh = change_domain(vh_to,Ω)
+  #vh = change_domain(vh_to,Ω)
+  vh  = (Ω === Ω_from) ? change_domain_c2f(vh_to,Ω,Ω.model.glue) : vh_to
 
   # Prepare system
   V_to = get_test_space(to)
@@ -38,14 +83,13 @@ function Gridap.Refinement.ProjectionTransferOperator(from::GridapDistributed.Di
   ss = symbolic_setup(solver,lhs_mat)
   ns = numerical_setup(ss,lhs_mat)
 
-  caches = ns, lhs_vec, rhs_vec, Π, assem, Ω, dΩ, U, V, vh
+  caches = ns, lhs_vec, rhs_vec, Π, assem, Ω, dΩ, U, V, vh, Ω_to
   return Gridap.Refinement.ProjectionTransferOperator(eltype(sysmat),from,to,caches)
 end
 
 # Solves the problem Π(uh,vh)_to = Π(uh_from,vh)_Ω for all vh in Vh_to
 function LinearAlgebra.mul!(y::PVector,A::Gridap.Refinement.ProjectionTransferOperator,x::PVector)
-  ns, lhs_vec, rhs_vec, Π, assem, Ω, dΩ, U, V , vh_Ω = A.caches
-  Ω_to = get_triangulation(A.to)
+  ns, lhs_vec, rhs_vec, Π, assem, Ω, dΩ, U, V, vh_Ω, Ω_to = A.caches
 
   # Bring uh to the integration domain
   uh_from = FEFunction(A.from,x)
@@ -64,6 +108,9 @@ function LinearAlgebra.mul!(y::PVector,A::Gridap.Refinement.ProjectionTransferOp
   solve!(y,ns,sysvec)
   return y
 end
+
+
+# ChangeDomain
 
 function Gridap.Refinement.merge_contr_cells(a::GridapDistributed.DistributedDomainContribution,
                                              rtrian::GridapDistributed.DistributedTriangulation,
