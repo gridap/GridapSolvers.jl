@@ -20,8 +20,9 @@ function main(parts,num_parts_x_level,num_trees,num_refs_coarse)
   domain    = (0,1,0,1)
   cmodel    = CartesianDiscreteModel(domain,num_trees)
 
-  num_levels = length(num_parts_x_level)
-  coarse_model = OctreeDistributedDiscreteModel(parts,cmodel,num_refs_coarse)
+  num_levels   = length(num_parts_x_level)
+  level_parts  = GridapSolvers.generate_level_parts(parts,num_parts_x_level)
+  coarse_model = OctreeDistributedDiscreteModel(level_parts[num_levels],cmodel,num_refs_coarse)
   mh = ModelHierarchy(parts,coarse_model,num_parts_x_level)
 
   sol(x) = x[1] + x[2]

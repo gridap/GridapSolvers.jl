@@ -75,11 +75,14 @@ function convert_to_refined_models(mh::ModelHierarchy)
   nlevs  = num_levels(mh)
   levels = Vector{ModelHierarchyLevel}(undef,nlevs)
   for lev in 1:nlevs-1
-    model       = get_model_before_redist(mh,lev)
-    parent      = get_model(mh,lev+1)
-    ref_glue    = mh.levels[lev].ref_glue
-    model_ref   = DistributedRefinedDiscreteModel(model,parent,ref_glue)
-    levels[lev] = ModelHierarchyLevel(lev,model_ref,ref_glue,mh.levels[lev].model_red,mh.levels[lev].red_glue)
+    parts       = get_level_parts(mh,lev)
+    if (GridapP4est.i_am_in(parts))
+      model       = get_model_before_redist(mh,lev)
+      parent      = get_model(mh,lev+1)
+      ref_glue    = mh.levels[lev].ref_glue
+      model_ref   = DistributedRefinedDiscreteModel(model,parent,ref_glue)
+      levels[lev] = ModelHierarchyLevel(lev,model_ref,ref_glue,mh.levels[lev].model_red,mh.levels[lev].red_glue)
+    end
   end
   levels[nlevs] = mh.levels[nlevs]
 

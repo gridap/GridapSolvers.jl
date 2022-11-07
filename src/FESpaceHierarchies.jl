@@ -72,7 +72,7 @@ function Gridap.FESpaces.TestFESpace(mh::ModelHierarchy,args...;kwargs...) where
     parts = get_level_parts(mh,i)
     if (GridapP4est.i_am_in(parts))
        Vh = TestFESpace(get_level(mh,i),args...;kwargs...)
-       test_spaces[i]  = Vh
+       test_spaces[i] = Vh
     end
   end
   FESpaceHierarchy(mh,test_spaces)
@@ -84,7 +84,7 @@ function Gridap.FESpaces.TrialFESpace(u,a::FESpaceHierarchy)
     parts = get_level_parts(a.mh,i)
     if (GridapP4est.i_am_in(parts))
        Uh = TrialFESpace(u,a[i])
-       trial_spaces[i]  = Uh
+       trial_spaces[i] = Uh
     end
   end
   FESpaceHierarchy(a.mh,trial_spaces)
@@ -96,7 +96,7 @@ function Gridap.FESpaces.TrialFESpace(a::FESpaceHierarchy)
     parts = get_level_parts(a.mh,i)
     if (GridapP4est.i_am_in(parts))
        Uh = TrialFESpace(a[i])
-       trial_spaces[i]  = Uh
+       trial_spaces[i] = Uh
     end
   end
   FESpaceHierarchy(a.mh,trial_spaces)

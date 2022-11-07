@@ -21,32 +21,37 @@ module InterGridTransferOperatorsTests
     num_levels   = length(num_parts_x_level)
     domain       = (0,1,0,1)
     cmodel       = CartesianDiscreteModel(domain,num_trees)
-    coarse_model = OctreeDistributedDiscreteModel(parts,cmodel,num_refs_coarse)
+    level_parts  = GridapSolvers.generate_level_parts(parts,num_parts_x_level)
+
+    coarse_model = OctreeDistributedDiscreteModel(level_parts[num_levels],cmodel,num_refs_coarse)
     mh           = ModelHierarchy(parts,coarse_model,num_parts_x_level)
 
     # FE Spaces
+    println(" > Testing FESpaces")
     order  = 1
     reffe  = ReferenceFE(lagrangian,Float64,order)
     tests  = TestFESpace(mh,reffe,dirichlet_tags="boundary")
     trials = TrialFESpace(u,tests)
 
     # Transfer ops
+    println(" > Testing operators")
     qdegree = 2
-    R = RestrictionOperator(1,trials,qdegree)
-    P = ProlongationOperator(1,trials,qdegree)
-    @test isa(R,DistributedGridTransferOperator{Val{:restriction},Val{true}})
-    @test isa(P,DistributedGridTransferOperator{Val{:prolongation},Val{true}})
+    for lev in 1:num_levels-1
+      println("   > Level num ", lev)
+      parts = get_level_parts(mh,lev)
+      if GridapP4est.i_am_in(parts)
+        R = RestrictionOperator(lev,trials,qdegree)
+        P = ProlongationOperator(lev,trials,qdegree)
+        @test isa(R,DistributedGridTransferOperator{Val{:restriction},Val{true}})
+        @test isa(P,DistributedGridTransferOperator{Val{:prolongation},Val{true}})
+      end
+    end
 
-    R = RestrictionOperator(2,trials,qdegree)
-    P = ProlongationOperator(2,trials,qdegree)
-    @test isa(R,DistributedGridTransferOperator{Val{:restriction},Val{false}})
-    @test isa(P,DistributedGridTransferOperator{Val{:prolongation},Val{false}})
+    println(" > Testing setup_transfer_operators")
+    ops = setup_transfer_operators(trials,qdegree)
 
-    #ops = setup_transfer_operators(trials,qdegree)
-
-    model_hierarchy_free!(mh)
+    #model_hierarchy_free!(mh)
   end
-
 
   num_parts_x_level = [4,2,2]   # Procs in each refinement level
   num_trees         = (1,1)     # Number of initial P4est trees

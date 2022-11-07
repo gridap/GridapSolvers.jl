@@ -22,7 +22,6 @@ ProlongationOperator(lev::Int,sh::FESpaceHierarchy,qdegree::Int) = DistributedGr
 
 function DistributedGridTransferOperator(lev::Int,sh::FESpaceHierarchy,qdegree::Int,op_type::Symbol)
   mh = sh.mh
-  cparts = get_level_parts(mh,lev+1)
   @check lev < num_levels(mh)
   @check op_type ∈ [:restriction, :prolongation]
 
@@ -30,6 +29,7 @@ function DistributedGridTransferOperator(lev::Int,sh::FESpaceHierarchy,qdegree::
   Ωh = get_triangulation(Uh,get_model_before_redist(mh,lev))
   
   # Refinement
+  cparts = get_level_parts(mh,lev+1)
   if GridapP4est.i_am_in(cparts)
     UH = get_fe_space(sh,lev+1)
     ΩH = get_triangulation(UH,get_model(mh,lev+1))
@@ -60,11 +60,15 @@ function DistributedGridTransferOperator(lev::Int,sh::FESpaceHierarchy,qdegree::
 end
 
 function setup_transfer_operators(sh::FESpaceHierarchy, qdegree::Int)
+  mh = sh.mh
   restrictions   = Vector{DistributedGridTransferOperator}(undef,num_levels(sh)-1)
   interpolations = Vector{DistributedGridTransferOperator}(undef,num_levels(sh)-1)
   for lev in 1:num_levels(sh)-1
-    restrictions[lev]   = RestrictionOperator(lev,sh,qdegree)
-    interpolations[lev] = InterpolationOperator(lev,sh,qdegree)
+    parts = get_level_parts(mh,lev)
+    if GridapP4est.i_am_in(parts)
+      restrictions[lev]   = RestrictionOperator(lev,sh,qdegree)
+      interpolations[lev] = ProlongationOperator(lev,sh,qdegree)
+    end
   end
   return restrictions, interpolations
 end

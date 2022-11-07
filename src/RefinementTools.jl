@@ -18,9 +18,8 @@ function DistributedRefinedDiscreteModel(model::GridapDistributed.AbstractDistri
                                          glue::AbstractPData{<:RefinementGlue})
   if !(model.parts === parent.parts)
     parent_models = map_parts(local_views(model)) do m
-      parent_models = local_views(parent)
-      if i_am_in(model.parts)
-        parent_models.part
+      if i_am_in(parent.parts)
+        parent.dmodel.models.part
       else
         nothing
       end
