@@ -7,7 +7,7 @@ module GridapSolvers
   using Gridap.Algebra
   using Gridap.Geometry
   using Gridap.FESpaces
-  using Gridap.Refinement
+  using Gridap.Adaptivity
   using PartitionedArrays
   using GridapDistributed
   using GridapP4est
@@ -23,16 +23,17 @@ module GridapSolvers
   export FESpaceHierarchy
   export get_fe_space, get_fe_space_before_redist
 
-  export DistributedGridTransferOperator
-  export RestrictionOperator, ProlongationOperator
-  export setup_transfer_operators
+  #export DistributedGridTransferOperator
+  #export RestrictionOperator, ProlongationOperator
+  #export setup_transfer_operators
 
   include("PartitionedArraysExtensions.jl")
+  include("GridapDistributedExtensions.jl")
   include("RefinementTools.jl")
   include("RedistributeTools.jl")
   include("ModelHierarchies.jl")
   include("FESpaceHierarchies.jl")
-  include("DistributedGridTransferOperators.jl")
+  #include("DistributedGridTransferOperators.jl")
 
 
 end

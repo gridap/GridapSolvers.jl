@@ -64,7 +64,7 @@ module RedistributeToolsTests
     n = sum(∫(uhold)*dΩ_old)
     @test o ≈ n
 
-    model_hierarchy_free!(mh)
+    #model_hierarchy_free!(mh)
   end
 
 

@@ -1,4 +1,5 @@
 module InterGridTransferOperatorsTests
+  """
   using MPI
   using PartitionedArrays
   using Gridap
@@ -25,6 +26,8 @@ module InterGridTransferOperatorsTests
 
     coarse_model = OctreeDistributedDiscreteModel(level_parts[num_levels],cmodel,num_refs_coarse)
     mh           = ModelHierarchy(parts,coarse_model,num_parts_x_level)
+
+    println(typeof(level_parts[1]))
 
     # FE Spaces
     println(" > Testing FESpaces")
@@ -60,4 +63,5 @@ module InterGridTransferOperatorsTests
   ranks = num_parts_x_level[1]
   prun(run,mpi,ranks,num_parts_x_level,num_trees,num_refs_coarse)
   MPI.Finalize()
+  """
 end
