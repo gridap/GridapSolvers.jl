@@ -25,7 +25,7 @@ function i_am_in(comm::MPI.Comm)
   PartitionedArrays.get_part_id(comm) >=0
 end
 
-function i_am_in(parts)
+function i_am_in(parts::MPIData)
   i_am_in(parts.comm)
 end
 

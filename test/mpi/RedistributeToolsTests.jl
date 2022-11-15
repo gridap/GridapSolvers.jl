@@ -7,8 +7,6 @@ module RedistributeToolsTests
   using GridapSolvers
   using Test
 
-  u(x) = x[1] + x[2]
-
   function model_hierarchy_free!(mh::ModelHierarchy)
     for lev in 1:num_levels(mh)
       model = get_model(mh,lev)
@@ -20,11 +18,15 @@ module RedistributeToolsTests
   function run(parts,num_parts_x_level,num_trees,num_refs_coarse)
     domain       = (0,1,0,1)
     cmodel       = CartesianDiscreteModel(domain,num_trees)
-    coarse_model = OctreeDistributedDiscreteModel(parts,cmodel,num_refs_coarse)
-    mh           = ModelHierarchy(parts,coarse_model,num_parts_x_level)
+    
+    num_levels   = length(num_parts_x_level)
+    level_parts  = GridapSolvers.generate_level_parts(parts,num_parts_x_level)
+    coarse_model = OctreeDistributedDiscreteModel(level_parts[num_levels],cmodel,num_refs_coarse)
+    mh = ModelHierarchy(coarse_model,level_parts)
 
     # FE Spaces
     order = 1
+    u(x)  = x[1] + x[2]
     reffe = ReferenceFE(lagrangian,Float64,order)
     glue  = mh.levels[1].red_glue
 
@@ -73,6 +75,6 @@ module RedistributeToolsTests
   num_refs_coarse   = 2         # Number of initial refinements
   
   ranks = num_parts_x_level[1]
-  prun(run,mpi,ranks,num_parts_x_level,num_trees,num_refs_coarse)
-  MPI.Finalize()
+  #prun(run,mpi,ranks,num_parts_x_level,num_trees,num_refs_coarse)
+  #MPI.Finalize()
 end

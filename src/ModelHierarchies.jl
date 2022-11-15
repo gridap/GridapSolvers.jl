@@ -45,12 +45,11 @@ has_redistribution(a::ModelHierarchyLevel{A,B,C,Nothing}) where {A,B,C} = false
                          each level into. We need `num_procs_x_level[end]` to be equal to 
                          the number of parts of `model`.
 """
-function ModelHierarchy(parts,coarsest_model::GridapDistributed.AbstractDistributedDiscreteModel,num_procs_x_level::Vector{Int}; num_refs_x_level=nothing)
+function ModelHierarchy(coarsest_model::GridapDistributed.AbstractDistributedDiscreteModel,level_parts; num_refs_x_level=nothing)
   # TODO: Implement support for num_refs_x_level? (future work)
-  num_levels  = length(num_procs_x_level)
-  level_parts = generate_level_parts(parts,num_procs_x_level)
-
-  meshes = Vector{ModelHierarchyLevel}(undef,num_levels)
+  num_levels         = length(level_parts)
+  num_procs_x_level  = map(num_parts,level_parts)
+  meshes             = Vector{ModelHierarchyLevel}(undef,num_levels)
   meshes[num_levels] = ModelHierarchyLevel(num_levels,coarsest_model,nothing,nothing,nothing)
 
   for i = num_levels-1:-1:1

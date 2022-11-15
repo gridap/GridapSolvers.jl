@@ -23,7 +23,7 @@ function main(parts,num_parts_x_level,num_trees,num_refs_coarse)
   num_levels   = length(num_parts_x_level)
   level_parts  = GridapSolvers.generate_level_parts(parts,num_parts_x_level)
   coarse_model = OctreeDistributedDiscreteModel(level_parts[num_levels],cmodel,num_refs_coarse)
-  mh = ModelHierarchy(parts,coarse_model,num_parts_x_level)
+  mh = ModelHierarchy(coarse_model,level_parts)
 
   sol(x) = x[1] + x[2]
   reffe  = ReferenceFE(lagrangian,Float64,1)
@@ -38,7 +38,7 @@ num_trees = (1,1)             # Number of initial P4est trees
 num_refs_coarse = 2           # Number of initial refinements
 
 ranks = num_parts_x_level[1]
-prun(main,mpi,ranks,num_parts_x_level,num_trees,num_refs_coarse)
-MPI.Finalize()
+#prun(main,mpi,ranks,num_parts_x_level,num_trees,num_refs_coarse)
+#MPI.Finalize()
 
 end
