@@ -14,6 +14,8 @@ module GridapSolvers
 
   import GridapDistributed: local_views
 
+  export change_parts, void
+
   export DistributedRefinedDiscreteModel
 
   export ModelHierarchy
@@ -29,6 +31,7 @@ module GridapSolvers
 
   include("PartitionedArraysExtensions.jl")
   include("GridapDistributedExtensions.jl")
+  include("GridapFixes.jl")
   include("RefinementTools.jl")
   include("RedistributeTools.jl")
   include("ModelHierarchies.jl")

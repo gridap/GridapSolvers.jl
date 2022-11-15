@@ -128,9 +128,9 @@ version = "1.1.0"
 
 [[deps.DiffRules]]
 deps = ["IrrationalConstants", "LogExpFunctions", "NaNMath", "Random", "SpecialFunctions"]
-git-tree-sha1 = "9a95659c283c9018ea99e017aa9e13b7e89fadd2"
+git-tree-sha1 = "c5b6685d53f933c11404a3ae9822afe30d522494"
 uuid = "b552c78f-8df3-52c6-915a-8e097449b14b"
-version = "1.12.1"
+version = "1.12.2"
 
 [[deps.Distances]]
 deps = ["LinearAlgebra", "SparseArrays", "Statistics", "StatsAPI"]
@@ -194,9 +194,9 @@ version = "2.16.0"
 
 [[deps.ForwardDiff]]
 deps = ["CommonSubexpressions", "DiffResults", "DiffRules", "LinearAlgebra", "LogExpFunctions", "NaNMath", "Preferences", "Printf", "Random", "SpecialFunctions", "StaticArrays"]
-git-tree-sha1 = "187198a4ed8ccd7b5d99c41b69c679269ea2b2d4"
+git-tree-sha1 = "10fa12fe96e4d76acfa738f4df2126589a67374f"
 uuid = "f6369f11-7733-5829-9624-2563aa707210"
-version = "0.10.32"
+version = "0.10.33"
 
 [[deps.Future]]
 deps = ["Random"]
@@ -204,7 +204,7 @@ uuid = "9fa8497b-333b-5362-9e8d-4d0656e87820"
 
 [[deps.Gridap]]
 deps = ["AbstractTrees", "BSON", "BlockArrays", "Combinatorics", "DocStringExtensions", "FastGaussQuadrature", "FileIO", "FillArrays", "ForwardDiff", "JLD2", "JSON", "LineSearches", "LinearAlgebra", "NLsolve", "NearestNeighbors", "PolynomialBases", "QuadGK", "Random", "SparseArrays", "SparseMatricesCSR", "StaticArrays", "Test", "WriteVTK"]
-git-tree-sha1 = "0633606f20ab18df9832a7bfed901cb0550ad212"
+git-tree-sha1 = "597eb564aafeb479d0c197d206857da867b248a7"
 repo-rev = "refined-discrete-models"
 repo-url = "https://github.com/gridap/Gridap.jl.git"
 uuid = "56d4f2e9-7ea1-5844-9cf6-b9c51ca7ce8e"
@@ -212,7 +212,7 @@ version = "0.17.14"
 
 [[deps.GridapDistributed]]
 deps = ["FillArrays", "Gridap", "LinearAlgebra", "MPI", "PartitionedArrays", "SparseArrays", "SparseMatricesCSR", "WriteVTK"]
-git-tree-sha1 = "2950eceffd1b4a35946e92489e3827aa077561ac"
+git-tree-sha1 = "c3ab1740aecfba01d6f68014486285b5f3155821"
 repo-rev = "p4est-migration"
 repo-url = "https://github.com/gridap/GridapDistributed.jl.git"
 uuid = "f9701e48-63b3-45aa-9a63-9bc6c271f355"
@@ -255,9 +255,9 @@ version = "0.9.2"
 
 [[deps.JLD2]]
 deps = ["FileIO", "MacroTools", "Mmap", "OrderedCollections", "Pkg", "Printf", "Reexport", "TranscodingStreams", "UUIDs"]
-git-tree-sha1 = "acb4be8227e1f3ff890d564d55dcde9cf92e4337"
+git-tree-sha1 = "18dd357553912b6adc23b5f721e4be19930140c6"
 uuid = "033835bb-8acc-5ee8-8aae-3f567f8a3819"
-version = "0.4.26"
+version = "0.4.28"
 
 [[deps.JLLWrappers]]
 deps = ["Preferences"]
