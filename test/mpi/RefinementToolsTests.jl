@@ -6,6 +6,7 @@ module RefinementToolsTests
   using GridapP4est
   using GridapSolvers
   using Test
+  using IterativeSolvers
 
   function run(parts,num_parts_x_level,num_trees,num_refs_coarse)
     domain       = (0,1,0,1)
@@ -29,6 +30,7 @@ module RefinementToolsTests
       cparts = get_level_parts(mh,lev+1)
 
       if GridapP4est.i_am_in(fparts)
+        Vh  = get_fe_space_before_redist(tests,lev)
         Uh  = get_fe_space_before_redist(trials,lev)
         Ωh  = get_triangulation(Uh,get_model_before_redist(mh,lev))
         dΩh = Measure(Ωh,quad_order)
@@ -36,6 +38,7 @@ module RefinementToolsTests
         vh  = get_fe_basis(Uh)
 
         if GridapP4est.i_am_in(cparts)
+          VH  = get_fe_space(tests,lev+1)
           UH  = get_fe_space(trials,lev+1)
           ΩH  = get_triangulation(UH,get_model(mh,lev+1))
           dΩH = Measure(ΩH,quad_order)
@@ -47,24 +50,45 @@ module RefinementToolsTests
           vH = nothing
         end
 
-        uHh = change_parts(GridapDistributed.DistributedCellField,uH,fparts)
-        vHh = change_parts(GridapDistributed.DistributedCellField,vH,fparts)
-
-        # Coarse FEFunction -> Fine FEFunction, by interpolation
-        uh_f_inter = interpolate(uHh,Uh)
+        uH_Ph = change_parts(GridapDistributed.DistributedCellField,uH,fparts)
+        vH_Ph = change_parts(GridapDistributed.DistributedCellField,vH,fparts)
 
         # Coarse FEFunction -> Fine FEFunction, by projection
-        #af(u,v)  = ∫(v⋅u)*dΩ_f
-        #lf(v)    = ∫(v⋅uh_c)*dΩ_f
-        #opf      = AffineFEOperator(af,lf,U_f,V_f)
+        ah(u,v) = ∫(v⋅u)*dΩh
+        lh(v)   = ∫(v⋅uH_Ph)*dΩh
+        Ah = assemble_matrix(ah,Uh,Vh)
+        bh = assemble_vector(lh,Vh)
 
+        xh = PVector(0.0,Ah.cols)
+        IterativeSolvers.cg!(xh,Ah,bh;verbose=i_am_main(parts),reltol=1.0e-06)
+        uhH = FEFunction(Uh,xh)
 
-        GridapP4est.i_am_main(parts) && println("FFFFF")
-        
+        eh = sum(∫(uh-uhH)*dΩh)
+        i_am_main(parts) && println("Error H2h: ", eh)
+
+        # Fine FEFunction -> Coarse FEFunction, by projection
+        if GridapP4est.i_am_in(cparts)
+          uh_PH = change_parts(GridapDistributed.DistributedCellField,uh,cparts)
+
+          aH(u,v) = ∫(v⋅u)*dΩH
+          lH(v)   = ∫(v⋅uh_PH)*dΩhH
+          AH = assemble_matrix(aH,UH,VH)
+          bH = assemble_vector(lH,VH)
+
+          xH = PVector(0.0,AH.cols)
+          IterativeSolvers.cg!(xH,AH,bH;verbose=i_am_main(parts),reltol=1.0e-06)
+          uHh = FEFunction(UH,xH)
+
+          eh = sum(∫(uH-uHh)*dΩH)
+          i_am_main(parts) && println("Error h2H: ", eh)
+        else
+          uHh = nothing
+        end
+        uHh_Ph = change_parts(GridapDistributed.DistributedCellField,uHh,fparts) 
+
       end
     end
 
-    #model_hierarchy_free!(mh)
   end
 
 

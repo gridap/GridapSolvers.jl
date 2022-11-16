@@ -207,7 +207,11 @@ function Gridap.Arrays.evaluate!(cache,s::Gridap.CellData.CellDof,f::CellField)
   trian_f = get_triangulation(f)
   trian_s = get_triangulation(s)
 
-  (num_cells(trian_s)==num_cells(trian_f)==0) && (return Gridap.CellData.get_data(f))
+  """if num_cells(trian_s)==num_cells(trian_f)==0
+    dof_data = Gridap.CellData.get_data(s)
+    item = Gridap.Arrays.testitem(dof_data)
+    return Fill(item,0)
+  end"""
 
   if trian_f !== trian_s
     @unreachable """\n
@@ -216,4 +220,43 @@ function Gridap.Arrays.evaluate!(cache,s::Gridap.CellData.CellDof,f::CellField)
   end
   b = change_domain(f,s.domain_style)
   lazy_map(evaluate,Gridap.CellData.get_data(s),Gridap.CellData.get_data(b))
+end
+
+
+function Gridap.CellData.integrate(f::Gridap.CellData.CellField,quad::Gridap.CellData.CellQuadrature) where DDS
+  trian_f = get_triangulation(f)
+  trian_x = get_triangulation(quad)
+
+  #if num_cells(trian_f)==num_cells(trian_x)==0
+  #  return [Float64[]]
+  #end
+
+  msg = """\n
+    Your are trying to integrate a CellField using a CellQuadrature defined on incompatible
+    triangulations. Verify that either the two objects are defined in the same triangulation
+    or that the triangulaiton of the CellField is the background triangulation of the CellQuadrature.
+    """
+  @check is_change_possible(trian_f,trian_x) msg
+
+  b = change_domain(f,quad.trian,quad.data_domain_style)
+  x = get_cell_points(quad)
+  bx = b(x)
+  if quad.data_domain_style == PhysicalDomain() &&
+            quad.integration_domain_style == PhysicalDomain()
+    lazy_map(Gridap.Fields.IntegrationMap(),bx,quad.cell_weight)
+  elseif quad.data_domain_style == ReferenceDomain() &&
+            quad.integration_domain_style == PhysicalDomain()
+    cell_map = get_cell_map(quad.trian)
+    cell_Jt = lazy_map(∇,cell_map)
+    cell_Jtx = lazy_map(evaluate,cell_Jt,quad.cell_point)
+    lazy_map(Gridap.Fields.IntegrationMap(),bx,quad.cell_weight,cell_Jtx)
+  elseif quad.data_domain_style == ReferenceDomain() &&
+            quad.integration_domain_style == ReferenceDomain()
+    cell_map = Fill(Gridap.Fields.GenericField(identity),length(bx))
+    cell_Jt = lazy_map(∇,cell_map)
+    cell_Jtx = lazy_map(evaluate,cell_Jt,quad.cell_point)
+    lazy_map(Gridap.Fields.IntegrationMap(),bx,quad.cell_weight,cell_Jtx)
+  else
+    @notimplemented
+  end
 end

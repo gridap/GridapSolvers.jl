@@ -2,6 +2,7 @@ module GridapSolvers
 
   using MPI
   using LinearAlgebra
+  using FillArrays
   using Gridap
   using Gridap.Helpers
   using Gridap.Algebra
