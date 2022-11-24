@@ -139,10 +139,15 @@ function void(::Type{<:UnstructuredDiscreteModel{Dc,Dp}}) where {Dc,Dp}
 end
 
 function void(::Type{<:AdaptivityGlue})
-  f2c_faces_map          = [Int32[],Int32[],Int32[]]
-  fcell_to_child_id      = Int32[]
-  f2c_reference_cell_map = Int32[]
-  return AdaptivityGlue(f2c_faces_map,fcell_to_child_id,f2c_reference_cell_map)
+  f2c_faces_map      = [Int32[],Int32[],Int32[]]
+  fcell_to_child_id  = Int32[]
+  rrules             = Fill(void(RefinementRule),0)
+  return AdaptivityGlue(f2c_faces_map,fcell_to_child_id,rrules)
+end
+
+function void(::Type{<:RefinementRule})
+  reffe = Gridap.ReferenceFEs.LagrangianRefFE(Float64,QUAD,1)
+  return RefinementRule(reffe,1)
 end
 
 function void(::Type{<:BodyFittedTriangulation{Dc,Dp}}) where {Dc,Dp}

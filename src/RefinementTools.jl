@@ -57,7 +57,7 @@ end
 
 # ChangeDomain
 
-function Gridap.Adaptivity.change_domain_c2f(c_cell_field,
+function Gridap.Adaptivity.change_domain_o2n(c_cell_field,
               ftrian::GridapDistributed.DistributedTriangulation{Dc,Dp},
               glue::AbstractPData{Gridap.Adaptivity.AdaptivityGlue}) where {Dc,Dp}
 
@@ -73,6 +73,6 @@ function Gridap.Adaptivity.change_domain_c2f(c_cell_field,
   end
   c_cell_field_fine = GridapDistributed.DistributedCellField(fields)
 
-  dfield = map_parts(Gridap.Adaptivity.change_domain_c2f,local_views(c_cell_field_fine),local_views(ftrian),glue)
+  dfield = map_parts(Gridap.Adaptivity.change_domain_o2n,local_views(c_cell_field_fine),local_views(ftrian),glue)
   return GridapDistributed.DistributedCellField(dfield)
 end
