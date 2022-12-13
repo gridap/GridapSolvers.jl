@@ -55,12 +55,12 @@ function Gridap.FESpaces.TestFESpace(
   FESpaceHierarchyLevel(mh.level,Vh,Vh_red)
 end
 
-function Gridap.FESpaces.TrialFESpace(u,a::FESpaceHierarchyLevel{A,Nothing}) where {A}
+function Gridap.FESpaces.TrialFESpace(a::FESpaceHierarchyLevel{A,Nothing},u) where {A}
   Uh = TrialFESpace(a.fe_space,u)
   FESpaceHierarchyLevel(a.level,Uh,nothing)
 end
 
-function Gridap.FESpaces.TrialFESpace(u,a::FESpaceHierarchyLevel{A,B}) where {A,B}
+function Gridap.FESpaces.TrialFESpace(a::FESpaceHierarchyLevel{A,B},u) where {A,B}
   Uh     = TrialFESpace(a.fe_space,u)
   Uh_red = TrialFESpace(a.fe_space_red,u)
   FESpaceHierarchyLevel(a.level,Uh,Uh_red)
@@ -78,12 +78,12 @@ function Gridap.FESpaces.TestFESpace(mh::ModelHierarchy,args...;kwargs...) where
   FESpaceHierarchy(mh,test_spaces)
 end
 
-function Gridap.FESpaces.TrialFESpace(u,a::FESpaceHierarchy)
+function Gridap.FESpaces.TrialFESpace(a::FESpaceHierarchy,u)
   trial_spaces = Vector{FESpaceHierarchyLevel}(undef,num_levels(a.mh))
   for i = 1:num_levels(a.mh)
     parts = get_level_parts(a.mh,i)
     if (GridapP4est.i_am_in(parts))
-       Uh = TrialFESpace(u,a[i])
+       Uh = TrialFESpace(a[i],u)
        trial_spaces[i] = Uh
     end
   end
@@ -100,4 +100,25 @@ function Gridap.FESpaces.TrialFESpace(a::FESpaceHierarchy)
     end
   end
   FESpaceHierarchy(a.mh,trial_spaces)
+end
+
+function compute_hierarchy_matrices(trials::FESpaceHierarchy,a::Function,qdegree::Int)
+  nlevs = num_levels(trials)
+  mh    = trials.mh
+
+  mats = Vector{PSparseMatrix}(undef,nlevs)
+  for lev in 1:nlevs
+    parts = get_level_parts(mh,lev)
+    if GridapP4est.i_am_in(parts)
+      model = get_model(mh,lev)
+      U = get_fe_space(trials,lev)
+      V = get_test_space(U)
+      Ω = Triangulation(model)
+      dΩ = Measure(Ω,qdegree)
+      ai(u,v) = a(u,v,dΩ)
+      A = assemble_matrix(ai,U,V)
+      mats[lev] = A
+    end
+  end
+  return mats
 end

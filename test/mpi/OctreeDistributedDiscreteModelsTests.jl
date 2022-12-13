@@ -41,6 +41,6 @@ module OctreeDistributedDiscreteModelsTests
     assemble_matrix(a,Uh,Vh)
   end
 
-  #prun(run,mpi,4,(2,2),[4,2])
-  #MPI.Finalize()
+  prun(run,mpi,4,(2,2),[4,2])
+  MPI.Finalize()
 end # module

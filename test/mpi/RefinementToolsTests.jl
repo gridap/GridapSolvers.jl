@@ -22,7 +22,7 @@ module RefinementToolsTests
     sol(x) = x[1] + x[2]
     reffe  = ReferenceFE(lagrangian,Float64,order)
     tests  = TestFESpace(mh,reffe,conformity=:H1,dirichlet_tags="boundary")
-    trials = TrialFESpace(sol,tests)
+    trials = TrialFESpace(tests,sol)
 
     quad_order = 2*order+1
     for lev in 1:nlevs-1
@@ -81,6 +81,6 @@ module RefinementToolsTests
   num_refs_coarse   = 2         # Number of initial refinements
   
   ranks = num_parts_x_level[1]
-  #prun(run,mpi,ranks,num_parts_x_level,num_trees,num_refs_coarse)
-  #MPI.Finalize()
+  prun(run,mpi,ranks,num_parts_x_level,num_trees,num_refs_coarse)
+  MPI.Finalize()
 end

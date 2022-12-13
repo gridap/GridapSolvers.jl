@@ -3,6 +3,7 @@ module GridapSolvers
   using MPI
   using LinearAlgebra
   using FillArrays
+  using IterativeSolvers
   using Gridap
   using Gridap.Helpers
   using Gridap.Algebra
@@ -13,6 +14,7 @@ module GridapSolvers
   using GridapDistributed
   using GridapP4est
 
+  import LinearAlgebra: mul!
   import GridapDistributed: local_views
 
   export change_parts, void
@@ -25,19 +27,21 @@ module GridapSolvers
 
   export FESpaceHierarchy
   export get_fe_space, get_fe_space_before_redist
+  export compute_hierarchy_matrices
 
-  #export DistributedGridTransferOperator
-  #export RestrictionOperator, ProlongationOperator
-  #export setup_transfer_operators
+  export DistributedGridTransferOperator
+  export RestrictionOperator, ProlongationOperator
+  export setup_transfer_operators
+  export mul!
 
   include("PartitionedArraysExtensions.jl")
   include("GridapDistributedExtensions.jl")
-  include("GridapFixes.jl")
+  #include("GridapFixes.jl")
   include("RefinementTools.jl")
   include("RedistributeTools.jl")
   include("ModelHierarchies.jl")
   include("FESpaceHierarchies.jl")
-  #include("DistributedGridTransferOperators.jl")
+  include("DistributedGridTransferOperators.jl")
 
 
 end

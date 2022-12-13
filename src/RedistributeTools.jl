@@ -148,24 +148,25 @@ function redistribute_cell_dofs(cell_dof_values_old,
   return cell_dof_values_new
 end
 
-function redistribute_free_values!(fv_new::PVector,
-                                  Uh_new::GridapDistributed.DistributedSingleFieldFESpace,
-                                  fv_old::PVector,
-                                  Uh_old::GridapDistributed.DistributedSingleFieldFESpace,
+function redistribute_free_values!(fv_new::Union{PVector,Nothing},
+                                  Uh_new::Union{GridapDistributed.DistributedSingleFieldFESpace,VoidDistributedFESpace},
+                                  fv_old::Union{PVector,Nothing},
+                                  dv_old::Union{AbstractPData,Nothing},
+                                  Uh_old::Union{GridapDistributed.DistributedSingleFieldFESpace,VoidDistributedFESpace},
                                   model_new,
                                   glue::GridapDistributed.RedistributeGlue;
                                   reverse=false)
 
-  uh_old = FEFunction(Uh_old,fv_old)
-  cell_dof_values_old = map_parts(get_cell_dof_values,local_views(uh_old))
-  cell_dof_ids_new    = map_parts(get_cell_dof_ids, local_views(Uh_new))
+  cell_dof_values_old = !isa(fv_old,Nothing) ? map_parts(scatter_free_and_dirichlet_values,local_views(Uh_old),local_views(fv_old),dv_old) : nothing
+  cell_dof_ids_new    = !isa(fv_new,Nothing) ? map_parts(get_cell_dof_ids, local_views(Uh_new)) : nothing
   cell_dof_values_new = redistribute_cell_dofs(cell_dof_values_old,cell_dof_ids_new,model_new,glue;reverse=reverse)
 
-  # Assemble the new FEFunction
-  Gridap.FESpaces.gather_free_values!(fv_new,local_views(Uh_new),cell_dof_values_new)
+  # Gather the new free dofs
+  if !isa(fv_new,Nothing)
+    Gridap.FESpaces.gather_free_values!(fv_new,Uh_new,cell_dof_values_new)
+  end
   return fv_new
 end
-
 
 function redistribute_fe_function(uh_old::Union{GridapDistributed.DistributedSingleFieldFEFunction,Nothing},
                                   Uh_new::Union{GridapDistributed.DistributedSingleFieldFESpace,VoidDistributedFESpace},
