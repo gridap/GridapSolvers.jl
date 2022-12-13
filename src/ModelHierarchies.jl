@@ -57,8 +57,8 @@ function ModelHierarchy(coarsest_model::GridapDistributed.AbstractDistributedDis
     if (num_procs_x_level[i] != num_procs_x_level[i+1])
       # meshes[i+1].model is distributed among P processors
       # model_ref is distributed among Q processors, with P!=Q
-      model_ref,ref_glue = Gridap.Adaptivity.refine(modelH,level_parts[i])
-      model_red,red_glue = redistribute(model_ref)
+      model_ref,ref_glue = Gridap.Adaptivity.refine(modelH)
+      model_red,red_glue = redistribute(model_ref,level_parts[i])
     else
       model_ref,ref_glue = Gridap.Adaptivity.refine(modelH)
       model_red,red_glue = nothing,nothing
@@ -77,6 +77,7 @@ function convert_to_refined_models(mh::ModelHierarchy)
     model       = get_model_before_redist(mh,lev)
     parent      = get_model(mh,lev+1)
     ref_glue    = change_parts(mh.levels[lev].ref_glue,get_parts(model);default=void(AdaptivityGlue))
+    #ref_glue    = mh.levels[lev].ref_glue
     model_ref   = DistributedAdaptedDiscreteModel(model,parent,ref_glue)
 
     levels[lev] = ModelHierarchyLevel(lev,model_ref,ref_glue,mh.levels[lev].model_red,mh.levels[lev].red_glue)

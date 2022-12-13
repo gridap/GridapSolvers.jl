@@ -101,13 +101,15 @@ end
 
 
 function redistribute_cell_dofs(cell_dof_values_old,
-                                Uh_new::GridapDistributed.DistributedSingleFieldFESpace,
+                                cell_dof_ids_new,
                                 model_new,
                                 glue::GridapDistributed.RedistributeGlue;
                                 reverse=false)
 
   lids_rcv, lids_snd, parts_rcv, parts_snd, new2old = get_glue_components(glue,Val(reverse))
-  cell_dof_ids_new    = map_parts(get_cell_dof_ids, Uh_new.spaces)
+
+  cell_dof_values_old = change_parts(cell_dof_values_old,get_parts(glue);default=[])
+  cell_dof_ids_new    = change_parts(cell_dof_ids_new,get_parts(glue);default=[[]])
 
   num_dofs_x_cell_snd = num_dofs_x_cell(cell_dof_values_old, lids_snd)
   num_dofs_x_cell_rcv = num_dofs_x_cell(cell_dof_ids_new, lids_rcv)
@@ -135,9 +137,13 @@ function redistribute_cell_dofs(cell_dof_values_old,
   map_parts(wait,tout)
   unpack_rcv_data!(cell_dof_values_new,rcv_data,lids_rcv)
 
-  # Why are we exchanging something that has already been exchanged?
-  fgids = get_cell_gids(model_new)
-  exchange!(cell_dof_values_new,fgids.exchanger) 
+  # Now that every part knows it's new owned dofs, exchange ghosts
+  new_parts = get_parts(model_new)
+  cell_dof_values_new = change_parts(cell_dof_values_new,new_parts)
+  if GridapP4est.i_am_in(new_parts)
+    fgids = get_cell_gids(model_new)
+    exchange!(cell_dof_values_new,fgids.exchanger)
+  end
 
   return cell_dof_values_new
 end
@@ -151,29 +157,35 @@ function redistribute_free_values!(fv_new::PVector,
                                   reverse=false)
 
   uh_old = FEFunction(Uh_old,fv_old)
-  cell_dof_values_old = map_parts(get_cell_dof_values,uh_old.fields)
-  cell_dof_values_new = redistribute_cell_dofs(cell_dof_values_old,Uh_new,model_new,glue;reverse=reverse)
+  cell_dof_values_old = map_parts(get_cell_dof_values,local_views(uh_old))
+  cell_dof_ids_new    = map_parts(get_cell_dof_ids, local_views(Uh_new))
+  cell_dof_values_new = redistribute_cell_dofs(cell_dof_values_old,cell_dof_ids_new,model_new,glue;reverse=reverse)
 
   # Assemble the new FEFunction
-  Gridap.FESpaces.gather_free_values!(fv_new, Uh_new.spaces,cell_dof_values_new)
+  Gridap.FESpaces.gather_free_values!(fv_new,local_views(Uh_new),cell_dof_values_new)
   return fv_new
 end
 
 
-function redistribute_fe_function(uh_old::GridapDistributed.DistributedSingleFieldFEFunction,
-                                  Uh_new::GridapDistributed.DistributedSingleFieldFESpace,
+function redistribute_fe_function(uh_old::Union{GridapDistributed.DistributedSingleFieldFEFunction,Nothing},
+                                  Uh_new::Union{GridapDistributed.DistributedSingleFieldFESpace,VoidDistributedFESpace},
                                   model_new,
                                   glue::GridapDistributed.RedistributeGlue;
                                   reverse=false)
 
-  cell_dof_values_old = map_parts(get_cell_dof_values,uh_old.fields)
-  cell_dof_values_new = redistribute_cell_dofs(cell_dof_values_old,Uh_new,model_new,glue;reverse=reverse)
+  cell_dof_values_old = !isa(uh_old,Nothing) ? map_parts(get_cell_dof_values,local_views(uh_old)) : nothing
+  cell_dof_ids_new    = !isa(Uh_new,VoidDistributedFESpace) ? map_parts(get_cell_dof_ids,local_views(Uh_new)) : nothing
+  cell_dof_values_new = redistribute_cell_dofs(cell_dof_values_old,cell_dof_ids_new,model_new,glue;reverse=reverse)
 
   # Assemble the new FEFunction
-  free_values, dirichlet_values = Gridap.FESpaces.gather_free_and_dirichlet_values(Uh_new,cell_dof_values_new)
-  free_values = PVector(free_values,Uh_new.gids)
-  uh_new = FEFunction(Uh_new,free_values,dirichlet_values)
-  return uh_new
+  if GridapP4est.i_am_in(get_parts(Uh_new))
+    free_values, dirichlet_values = Gridap.FESpaces.gather_free_and_dirichlet_values(Uh_new,cell_dof_values_new)
+    free_values = PVector(free_values,Uh_new.gids)
+    uh_new = FEFunction(Uh_new,free_values,dirichlet_values)
+    return uh_new
+  else
+    return nothing
+  end
 end
 
 

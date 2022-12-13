@@ -18,10 +18,10 @@ module RefinementToolsTests
     mh = ModelHierarchy(coarse_model,level_parts)
 
     # FE Spaces
-    order  = 4
-    sol(x) = x[1]*(x[1]-1.0)*x[2]*(x[2]-1.0)       # This high-order function is needed to have sol(x) = 0 for x ∈ Γ
-    reffe  = ReferenceFE(lagrangian,Float64,order) # which is needed since we cannot impose Dirichlet BCs in the empty 
-    tests  = TestFESpace(mh,reffe,conformity=:H1)  # discrete models. Hopefuly fixed soon...
+    order  = 1
+    sol(x) = x[1] + x[2]
+    reffe  = ReferenceFE(lagrangian,Float64,order)
+    tests  = TestFESpace(mh,reffe,conformity=:H1,dirichlet_tags="boundary")
     trials = TrialFESpace(sol,tests)
 
     quad_order = 2*order+1
@@ -29,32 +29,23 @@ module RefinementToolsTests
       fparts = get_level_parts(mh,lev)
       cparts = get_level_parts(mh,lev+1)
 
-      if GridapP4est.i_am_in(fparts)
+      if GridapP4est.i_am_in(cparts)
         Vh  = get_fe_space_before_redist(tests,lev)
         Uh  = get_fe_space_before_redist(trials,lev)
         Ωh  = get_triangulation(Uh,get_model_before_redist(mh,lev))
         dΩh = Measure(Ωh,quad_order)
         uh  = interpolate(sol,Uh)
-        vh  = get_fe_basis(Uh)
 
-        if GridapP4est.i_am_in(cparts)
-          VH  = get_fe_space(tests,lev+1)
-          UH  = get_fe_space(trials,lev+1)
-          ΩH  = get_triangulation(UH,get_model(mh,lev+1))
-          dΩH = Measure(ΩH,quad_order)
-          uH  = interpolate(sol,UH)
-          vH  = get_fe_basis(UH)
-          dΩhH = Measure(ΩH,Ωh,quad_order)
-        else
-          uH = nothing
-          vH = nothing
-        end
-        
+        VH  = get_fe_space(tests,lev+1)
+        UH  = get_fe_space(trials,lev+1)
+        ΩH  = get_triangulation(UH,get_model(mh,lev+1))
+        dΩH = Measure(ΩH,quad_order)
+        uH  = interpolate(sol,UH)
+        dΩhH = Measure(ΩH,Ωh,quad_order)
+
         # Coarse FEFunction -> Fine FEFunction, by projection
-        uH_Ph = change_parts(GridapDistributed.DistributedCellField,uH,fparts)
-
         ah(u,v) = ∫(v⋅u)*dΩh
-        lh(v)   = ∫(v⋅uH_Ph)*dΩh
+        lh(v)   = ∫(v⋅uH)*dΩh
         Ah = assemble_matrix(ah,Uh,Vh)
         bh = assemble_vector(lh,Vh)
 
@@ -67,27 +58,18 @@ module RefinementToolsTests
         i_am_main(parts) && println("Error H2h: ", eh)
 
         # Fine FEFunction -> Coarse FEFunction, by projection
-        if GridapP4est.i_am_in(cparts)
-          uh_PH = change_parts(GridapDistributed.DistributedCellField,uh,cparts)
-          uH_projected_PH = change_parts(GridapDistributed.DistributedCellField,uH_projected,cparts)
+        aH(u,v) = ∫(v⋅u)*dΩH
+        lH(v)   = ∫(v⋅uH_projected)*dΩhH
+        AH = assemble_matrix(aH,UH,VH)
+        bH = assemble_vector(lH,VH)
 
-          aH(u,v) = ∫(v⋅u)*dΩH
-          lH(v)   = ∫(v⋅uH_projected_PH)*dΩhH
-          AH = assemble_matrix(aH,UH,VH)
-          bH = assemble_vector(lH,VH)
+        xH = PVector(0.0,AH.cols)
+        IterativeSolvers.cg!(xH,AH,bH;verbose=i_am_main(parts),reltol=1.0e-06)
+        uh_projected = FEFunction(UH,xH)
 
-          xH = PVector(0.0,AH.cols)
-          IterativeSolvers.cg!(xH,AH,bH;verbose=i_am_main(parts),reltol=1.0e-06)
-          uh_projected = FEFunction(UH,xH)
-
-          _eH = uH-uh_projected
-          eH  = sum(∫(_eH⋅_eH)*dΩH)
-          i_am_main(parts) && println("Error h2H: ", eH)
-        else
-          uh_projected = nothing
-        end
-        uh_projected_Ph = change_parts(GridapDistributed.DistributedCellField,uh_projected,fparts) 
-
+        _eH = uH-uh_projected
+        eH  = sum(∫(_eH⋅_eH)*dΩH)
+        i_am_main(parts) && println("Error h2H: ", eH)
       end
     end
 
@@ -99,6 +81,6 @@ module RefinementToolsTests
   num_refs_coarse   = 2         # Number of initial refinements
   
   ranks = num_parts_x_level[1]
-  prun(run,mpi,ranks,num_parts_x_level,num_trees,num_refs_coarse)
-  MPI.Finalize()
+  #prun(run,mpi,ranks,num_parts_x_level,num_trees,num_refs_coarse)
+  #MPI.Finalize()
 end

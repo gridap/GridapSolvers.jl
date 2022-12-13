@@ -37,24 +37,6 @@ end
 
 const DistributedRefinedTriangulation{Dc,Dp} = GridapDistributed.DistributedTriangulation{Dc,Dp,<:AbstractPData{<:AdaptedTriangulation{Dc,Dp}}}
 
-
-# DistributedFESpaces
-
-function get_test_space(U::GridapDistributed.DistributedSingleFieldFESpace)
-  spaces = map_parts(local_views(U)) do U
-    U.space
-  end
-  gids = U.gids
-  vector_type = U.vector_type
-  return GridapDistributed.DistributedSingleFieldFESpace(spaces,gids,vector_type)
-end
-
-function FESpaces.get_triangulation(f::GridapDistributed.DistributedSingleFieldFESpace,model::GridapDistributed.AbstractDistributedDiscreteModel)
-  trians = map_parts(get_triangulation,local_views(f))
-  GridapDistributed.DistributedTriangulation(trians,model)
-end
-
-
 # ChangeDomain
 
 function Gridap.Adaptivity.change_domain_o2n(c_cell_field,

@@ -84,6 +84,29 @@ function get_parts(x::GridapP4est.OctreeDistributedDiscreteModel)
   return x.parts
 end
 
+function get_parts(x::GridapDistributed.RedistributeGlue)
+  return PartitionedArrays.get_part_ids(x.old2new)
+end
+
+function get_parts(x::GridapDistributed.DistributedSingleFieldFESpace)
+  return PartitionedArrays.get_part_ids(x.spaces)
+end
+
+# DistributedFESpaces
+
+function get_test_space(U::GridapDistributed.DistributedSingleFieldFESpace)
+  spaces = map_parts(local_views(U)) do U
+    U.space
+  end
+  gids = U.gids
+  vector_type = U.vector_type
+  return GridapDistributed.DistributedSingleFieldFESpace(spaces,gids,vector_type)
+end
+
+function FESpaces.get_triangulation(f::GridapDistributed.DistributedSingleFieldFESpace,model::GridapDistributed.AbstractDistributedDiscreteModel)
+  trians = map_parts(get_triangulation,local_views(f))
+  GridapDistributed.DistributedTriangulation(trians,model)
+end
 
 # Void GridapDistributed structures
 
@@ -119,8 +142,28 @@ function VoidDistributedTriangulation(trian::GridapDistributed.DistributedTriang
   return VoidDistributedTriangulation(Dc,Dp,get_parts(trian))
 end
 
-function Triangulation(model::VoidDistributedDiscreteModel{Dc,Dp}) where {Dc,Dp}
+function Gridap.Geometry.Triangulation(model::VoidDistributedDiscreteModel{Dc,Dp}) where {Dc,Dp}
   return VoidDistributedTriangulation(Dc,Dp,get_parts(model))
+end
+
+struct VoidDistributedFESpace{A} <: GridapType
+  parts::A
+end
+
+function get_parts(x::VoidDistributedFESpace)
+  return x.parts
+end
+
+function Gridap.FESpaces.TestFESpace(model::VoidDistributedDiscreteModel,args...;kwargs...)
+  return VoidDistributedFESpace(get_parts(model))
+end
+
+function Gridap.FESpaces.TrialFESpace(space::VoidDistributedFESpace,args...;kwargs...)
+  return VoidDistributedFESpace(get_parts(space))
+end
+
+function FESpaces.get_triangulation(f::VoidDistributedFESpace,model::VoidDistributedDiscreteModel)
+  return VoidDistributedTriangulation(model)
 end
 
 

@@ -56,13 +56,13 @@ function Gridap.FESpaces.TestFESpace(
 end
 
 function Gridap.FESpaces.TrialFESpace(u,a::FESpaceHierarchyLevel{A,Nothing}) where {A}
-  Uh = TrialFESpace(u,a.fe_space)
+  Uh = TrialFESpace(a.fe_space,u)
   FESpaceHierarchyLevel(a.level,Uh,nothing)
 end
 
 function Gridap.FESpaces.TrialFESpace(u,a::FESpaceHierarchyLevel{A,B}) where {A,B}
-  Uh     = TrialFESpace(u,a.fe_space)
-  Uh_red = TrialFESpace(u,a.fe_space_red)
+  Uh     = TrialFESpace(a.fe_space,u)
+  Uh_red = TrialFESpace(a.fe_space_red,u)
   FESpaceHierarchyLevel(a.level,Uh,Uh_red)
 end
 

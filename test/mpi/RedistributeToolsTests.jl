@@ -24,6 +24,9 @@ module RedistributeToolsTests
     coarse_model = OctreeDistributedDiscreteModel(level_parts[num_levels],cmodel,num_refs_coarse)
     mh = ModelHierarchy(coarse_model,level_parts)
 
+    old_parts = level_parts[2]
+    new_parts = level_parts[1]
+
     # FE Spaces
     order = 1
     u(x)  = x[1] + x[2]
@@ -32,39 +35,50 @@ module RedistributeToolsTests
 
     model_old = get_model_before_redist(mh.levels[1])
     VOLD  = TestFESpace(model_old,reffe,dirichlet_tags="boundary")
-    UOLD  = TrialFESpace(u,VOLD)
+    UOLD  = TrialFESpace(VOLD,u)
 
     model_new = get_model(mh.levels[1])
     VNEW  = TestFESpace(model_new,reffe,dirichlet_tags="boundary")
-    UNEW  = TrialFESpace(u,VNEW)
+    UNEW  = TrialFESpace(VNEW,u)
 
     # Triangulations
     qdegree = 2*order+1
-    Ω_old   = Triangulation(model_old)
-    dΩ_old  = Measure(Ω_old,qdegree)
     Ω_new   = Triangulation(model_new)
     dΩ_new  = Measure(Ω_new,qdegree)
+    uh_new  = interpolate(u,UNEW)
+
+    if GridapP4est.i_am_in(old_parts)
+      Ω_old   = Triangulation(model_old)
+      dΩ_old  = Measure(Ω_old,qdegree)
+      uh_old  = interpolate(u,UOLD)
+    else
+      Ω_old   = nothing
+      dΩ_old  = nothing
+      uh_old  = nothing
+    end
 
     # Old -> New
-    uhold = interpolate(u,UOLD)
-    uhnew = GridapSolvers.redistribute_fe_function(uhold,
-                                                   UNEW,
-                                                   model_new,
-                                                   glue)
-    o = sum(∫(uhold)*dΩ_old)
-    n = sum(∫(uhnew)*dΩ_new)
-    @test o ≈ n
+    uh_old_red = GridapSolvers.redistribute_fe_function(uh_old,
+                                                       UNEW,
+                                                       model_new,
+                                                       glue)
+    n = sum(∫(uh_old_red)*dΩ_new)
+    if GridapP4est.i_am_in(old_parts)
+      o = sum(∫(uh_old)*dΩ_old)
+      @test o ≈ n
+    end
 
     # New -> Old
-    uhnew = interpolate(u,UNEW)
-    uhold = GridapSolvers.redistribute_fe_function(uhnew,
+    uh_new_red = GridapSolvers.redistribute_fe_function(uh_new,
                                                    UOLD,
                                                    model_old,
                                                    glue;
                                                    reverse=true)
-    o = sum(∫(uhnew)*dΩ_new)
-    n = sum(∫(uhold)*dΩ_old)
-    @test o ≈ n
+    n = sum(∫(uh_new)*dΩ_new)
+    if GridapP4est.i_am_in(old_parts)
+      o = sum(∫(uh_new_red)*dΩ_old)
+      @test o ≈ n
+    end
 
     #model_hierarchy_free!(mh)
   end
@@ -75,6 +89,6 @@ module RedistributeToolsTests
   num_refs_coarse   = 2         # Number of initial refinements
   
   ranks = num_parts_x_level[1]
-  #prun(run,mpi,ranks,num_parts_x_level,num_trees,num_refs_coarse)
-  #MPI.Finalize()
+  prun(run,mpi,ranks,num_parts_x_level,num_trees,num_refs_coarse)
+  MPI.Finalize()
 end
