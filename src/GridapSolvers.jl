@@ -1,29 +1,17 @@
 module GridapSolvers
 
-  using MPI
-  using LinearAlgebra
-  using FillArrays
-  using IterativeSolvers
-  using Gridap
-  using Gridap.Helpers
-  using Gridap.Algebra
-  using Gridap.Geometry
-  using Gridap.FESpaces
-  using Gridap.Adaptivity
-  using PartitionedArrays
-  using GridapDistributed
-  using GridapP4est
+  include("MultilevelTools/MultilevelTools.jl")
+  include("LinearSolvers/LinearSolvers.jl")
 
-  import LinearAlgebra: mul!
-  import GridapDistributed: local_views
+  using GridapSolvers.MultilevelTools
+  using GridapSolvers.LinearSolvers
 
-  export change_parts, void
-
-  export DistributedRefinedDiscreteModel
+  # MultilevelTools
+  export get_parts, generate_level_parts
 
   export ModelHierarchy
   export num_levels, get_level, get_level_parts
-  export get_model, get_model_before_redist, has_refinement, has_redistribution
+  export get_model, get_model_before_redist
 
   export FESpaceHierarchy
   export get_fe_space, get_fe_space_before_redist
@@ -32,16 +20,7 @@ module GridapSolvers
   export DistributedGridTransferOperator
   export RestrictionOperator, ProlongationOperator
   export setup_transfer_operators
-  export mul!
 
-  include("PartitionedArraysExtensions.jl")
-  include("GridapDistributedExtensions.jl")
-  #include("GridapFixes.jl")
-  include("RefinementTools.jl")
-  include("RedistributeTools.jl")
-  include("ModelHierarchies.jl")
-  include("FESpaceHierarchies.jl")
-  include("DistributedGridTransferOperators.jl")
-
+  # LinearSolvers
 
 end

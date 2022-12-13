@@ -5,8 +5,10 @@ using Gridap
 using Gridap.FESpaces
 using GridapDistributed
 using PartitionedArrays
-using GridapSolvers
 using GridapP4est
+
+using GridapSolvers
+using GridapSolvers.MultilevelTools
 
 function model_hierarchy_free!(mh::ModelHierarchy)
   for lev in 1:num_levels(mh)
@@ -21,7 +23,7 @@ function main(parts,num_parts_x_level,num_trees,num_refs_coarse)
   cmodel    = CartesianDiscreteModel(domain,num_trees)
 
   num_levels   = length(num_parts_x_level)
-  level_parts  = GridapSolvers.generate_level_parts(parts,num_parts_x_level)
+  level_parts  = generate_level_parts(parts,num_parts_x_level)
   coarse_model = OctreeDistributedDiscreteModel(level_parts[num_levels],cmodel,num_refs_coarse)
   mh = ModelHierarchy(coarse_model,level_parts)
 
