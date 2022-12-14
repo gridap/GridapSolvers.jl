@@ -1,4 +1,4 @@
-module GMGLinearSolverLaplacianTests
+module GMGLinearSolverPoissonTests
 using MPI
 using Test
 using LinearAlgebra
@@ -18,7 +18,7 @@ using GridapSolvers.LinearSolvers
 u(x) = x[1] + x[2]
 f(x) = -Δ(u)(x)
 
-function main(parts, coarse_grid_partition, num_parts_x_level, num_refs_coarse, order, α)
+function main(parts, coarse_grid_partition, num_parts_x_level, num_refs_coarse, order)
   domain       = (0,1,0,1)
   num_levels   = length(num_parts_x_level)
   level_parts  = generate_level_parts(parts,num_parts_x_level)
@@ -31,7 +31,7 @@ function main(parts, coarse_grid_partition, num_parts_x_level, num_refs_coarse, 
   tests     = TestFESpace(mh,reffe,conformity=:H1,dirichlet_tags="boundary")
   trials    = TrialFESpace(tests,u)
 
-  biform(u,v,dΩ) = ∫(v*u)dΩ + ∫(α*∇(v)⋅∇(u))dΩ
+  biform(u,v,dΩ) = ∫(∇(v)⋅∇(u))dΩ
   liform(v,dΩ)   = ∫(v*f)dΩ
 
   # Finest level problem
@@ -77,12 +77,10 @@ function main(parts, coarse_grid_partition, num_parts_x_level, num_refs_coarse, 
   e    = u-uh
   e_l2 = sum(∫(e*e)dΩ)
   tol  = 1.0e-9
-  #@test e_l2 < tol
+  @test e_l2 < tol
   if GridapP4est.i_am_main(parts)
     println("L2 error = ", e_l2)
   end
-
-  return history.iters, num_free_dofs(Vh)
 end
 
 ##############################################
@@ -96,46 +94,9 @@ order = 2
 coarse_grid_partition = (2,2)
 num_refs_coarse = 2
 
-α = 1.0
 num_parts_x_level = [4,2,1]
 ranks = num_parts_x_level[1]
-num_iters, num_free_dofs2 = prun(main,mpi,ranks,coarse_grid_partition,num_parts_x_level,num_refs_coarse,order,α)
-
-"""
-
-num_refinements = [1,2,3,4]
-alpha_exps = [0,1,2,3]
-nr = length(num_refinements)
-na = length(alpha_exps)
-
-# Do experiments
-iter_matrix = zeros(Int,nr,na)
-free_dofs   = Vector{Int64}(undef,nr)
-for ref = 1:nr
-  num_parts_x_level = [1 for i=1:num_refinements[ref]+1]
-  for alpha_exp = 1:na
-    α = 10.0^alpha_exps[alpha_exp]
-
-    num_iters, num_free_dofs2 = prun(main,mpi,ranks,coarse_grid_partition,num_parts_x_level,order,α)
-    free_dofs[ref] = num_free_dofs2
-    iter_matrix[ref,alpha_exp] = num_iters
-  end
-end
-
-# Display results
-if GridapP4est.i_am_main(parts)
-  println("> α = ", map(exp->10.0^exp,alpha_exp))
-end
-
-for ref = 1:nr
-  if GridapP4est.i_am_main(parts)
-    println("> Num Refinements: ", num_refinements[ref])
-    println("  > Num free dofs         : ", free_dofs[ref])
-    println("  > Num Refinements       : ", num_refinements[ref])
-    println("  > Num Iters (per alpha) : ", iter_matrix[ref,:])
-  end
-end
-"""
+prun(main,mpi,ranks,coarse_grid_partition,num_parts_x_level,num_refs_coarse,order)
 
 
 MPI.Finalize()
