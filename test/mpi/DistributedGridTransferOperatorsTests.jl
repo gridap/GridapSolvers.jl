@@ -26,7 +26,6 @@ function run(parts,num_parts_x_level,num_trees,num_refs_coarse)
   coarse_model = OctreeDistributedDiscreteModel(level_parts[num_levels],cmodel,num_refs_coarse)
   mh = ModelHierarchy(coarse_model,level_parts)
 
-
   old_parts = level_parts[2]
   new_parts = level_parts[1]
 

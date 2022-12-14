@@ -46,11 +46,11 @@ function _get_prolongation_cache(lev::Int,sh::FESpaceHierarchy,qdegree::Int)
     model_h = get_model_before_redist(mh,lev)
     Uh = get_fe_space_before_redist(sh,lev)
     fv_h = PVector(0.0,Uh.gids)
-    dv_h = get_dirichlet_dof_values(Uh) # Should this be zeros? 
+    dv_h = zero_dirichlet_values(Uh)#get_dirichlet_dof_values(Uh)
 
     UH = get_fe_space(sh,lev+1)
     fv_H = PVector(0.0,UH.gids)
-    dv_H = get_dirichlet_dof_values(UH)
+    dv_H = zero_dirichlet_values(UH)#get_dirichlet_dof_values(UH)
 
     cache_refine = model_h, Uh, fv_h, dv_h, UH, fv_H, dv_H
   else
@@ -71,7 +71,7 @@ function _get_restriction_cache(lev::Int,sh::FESpaceHierarchy,qdegree::Int)
     Uh = get_fe_space_before_redist(sh,lev)
     Ωh = get_triangulation(Uh,get_model_before_redist(mh,lev))
     fv_h = PVector(0.0,Uh.gids)
-    dv_h = get_dirichlet_dof_values(Uh) # Should this be zeros? 
+    dv_h = zero_dirichlet_values(Uh)#get_dirichlet_dof_values(Uh)
 
     UH   = get_fe_space(sh,lev+1)
     VH   = get_test_space(UH)
@@ -101,7 +101,7 @@ function _get_redistribution_cache(lev::Int,sh::FESpaceHierarchy)
     Uh_red      = get_fe_space(sh,lev)
     model_h_red = get_model(mh,lev)
     fv_h_red    = PVector(0.0,Uh_red.gids)
-    dv_h_red    = get_dirichlet_dof_values(Uh_red)
+    dv_h_red    = zero_dirichlet_values(Uh_red)#get_dirichlet_dof_values(Uh_red)
     glue        = mh.levels[lev].red_glue
 
     cache_redist = fv_h_red, dv_h_red, Uh_red, model_h_red, glue

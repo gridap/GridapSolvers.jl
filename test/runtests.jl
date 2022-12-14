@@ -31,7 +31,8 @@ function run_tests(testdir)
         if f in ["DistributedGridTransferOperatorsTests.jl",
                  "RedistributeToolsTests.jl",
                  "RefinementToolsTests",
-                 "RichardsonSmoothersTests"]
+                 "RichardsonSmoothersTests",
+                 "GMGLinearSolversLaplacianTests.jl"]
           np = 4
           extra_args = "-s 2 2 -r 2"
         elseif f in ["ModelHierarchiesTests.jl"]
@@ -56,7 +57,7 @@ function run_tests(testdir)
     end
 end
 
-run(`mpiexec -n 4 julia --project=. mpi/RichardsonSmoothersTests.jl`)
+run(`mpiexec -n 4 julia --project=. mpi/GMGLinearSolversLaplacianTests.jl`)
 
 #run_tests(@__DIR__)
 #run_tests(joinpath(@__DIR__, "mpi"))
