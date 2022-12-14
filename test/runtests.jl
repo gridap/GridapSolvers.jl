@@ -28,7 +28,10 @@ function run_tests(testdir)
     testfiles = sort(filter(istest, readdir(testdir)))
     @time @testset "$f" for f in testfiles
       MPI.mpiexec() do cmd
-        if f in ["DistributedGridTransferOperatorsTests.jl","RedistributeToolsTests.jl","RefinementToolsTests"]
+        if f in ["DistributedGridTransferOperatorsTests.jl",
+                 "RedistributeToolsTests.jl",
+                 "RefinementToolsTests",
+                 "RichardsonSmoothersTests"]
           np = 4
           extra_args = "-s 2 2 -r 2"
         elseif f in ["ModelHierarchiesTests.jl"]
@@ -53,5 +56,7 @@ function run_tests(testdir)
     end
 end
 
-run_tests(@__DIR__)
-run_tests(joinpath(@__DIR__, "mpi"))
+run(`mpiexec -n 4 julia --project=. mpi/RichardsonSmoothersTests.jl`)
+
+#run_tests(@__DIR__)
+#run_tests(joinpath(@__DIR__, "mpi"))
