@@ -49,7 +49,7 @@ function main(parts, coarse_grid_partition, num_parts_x_level, num_refs_coarse, 
   # Preconditioner
   smatrices = compute_hierarchy_matrices(trials,biform,qdegree)
   smoothers = Fill(RichardsonSmoother(JacobiLinearSolver(),10,2.0/3.0),num_levels-1)
-  restrictions, prolongations = setup_transfer_operators(trials, qdegree)
+  restrictions, prolongations = setup_transfer_operators(trials,qdegree;mode=:residual)
 
   gmg = GMGLinearSolver(mh,
                         smatrices,
@@ -58,7 +58,7 @@ function main(parts, coarse_grid_partition, num_parts_x_level, num_refs_coarse, 
                         pre_smoothers=smoothers,
                         post_smoothers=smoothers,
                         maxiter=1,
-                        rtol=1.0e-06,
+                        rtol=1.0e-10,
                         verbose=false,
                         mode=:preconditioner)
   ss = symbolic_setup(gmg,A)
@@ -68,7 +68,7 @@ function main(parts, coarse_grid_partition, num_parts_x_level, num_refs_coarse, 
   x = PVector(0.0,A.cols)
   x, history = IterativeSolvers.cg!(x,A,b;
                         verbose=GridapP4est.i_am_main(parts),
-                        reltol=1.0e-06,
+                        reltol=1.0e-10,
                         Pl=ns,
                         log=true)
 

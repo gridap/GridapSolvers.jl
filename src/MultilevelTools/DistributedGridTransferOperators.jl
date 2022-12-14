@@ -15,30 +15,36 @@ end
 
 ### Constructors
 
-RestrictionOperator(lev::Int,sh::FESpaceHierarchy,qdegree::Int) = DistributedGridTransferOperator(lev,sh,qdegree,:restriction)
-ProlongationOperator(lev::Int,sh::FESpaceHierarchy,qdegree::Int) = DistributedGridTransferOperator(lev,sh,qdegree,:prolongation)
+function RestrictionOperator(lev::Int,sh::FESpaceHierarchy,qdegree::Int;kwargs...)
+  return DistributedGridTransferOperator(lev,sh,qdegree,:restriction;kwargs...)
+end
 
-function DistributedGridTransferOperator(lev::Int,sh::FESpaceHierarchy,qdegree::Int,op_type::Symbol)
+function ProlongationOperator(lev::Int,sh::FESpaceHierarchy,qdegree::Int;kwargs...)
+  return DistributedGridTransferOperator(lev,sh,qdegree,:prolongation;kwargs...)
+end
+
+function DistributedGridTransferOperator(lev::Int,sh::FESpaceHierarchy,qdegree::Int,op_type::Symbol;mode=:solution)
   mh = sh.mh
   @check lev < num_levels(mh)
   @check op_type ∈ [:restriction, :prolongation]
+  @check mode ∈ [:solution, :residual]
 
   # Refinement
   if (op_type == :restriction)
-    cache_refine = _get_restriction_cache(lev,sh,qdegree)
+    cache_refine = _get_restriction_cache(lev,sh,qdegree,mode)
   else
-    cache_refine = _get_prolongation_cache(lev,sh,qdegree)
+    cache_refine = _get_prolongation_cache(lev,sh,qdegree,mode)
   end
 
   # Redistribution
   redist = has_redistribution(mh,lev)
-  cache_redist = _get_redistribution_cache(lev,sh)
+  cache_redist = _get_redistribution_cache(lev,sh,mode)
 
   cache = cache_refine, cache_redist
   return DistributedGridTransferOperator(op_type,redist,sh,cache)
 end
 
-function _get_prolongation_cache(lev::Int,sh::FESpaceHierarchy,qdegree::Int)
+function _get_prolongation_cache(lev::Int,sh::FESpaceHierarchy,qdegree::Int,mode)
   mh = sh.mh
   cparts = get_level_parts(mh,lev+1)
 
@@ -46,11 +52,11 @@ function _get_prolongation_cache(lev::Int,sh::FESpaceHierarchy,qdegree::Int)
     model_h = get_model_before_redist(mh,lev)
     Uh = get_fe_space_before_redist(sh,lev)
     fv_h = PVector(0.0,Uh.gids)
-    dv_h = zero_dirichlet_values(Uh)#get_dirichlet_dof_values(Uh)
+    dv_h = (mode == :solution) ? get_dirichlet_dof_values(Uh) : zero_dirichlet_values(Uh)
 
     UH = get_fe_space(sh,lev+1)
     fv_H = PVector(0.0,UH.gids)
-    dv_H = zero_dirichlet_values(UH)#get_dirichlet_dof_values(UH)
+    dv_H = (mode == :solution) ? get_dirichlet_dof_values(UH) : zero_dirichlet_values(UH)
 
     cache_refine = model_h, Uh, fv_h, dv_h, UH, fv_H, dv_H
   else
@@ -62,7 +68,7 @@ function _get_prolongation_cache(lev::Int,sh::FESpaceHierarchy,qdegree::Int)
   return cache_refine
 end
 
-function _get_restriction_cache(lev::Int,sh::FESpaceHierarchy,qdegree::Int)
+function _get_restriction_cache(lev::Int,sh::FESpaceHierarchy,qdegree::Int,mode)
   mh = sh.mh
   cparts = get_level_parts(mh,lev+1)
 
@@ -71,7 +77,7 @@ function _get_restriction_cache(lev::Int,sh::FESpaceHierarchy,qdegree::Int)
     Uh = get_fe_space_before_redist(sh,lev)
     Ωh = get_triangulation(Uh,get_model_before_redist(mh,lev))
     fv_h = PVector(0.0,Uh.gids)
-    dv_h = zero_dirichlet_values(Uh)#get_dirichlet_dof_values(Uh)
+    dv_h = (mode == :solution) ? get_dirichlet_dof_values(Uh) : zero_dirichlet_values(Uh)
 
     UH   = get_fe_space(sh,lev+1)
     VH   = get_test_space(UH)
@@ -94,14 +100,14 @@ function _get_restriction_cache(lev::Int,sh::FESpaceHierarchy,qdegree::Int)
   return cache_refine
 end
 
-function _get_redistribution_cache(lev::Int,sh::FESpaceHierarchy)
+function _get_redistribution_cache(lev::Int,sh::FESpaceHierarchy,mode)
   mh = sh.mh
   redist = has_redistribution(mh,lev)
   if redist
     Uh_red      = get_fe_space(sh,lev)
     model_h_red = get_model(mh,lev)
     fv_h_red    = PVector(0.0,Uh_red.gids)
-    dv_h_red    = zero_dirichlet_values(Uh_red)#get_dirichlet_dof_values(Uh_red)
+    dv_h_red    = (mode == :solution) ? get_dirichlet_dof_values(Uh_red) : zero_dirichlet_values(Uh_red)
     glue        = mh.levels[lev].red_glue
 
     cache_redist = fv_h_red, dv_h_red, Uh_red, model_h_red, glue
@@ -111,15 +117,15 @@ function _get_redistribution_cache(lev::Int,sh::FESpaceHierarchy)
   return cache_redist
 end
 
-function setup_transfer_operators(sh::FESpaceHierarchy, qdegree::Int)
+function setup_transfer_operators(sh::FESpaceHierarchy,qdegree::Int;kwargs...)
   mh = sh.mh
   restrictions  = Vector{DistributedGridTransferOperator}(undef,num_levels(sh)-1)
   prolongations = Vector{DistributedGridTransferOperator}(undef,num_levels(sh)-1)
   for lev in 1:num_levels(sh)-1
     parts = get_level_parts(mh,lev)
     if GridapP4est.i_am_in(parts)
-      restrictions[lev]  = RestrictionOperator(lev,sh,qdegree)
-      prolongations[lev] = ProlongationOperator(lev,sh,qdegree)
+      restrictions[lev]  = RestrictionOperator(lev,sh,qdegree;kwargs...)
+      prolongations[lev] = ProlongationOperator(lev,sh,qdegree;kwargs...)
     end
   end
   return restrictions, prolongations
