@@ -102,10 +102,12 @@ function Gridap.FESpaces.TrialFESpace(a::FESpaceHierarchy)
   FESpaceHierarchy(a.mh,trial_spaces)
 end
 
-function compute_hierarchy_matrices(trials::FESpaceHierarchy,a::Function,qdegree::Int)
+function compute_hierarchy_matrices(trials::FESpaceHierarchy,a::Function,l::Function,qdegree::Int)
   nlevs = num_levels(trials)
   mh    = trials.mh
 
+  A = nothing
+  b = nothing
   mats = Vector{PSparseMatrix}(undef,nlevs)
   for lev in 1:nlevs
     parts = get_level_parts(mh,lev)
@@ -116,9 +118,15 @@ function compute_hierarchy_matrices(trials::FESpaceHierarchy,a::Function,qdegree
       Ω = Triangulation(model)
       dΩ = Measure(Ω,qdegree)
       ai(u,v) = a(u,v,dΩ)
-      A = assemble_matrix(ai,U,V)
-      mats[lev] = A
+      if lev == 1
+        li(v) = l(v,dΩ)
+        op    = AffineFEOperator(ai,li,U,V)
+        A, b  = get_matrix(op), get_vector(op)
+        mats[lev] = A
+      else
+        mats[lev] = assemble_matrix(ai,U,V)
+      end
     end
   end
-  return mats
+  return mats, A, b
 end

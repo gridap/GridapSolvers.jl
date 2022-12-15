@@ -31,23 +31,11 @@ function main(parts, coarse_grid_partition, num_parts_x_level, num_refs_coarse, 
   tests     = TestFESpace(mh,reffe,conformity=:H1,dirichlet_tags="boundary")
   trials    = TrialFESpace(tests,u)
 
-  biform(u,v,dΩ) = ∫(v⋅u)dΩ + ∫(α*∇(v)⊙∇(u))dΩ
-  liform(v,dΩ)   = ∫(v⋅f)dΩ
-
-  # Finest level problem
-  model = get_model(mh,1)
-  Ω  = Triangulation(model)
-  dΩ = Measure(Ω,qdegree)
-  Vh = get_fe_space(tests,1)
-  Uh = get_fe_space(trials,1)
-
-  a(u,v) = biform(u,v,dΩ)
-  l(v)   = liform(v,dΩ)
-  op     = AffineFEOperator(a,l,Uh,Vh)
-  A, b   = get_matrix(op), get_vector(op)
+  biform(u,v,dΩ)  = ∫(v⋅u)dΩ + ∫(α*∇(v)⊙∇(u))dΩ
+  liform(v,dΩ)    = ∫(v⋅f)dΩ
+  smatrices, A, b = compute_hierarchy_matrices(trials,biform,liform,qdegree)
   
   # Preconditioner
-  smatrices = compute_hierarchy_matrices(trials,biform,qdegree)
   smoothers = Fill(RichardsonSmoother(JacobiLinearSolver(),10,2.0/3.0),num_levels-1)
   restrictions, prolongations = setup_transfer_operators(trials,qdegree;mode=:residual)
 

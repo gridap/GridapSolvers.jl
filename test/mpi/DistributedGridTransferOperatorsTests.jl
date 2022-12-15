@@ -42,7 +42,8 @@ function run(parts,num_parts_x_level,num_trees,num_refs_coarse)
   restrictions, prolongations = ops
 
   a(u,v,dΩ) = ∫(∇(v)⋅∇(u))*dΩ
-  mats = compute_hierarchy_matrices(trials,a,qdegree)
+  l(v,dΩ)   = ∫(v⋅u)*dΩ
+  mats, A, b = compute_hierarchy_matrices(trials,a,l,qdegree)
 
   for lev in 1:num_levels-1
     parts_h = get_level_parts(mh,lev)
