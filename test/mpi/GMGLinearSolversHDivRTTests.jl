@@ -61,10 +61,14 @@ function main(parts, coarse_grid_partition, num_parts_x_level, num_refs_coarse, 
                         log=true)
 
   # Error norms and print solution
-  uh   = FEFunction(Uh,x)
-  e    = u-uh
-  e_l2 = sum(∫(e⋅e)dΩ)
-  tol  = 1.0e-9
+  model = get_model(mh,1)
+  Uh    = get_fe_space(trials,1)
+  Ω     = Triangulation(model)
+  dΩ    = Measure(Ω,qdegree)
+  uh    = FEFunction(Uh,x)
+  e     = u-uh
+  e_l2  = sum(∫(e⋅e)dΩ)
+  tol   = 1.0e-9
   #@test e_l2 < tol
   if GridapP4est.i_am_main(parts)
     println("L2 error = ", e_l2)
