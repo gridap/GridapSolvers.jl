@@ -91,7 +91,7 @@ num_refs_coarse = 2
 α = 1.0
 num_parts_x_level = [4,2,1]
 ranks = num_parts_x_level[1]
-num_iters, num_free_dofs2 = prun(main,mpi,ranks,coarse_grid_partition,num_parts_x_level,num_refs_coarse,order,α)
+#num_iters, num_free_dofs2 = prun(main,mpi,ranks,coarse_grid_partition,num_parts_x_level,num_refs_coarse,order,α)
 
 """
 

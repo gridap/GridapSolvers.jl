@@ -74,7 +74,7 @@ function main(parts, coarse_grid_partition, num_parts_x_level, num_refs_coarse, 
     println("L2 error = ", e_l2)
   end
 
-  return history.iters, num_free_dofs(Vh)
+  return history.iters, num_free_dofs(Uh)
 end
 
 ##############################################
