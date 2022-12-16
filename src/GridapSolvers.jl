@@ -22,5 +22,8 @@ module GridapSolvers
   export setup_transfer_operators
 
   # LinearSolvers
+  export JacobiLinearSolver
+  export RichardsonSmoother
+  export GMGLinearSolver
 
 end
