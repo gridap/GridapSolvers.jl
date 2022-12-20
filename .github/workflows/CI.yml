@@ -17,6 +17,7 @@ jobs:
     env:
       JULIA_MPI_BINARY: "system"
       P4EST_ROOT_DIR: "/opt/p4est/2.2/"
+      JULIA_PETSC_LIBRARY: "/opt/petsc/3.15.4/lib/libpetsc"
     strategy:
       fail-fast: false
       matrix:
@@ -68,10 +69,33 @@ jobs:
           make --quiet
           make --quiet install
           rm -rf $ROOT_DIR/$TAR_FILE $SOURCES_DIR
-          cd $CURR_DIR         
+          cd $CURR_DIR
+      - name: Install petsc
+        ##if: steps.cache-petsc.outputs.cache-hit != 'true'
+        run: |
+          CURR_DIR=$(pwd)
+          PACKAGE=petsc
+          VERSION=3.18
+          INSTALL_ROOT=/opt
+          PETSC_INSTALL=$INSTALL_ROOT/$PACKAGE/$VERSION
+          TAR_FILE=$PACKAGE-$VERSION.tar.gz
+          URL="https://ftp.mcs.anl.gov/pub/petsc/release-snapshots/"
+          ROOT_DIR=/tmp
+          SOURCES_DIR=$ROOT_DIR/$PACKAGE-$VERSION
+          BUILD_DIR=$SOURCES_DIR/build
+          wget -q $URL/$TAR_FILE -O $ROOT_DIR/$TAR_FILE
+          mkdir -p $SOURCES_DIR
+          tar xzf $ROOT_DIR/$TAR_FILE -C $SOURCES_DIR --strip-components=1
+          cd $SOURCES_DIR
+          ./configure --prefix=$PETSC_INSTALL --with-cc=mpicc --with-cxx=mpicxx --with-fc=mpif90 \
+             --download-mumps --download-scalapack --download-parmetis --download-metis \
+             --download-ptscotch --with-debugging --with-x=0 --with-shared=1 \
+             --with-mpi=1 --with-64-bit-indices
+          make
+          make install
       - uses: julia-actions/julia-buildpkg@latest
-      - run: echo $PWD  
-      - run: julia --project=. --color=yes -e 'using Pkg; Pkg.instantiate()'
+      - run: echo $PWD
+      - run: julia --project=. -e 'using Pkg; Pkg.instantiate(); Pkg.build(); Pkg.precompile()'
       - run: julia --project=. --color=yes --check-bounds=yes test/runtests.jl
       - uses: codecov/codecov-action@v1
         with:
