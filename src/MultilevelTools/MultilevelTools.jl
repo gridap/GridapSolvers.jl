@@ -21,6 +21,7 @@ import GridapP4est: i_am_in, i_am_main
 
 export change_parts
 export generate_level_parts
+export generate_subparts
 
 export redistribute_fe_function
 export redistribute_free_values!

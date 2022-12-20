@@ -10,14 +10,13 @@ using IterativeSolvers
 using GridapSolvers
 using GridapSolvers.MultilevelTools
 
-function run(parts,num_parts_x_level,num_trees,num_refs_coarse)
+function run(parts,num_parts_x_level,coarse_grid_partition,num_refs_coarse)
   domain       = (0,1,0,1)
-  cmodel       = CartesianDiscreteModel(domain,num_trees)
-
-  nlevs        = length(num_parts_x_level)
-  level_parts  = generate_level_parts(parts,num_parts_x_level)
-  coarse_model = OctreeDistributedDiscreteModel(level_parts[nlevs],cmodel,num_refs_coarse)
-  mh = ModelHierarchy(coarse_model,level_parts)
+  num_levels   = length(num_parts_x_level)
+  cparts       = generate_subparts(parts,num_parts_x_level[num_levels])
+  cmodel       = CartesianDiscreteModel(domain,coarse_grid_partition)
+  coarse_model = OctreeDistributedDiscreteModel(cparts,cmodel,num_refs_coarse)
+  mh = ModelHierarchy(parts,coarse_model,num_parts_x_level)
 
   # FE Spaces
   order  = 1
@@ -27,7 +26,7 @@ function run(parts,num_parts_x_level,num_trees,num_refs_coarse)
   trials = TrialFESpace(tests,sol)
 
   quad_order = 3*order+1
-  for lev in 1:nlevs-1
+  for lev in 1:num_levels-1
     fparts = get_level_parts(mh,lev)
     cparts = get_level_parts(mh,lev+1)
 

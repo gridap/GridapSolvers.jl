@@ -7,7 +7,7 @@ module GridapSolvers
   using GridapSolvers.LinearSolvers
 
   # MultilevelTools
-  export get_parts, generate_level_parts
+  export get_parts, generate_level_parts, generate_subparts
 
   export ModelHierarchy
   export num_levels, get_level, get_level_parts

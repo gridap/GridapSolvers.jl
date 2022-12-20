@@ -17,17 +17,13 @@ function model_hierarchy_free!(mh::ModelHierarchy)
   end
 end
 
-function run(parts,num_parts_x_level,num_trees,num_refs_coarse)
+function run(parts,num_parts_x_level,coarse_grid_partition,num_refs_coarse)
   domain       = (0,1,0,1)
-  cmodel       = CartesianDiscreteModel(domain,num_trees)
-  
   num_levels   = length(num_parts_x_level)
-  level_parts  = generate_level_parts(parts,num_parts_x_level)
-  coarse_model = OctreeDistributedDiscreteModel(level_parts[num_levels],cmodel,num_refs_coarse)
-  mh = ModelHierarchy(coarse_model,level_parts)
-
-  old_parts = level_parts[2]
-  new_parts = level_parts[1]
+  cparts       = generate_subparts(parts,num_parts_x_level[num_levels])
+  cmodel       = CartesianDiscreteModel(domain,coarse_grid_partition)
+  coarse_model = OctreeDistributedDiscreteModel(cparts,cmodel,num_refs_coarse)
+  mh = ModelHierarchy(parts,coarse_model,num_parts_x_level)
 
   # Create Operators: 
   order = 1

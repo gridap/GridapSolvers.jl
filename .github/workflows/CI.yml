@@ -17,7 +17,7 @@ jobs:
     env:
       JULIA_MPI_BINARY: "system"
       P4EST_ROOT_DIR: "/opt/p4est/2.2/"
-      JULIA_PETSC_LIBRARY: "/opt/petsc/3.15.4/lib/libpetsc"
+      JULIA_PETSC_LIBRARY: "/opt/petsc/3.18/lib/libpetsc"
     strategy:
       fail-fast: false
       matrix:

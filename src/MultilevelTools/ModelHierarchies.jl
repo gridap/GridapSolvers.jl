@@ -25,6 +25,7 @@ end
 num_levels(a::ModelHierarchy) = length(a.levels)
 get_level(a::ModelHierarchy,level::Integer) = a.levels[level]
 
+get_level_parts(a::ModelHierarchy) = a.level_parts
 get_level_parts(a::ModelHierarchy,level::Integer) = a.level_parts[level]
 
 get_model(a::ModelHierarchy,level::Integer) = get_model(get_level(a,level))
@@ -45,11 +46,37 @@ has_redistribution(a::ModelHierarchyLevel{A,B,C,Nothing}) where {A,B,C} = false
                          each level into. We need `num_procs_x_level[end]` to be equal to 
                          the number of parts of `model`.
 """
-function ModelHierarchy(coarsest_model::GridapDistributed.AbstractDistributedDiscreteModel,level_parts; num_refs_x_level=nothing)
+function ModelHierarchy(root_parts        ::AbstractPData,
+                        model             ::GridapDistributed.AbstractDistributedDiscreteModel,
+                        num_procs_x_level ::Vector{<:Integer}; 
+                        kwargs...)
+
+  # Request correct number of parts from MAIN
+  model_parts  = get_parts(model)
+  my_num_parts = map_parts(root_parts) do _p
+    num_parts(model_parts) # == -1 if !i_am_in(my_parts)
+  end
+  main_num_parts = get_main_part(my_num_parts)
+
+  if main_num_parts == num_procs_x_level[end] # Coarsest model
+    return create_model_hierarchy_by_refinement(root_parts,model,num_procs_x_level;kwargs...)
+  end
+  if main_num_parts == num_procs_x_level[1]   # Finest model
+    return create_model_hierarchy_by_coarsening(root_parts,model,num_procs_x_level;kwargs...)
+  end
+  @error "Model parts do not correspond to coarsest or finest parts!"
+end
+
+function create_model_hierarchy_by_refinement(root_parts::AbstractPData,
+                                              coarsest_model::GridapDistributed.AbstractDistributedDiscreteModel,
+                                              num_procs_x_level ::Vector{<:Integer}; 
+                                              num_refs_x_level=nothing)
   # TODO: Implement support for num_refs_x_level? (future work)
-  num_levels         = length(level_parts)
-  num_procs_x_level  = map(num_parts,level_parts)
+  num_levels         = length(num_procs_x_level)
+  level_parts        = Vector{typeof(root_parts)}(undef,num_levels)
   meshes             = Vector{ModelHierarchyLevel}(undef,num_levels)
+
+  level_parts[num_levels] = get_parts(coarsest_model)
   meshes[num_levels] = ModelHierarchyLevel(num_levels,coarsest_model,nothing,nothing,nothing)
 
   for i = num_levels-1:-1:1
@@ -57,14 +84,49 @@ function ModelHierarchy(coarsest_model::GridapDistributed.AbstractDistributedDis
     if (num_procs_x_level[i] != num_procs_x_level[i+1])
       # meshes[i+1].model is distributed among P processors
       # model_ref is distributed among Q processors, with P!=Q
+      level_parts[i]     = generate_subparts(root_parts,num_procs_x_level[i])
       model_ref,ref_glue = Gridap.Adaptivity.refine(modelH)
-      model_red,red_glue = redistribute(model_ref,level_parts[i])
+      model_red,red_glue = GridapDistributed.redistribute(model_ref,level_parts[i])
     else
+      level_parts[i]     = level_parts[i+1]
       model_ref,ref_glue = Gridap.Adaptivity.refine(modelH)
       model_red,red_glue = nothing,nothing
     end
     meshes[i] = ModelHierarchyLevel(i,model_ref,ref_glue,model_red,red_glue)
   end
+
+  mh = ModelHierarchy(level_parts,meshes)
+  return convert_to_refined_models(mh)
+end
+
+function create_model_hierarchy_by_coarsening(root_parts::AbstractPData,
+                                              finest_model::GridapDistributed.AbstractDistributedDiscreteModel,
+                                              num_procs_x_level ::Vector{<:Integer}; 
+                                              num_refs_x_level=nothing)
+  # TODO: Implement support for num_refs_x_level? (future work)
+  num_levels         = length(num_procs_x_level)
+  level_parts        = Vector{typeof(root_parts)}(undef,num_levels)
+  meshes             = Vector{ModelHierarchyLevel}(undef,num_levels)
+  
+  level_parts[1] = get_parts(finest_model)
+  model = finest_model
+  for i = 1:num_levels-1
+    if (num_procs_x_level[i] != num_procs_x_level[i+1])
+      level_parts[i+1]   = generate_subparts(root_parts,num_procs_x_level[i])
+      model_red          = model
+      model_ref,red_glue = GridapDistributed.redistribute(model_red,level_parts[i+1])
+      model_H  ,ref_glue = Gridap.Adaptivity.coarsen(model_ref)
+    else
+      level_parts[i+1]   = level_parts[i]
+      model_red          = nothing
+      model_ref,red_glue = model, nothing
+      model_H  ,ref_glue = Gridap.Adaptivity.coarsen(model_ref)
+    end
+    model     = model_H
+    meshes[i] = ModelHierarchyLevel(i,model_ref,ref_glue,model_red,red_glue)
+  end
+
+  meshes[num_levels] = ModelHierarchyLevel(num_levels,model,nothing,nothing,nothing)
 
   mh = ModelHierarchy(level_parts,meshes)
   return convert_to_refined_models(mh)
