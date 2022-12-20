@@ -112,7 +112,7 @@ function create_model_hierarchy_by_coarsening(root_parts::AbstractPData,
   model = finest_model
   for i = 1:num_levels-1
     if (num_procs_x_level[i] != num_procs_x_level[i+1])
-      level_parts[i+1]   = generate_subparts(root_parts,num_procs_x_level[i])
+      level_parts[i+1]   = generate_subparts(root_parts,num_procs_x_level[i+1])
       model_red          = model
       model_ref,red_glue = GridapDistributed.redistribute(model_red,level_parts[i+1])
       model_H  ,ref_glue = Gridap.Adaptivity.coarsen(model_ref)

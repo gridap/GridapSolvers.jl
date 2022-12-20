@@ -20,7 +20,6 @@ end
 
 function main(parts,num_parts_x_level)
   # Start from coarse, refine models
-  """
   domain       = (0,1,0,1)
   num_levels   = length(num_parts_x_level)
   cparts       = generate_subparts(parts,num_parts_x_level[num_levels])
@@ -32,13 +31,12 @@ function main(parts,num_parts_x_level)
   reffe  = ReferenceFE(lagrangian,Float64,1)
   tests  = TestFESpace(mh,reffe,conformity=:H1)
   trials = TrialFESpace(tests,sol)
-  """
 
   # Start from fine, coarsen models
   domain     = (0,1,0,1)
   fparts     = generate_subparts(parts,num_parts_x_level[1])
-  fmodel     = CartesianDiscreteModel(domain,(2^8,2^8))
-  fine_model = OctreeDistributedDiscreteModel(fparts,fmodel)
+  fmodel     = CartesianDiscreteModel(domain,(2,2))
+  fine_model = OctreeDistributedDiscreteModel(fparts,fmodel,8)
   mh = ModelHierarchy(parts,fine_model,num_parts_x_level)
 
   sol(x) = x[1] + x[2]
