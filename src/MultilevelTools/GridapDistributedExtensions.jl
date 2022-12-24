@@ -166,7 +166,6 @@ function FESpaces.get_triangulation(f::VoidDistributedFESpace,model::VoidDistrib
   return VoidDistributedTriangulation(model)
 end
 
-
 # Void Gridap structures
 
 function void(::Type{<:CartesianDiscreteModel{Dc,Dp}}) where {Dc,Dp}

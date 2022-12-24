@@ -1,15 +1,16 @@
 
 
-struct DistributedGridTransferOperator{T,R,A,B}
+struct DistributedGridTransferOperator{T,R,M,A,B}
   sh     :: A
   cache  :: B
 
-  function DistributedGridTransferOperator(op_type::Symbol,redist::Bool,sh::FESpaceHierarchy,cache)
+  function DistributedGridTransferOperator(op_type::Symbol,redist::Bool,restriction_method::Symbol,sh::FESpaceHierarchy,cache)
     T = typeof(Val(op_type))
     R = typeof(Val(redist))
+    M = typeof(Val(restriction_method))
     A = typeof(sh)
     B = typeof(cache)
-    new{T,R,A,B}(sh,cache)
+    new{T,R,M,A,B}(sh,cache)
   end
 end
 
@@ -23,17 +24,19 @@ function ProlongationOperator(lev::Int,sh::FESpaceHierarchy,qdegree::Int;kwargs.
   return DistributedGridTransferOperator(lev,sh,qdegree,:prolongation;kwargs...)
 end
 
-function DistributedGridTransferOperator(lev::Int,sh::FESpaceHierarchy,qdegree::Int,op_type::Symbol;mode=:solution)
+function DistributedGridTransferOperator(lev::Int,sh::FESpaceHierarchy,qdegree::Int,op_type::Symbol;
+                                         mode::Symbol=:solution,restriction_method::Symbol=:projection)
   mh = sh.mh
   @check lev < num_levels(mh)
   @check op_type ∈ [:restriction, :prolongation]
   @check mode ∈ [:solution, :residual]
+  @check restriction_method ∈ [:projection, :interpolation]
 
   # Refinement
-  if (op_type == :restriction)
-    cache_refine = _get_restriction_cache(lev,sh,qdegree,mode)
+  if (op_type == :prolongation) || (restriction_method == :interpolation)
+    cache_refine = _get_interpolation_cache(lev,sh,qdegree,mode)
   else
-    cache_refine = _get_prolongation_cache(lev,sh,qdegree,mode)
+    cache_refine = _get_projection_cache(lev,sh,qdegree,mode)
   end
 
   # Redistribution
@@ -41,10 +44,10 @@ function DistributedGridTransferOperator(lev::Int,sh::FESpaceHierarchy,qdegree::
   cache_redist = _get_redistribution_cache(lev,sh,mode)
 
   cache = cache_refine, cache_redist
-  return DistributedGridTransferOperator(op_type,redist,sh,cache)
+  return DistributedGridTransferOperator(op_type,redist,restriction_method,sh,cache)
 end
 
-function _get_prolongation_cache(lev::Int,sh::FESpaceHierarchy,qdegree::Int,mode)
+function _get_interpolation_cache(lev::Int,sh::FESpaceHierarchy,qdegree::Int,mode::Symbol)
   mh = sh.mh
   cparts = get_level_parts(mh,lev+1)
 
@@ -68,7 +71,7 @@ function _get_prolongation_cache(lev::Int,sh::FESpaceHierarchy,qdegree::Int,mode
   return cache_refine
 end
 
-function _get_restriction_cache(lev::Int,sh::FESpaceHierarchy,qdegree::Int,mode)
+function _get_projection_cache(lev::Int,sh::FESpaceHierarchy,qdegree::Int,mode::Symbol)
   mh = sh.mh
   cparts = get_level_parts(mh,lev+1)
 
@@ -100,7 +103,7 @@ function _get_restriction_cache(lev::Int,sh::FESpaceHierarchy,qdegree::Int,mode)
   return cache_refine
 end
 
-function _get_redistribution_cache(lev::Int,sh::FESpaceHierarchy,mode)
+function _get_redistribution_cache(lev::Int,sh::FESpaceHierarchy,mode::Symbol)
   mh = sh.mh
   redist = has_redistribution(mh,lev)
   if redist
@@ -131,7 +134,7 @@ function setup_transfer_operators(sh::FESpaceHierarchy,qdegree::Int;kwargs...)
   return restrictions, prolongations
 end
 
-### Applying the operators: 
+### Applying the operators:
 
 # A) Prolongation, without redistribution
 function LinearAlgebra.mul!(y::PVector,A::DistributedGridTransferOperator{Val{:prolongation},Val{false}},x::PVector)
@@ -146,8 +149,21 @@ function LinearAlgebra.mul!(y::PVector,A::DistributedGridTransferOperator{Val{:p
   return y
 end
 
-# B) Restriction, without redistribution
-function LinearAlgebra.mul!(y::PVector,A::DistributedGridTransferOperator{Val{:restriction},Val{false}},x::PVector)
+# B.1) Restriction, without redistribution, by interpolation
+function LinearAlgebra.mul!(y::PVector,A::DistributedGridTransferOperator{Val{:restriction},Val{false},Val{:interpolation}},x::PVector)
+  cache_refine, cache_redist = A.cache
+  model_h, Uh, fv_h, dv_h, UH, fv_H, dv_H = cache_refine
+
+  copy!(fv_h,x) # Matrix layout -> FE layout
+  uh = FEFunction(Uh,fv_h,dv_h)
+  uH = interpolate!(uh,fv_H,UH)
+  copy!(y,fv_H) # FE layout -> Matrix layout
+  
+  return y
+end
+
+# B.2) Restriction, without redistribution, by projection
+function LinearAlgebra.mul!(y::PVector,A::DistributedGridTransferOperator{Val{:restriction},Val{false},Val{:projection}},x::PVector)
   cache_refine, cache_redist = A.cache
   model_h, Uh, fv_h, dv_h, VH, AH, lH, xH = cache_refine
 
@@ -167,7 +183,7 @@ function LinearAlgebra.mul!(y::PVector,A::DistributedGridTransferOperator{Val{:p
   model_h, Uh, fv_h, dv_h, UH, fv_H, dv_H = cache_refine
   fv_h_red, dv_h_red, Uh_red, model_h_red, glue = cache_redist
 
-  # 1 - Solve c2f projection in coarse partition
+  # 1 - Interpolate in coarse partition
   if !isa(x,Nothing)
     copy!(fv_H,x) # Matrix layout -> FE layout
     uH = FEFunction(UH,fv_H,dv_H)
@@ -181,8 +197,28 @@ function LinearAlgebra.mul!(y::PVector,A::DistributedGridTransferOperator{Val{:p
   return y
 end
 
-# D) Restriction, with redistribution
-function LinearAlgebra.mul!(y::Union{PVector,Nothing},A::DistributedGridTransferOperator{Val{:restriction},Val{true}},x::PVector)
+# D.1) Restriction, with redistribution, by interpolation
+function LinearAlgebra.mul!(y::Union{PVector,Nothing},A::DistributedGridTransferOperator{Val{:restriction},Val{true},Val{:interpolation}},x::PVector)
+  cache_refine, cache_redist = A.cache
+  model_h, Uh, fv_h, dv_h, UH, fv_H, dv_H = cache_refine
+  fv_h_red, dv_h_red, Uh_red, model_h_red, glue = cache_redist
+
+  # 1 - Redistribute from fine partition to coarse partition
+  copy!(fv_h_red,x)
+  redistribute_free_values!(fv_h,Uh,fv_h_red,dv_h_red,Uh_red,model_h,glue;reverse=true)
+
+  # 2 - Interpolate in coarse partition
+  if !isa(y,Nothing)
+    uh = FEFunction(Uh,fv_h,dv_h)
+    uH = interpolate!(uh,fv_H,UH)
+    copy!(y,fv_H) # FE layout -> Matrix layout
+  end
+
+  return y 
+end
+
+# D.2) Restriction, with redistribution, by projection
+function LinearAlgebra.mul!(y::Union{PVector,Nothing},A::DistributedGridTransferOperator{Val{:restriction},Val{true},Val{:projection}},x::PVector)
   cache_refine, cache_redist = A.cache
   model_h, Uh, fv_h, dv_h, VH, AH, lH, xH = cache_refine
   fv_h_red, dv_h_red, Uh_red, model_h_red, glue = cache_redist
@@ -191,7 +227,7 @@ function LinearAlgebra.mul!(y::Union{PVector,Nothing},A::DistributedGridTransfer
   copy!(fv_h_red,x)
   redistribute_free_values!(fv_h,Uh,fv_h_red,dv_h_red,Uh_red,model_h,glue;reverse=true)
 
-  # 2 - Solve f2c projection in fine partition
+  # 2 - Solve f2c projection coarse partition
   if !isa(y,Nothing)
     uh = FEFunction(Uh,fv_h,dv_h)
     rhs(v) = lH(v,uh)

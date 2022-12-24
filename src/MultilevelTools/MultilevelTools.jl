@@ -41,13 +41,12 @@ export mul!
 
 include("PartitionedArraysExtensions.jl")
 include("GridapDistributedExtensions.jl")
-#include("GridapFixes.jl")
+include("GridapFixes.jl")
 include("RefinementTools.jl")
 include("RedistributeTools.jl")
 include("ModelHierarchies.jl")
 include("FESpaceHierarchies.jl")
 include("DistributedGridTransferOperators.jl")
-
 
 
 end
