@@ -30,8 +30,8 @@ function run_tests(testdir)
       MPI.mpiexec() do cmd
         if f in ["DistributedGridTransferOperatorsTests.jl",
                  "RedistributeToolsTests.jl",
-                 "RefinementToolsTests",
-                 "RichardsonSmoothersTests",
+                 "RefinementToolsTests.jl",
+                 "RichardsonSmoothersTests.jl",
                  "GMGLinearSolversPoissonTests.jl",
                  "GMGLinearSolversLaplacianTests.jl",
                  "GMGLinearSolversVectorLaplacianTests.jl",
