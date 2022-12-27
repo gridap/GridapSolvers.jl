@@ -32,7 +32,7 @@ function _update_cell_dof_values_with_local_info!(cell_dof_values_new,
    end
 end
 
-function allocate_comm_data(num_dofs_x_cell,lids)
+function _allocate_comm_data(num_dofs_x_cell,lids)
   map_parts(num_dofs_x_cell,lids) do num_dofs_x_cell,lids
     n = length(lids)
     ptrs = Vector{Int32}(undef,n+1)
@@ -49,7 +49,7 @@ function allocate_comm_data(num_dofs_x_cell,lids)
   end
 end
 
-function pack_snd_data!(snd_data,cell_dof_values,snd_lids)
+function _pack_snd_data!(snd_data,cell_dof_values,snd_lids)
   map_parts(snd_data,cell_dof_values,snd_lids) do snd_data,cell_dof_values,snd_lids
     cache = array_cache(cell_dof_values)
     s = 1
@@ -67,7 +67,7 @@ function pack_snd_data!(snd_data,cell_dof_values,snd_lids)
   end
 end
 
-function unpack_rcv_data!(cell_dof_values,rcv_data,rcv_lids)
+function _unpack_rcv_data!(cell_dof_values,rcv_data,rcv_lids)
   map_parts(cell_dof_values,rcv_data,rcv_lids) do cell_dof_values,rcv_data,rcv_lids
     s = 1
     for i = 1:length(rcv_lids.ptrs)-1
@@ -92,31 +92,58 @@ function get_glue_components(glue::GridapDistributed.RedistributeGlue,reverse::V
   return glue.lids_snd, glue.lids_rcv, glue.parts_snd, glue.parts_rcv, glue.old2new
 end
 
-function num_dofs_x_cell(cell_dofs_array,lids)
+function _num_dofs_x_cell(cell_dofs_array,lids)
   map_parts(cell_dofs_array,lids) do cell_dofs_array, lids
      data = [length(cell_dofs_array[i]) for i = 1:length(cell_dofs_array) ]
      PartitionedArrays.Table(data,lids.ptrs)
   end
 end
 
-
-function redistribute_cell_dofs(cell_dof_values_old,
-                                cell_dof_ids_new,
-                                model_new,
-                                glue::GridapDistributed.RedistributeGlue;
-                                reverse=false)
+function get_redistribute_cell_dofs_cache(cell_dof_values_old,
+                                           cell_dof_ids_new,
+                                           model_new,
+                                           glue::GridapDistributed.RedistributeGlue;
+                                           reverse=false)
 
   lids_rcv, lids_snd, parts_rcv, parts_snd, new2old = get_glue_components(glue,Val(reverse))
 
   cell_dof_values_old = change_parts(cell_dof_values_old,get_parts(glue);default=[])
   cell_dof_ids_new    = change_parts(cell_dof_ids_new,get_parts(glue);default=[[]])
 
-  num_dofs_x_cell_snd = num_dofs_x_cell(cell_dof_values_old, lids_snd)
-  num_dofs_x_cell_rcv = num_dofs_x_cell(cell_dof_ids_new, lids_rcv)
-  snd_data = allocate_comm_data(num_dofs_x_cell_snd, lids_snd)
-  rcv_data = allocate_comm_data(num_dofs_x_cell_rcv, lids_rcv)
+  num_dofs_x_cell_snd = _num_dofs_x_cell(cell_dof_values_old, lids_snd)
+  num_dofs_x_cell_rcv = _num_dofs_x_cell(cell_dof_ids_new, lids_rcv)
+  snd_data = _allocate_comm_data(num_dofs_x_cell_snd, lids_snd)
+  rcv_data = _allocate_comm_data(num_dofs_x_cell_rcv, lids_rcv)
 
-  pack_snd_data!(snd_data,cell_dof_values_old,lids_snd)
+  cell_dof_values_new = _allocate_cell_wise_dofs(cell_dof_ids_new)
+
+  caches = snd_data, rcv_data, cell_dof_values_new
+  return caches
+end
+
+function redistribute_cell_dofs(cell_dof_values_old,
+                                cell_dof_ids_new,
+                                model_new,
+                                glue::GridapDistributed.RedistributeGlue;
+                                reverse=false)
+  caches = get_redistribute_cell_dofs_cache(cell_dof_values_old,cell_dof_ids_new,model_new,glue;reverse=reverse)
+  return redistribute_cell_dofs!(caches,cell_dof_values_old,cell_dof_ids_new,model_new,glue;reverse=reverse)
+end
+
+function redistribute_cell_dofs!(caches,
+                                 cell_dof_values_old,
+                                 cell_dof_ids_new,
+                                 model_new,
+                                 glue::GridapDistributed.RedistributeGlue;
+                                 reverse=false)
+
+  snd_data, rcv_data, cell_dof_values_new = caches
+  lids_rcv, lids_snd, parts_rcv, parts_snd, new2old = get_glue_components(glue,Val(reverse))
+
+  cell_dof_values_old = change_parts(cell_dof_values_old,get_parts(glue);default=[])
+  cell_dof_ids_new    = change_parts(cell_dof_ids_new,get_parts(glue);default=[[]])
+
+  _pack_snd_data!(snd_data,cell_dof_values_old,lids_snd)
 
   tout = async_exchange!(rcv_data,
                         snd_data,
@@ -124,8 +151,6 @@ function redistribute_cell_dofs(cell_dof_values_old,
                         parts_snd,
                         PartitionedArrays._empty_tasks(parts_rcv))
   map_parts(schedule,tout)
-
-  cell_dof_values_new = _allocate_cell_wise_dofs(cell_dof_ids_new)
 
   # We have to build the owned part of "cell_dof_values_new" out of
   #  1. cell_dof_values_old (for those cells s.t. new2old[:]!=0)
@@ -135,7 +160,7 @@ function redistribute_cell_dofs(cell_dof_values_old,
                                            new2old)
 
   map_parts(wait,tout)
-  unpack_rcv_data!(cell_dof_values_new,rcv_data,lids_rcv)
+  _unpack_rcv_data!(cell_dof_values_new,rcv_data,lids_rcv)
 
   # Now that every part knows it's new owned dofs, exchange ghosts
   new_parts = get_parts(model_new)
@@ -148,6 +173,21 @@ function redistribute_cell_dofs(cell_dof_values_old,
   return cell_dof_values_new
 end
 
+function get_redistribute_free_values_cache(fv_new::Union{PVector,Nothing},
+                                             Uh_new::Union{GridapDistributed.DistributedSingleFieldFESpace,VoidDistributedFESpace},
+                                             fv_old::Union{PVector,Nothing},
+                                             dv_old::Union{AbstractPData,Nothing},
+                                             Uh_old::Union{GridapDistributed.DistributedSingleFieldFESpace,VoidDistributedFESpace},
+                                             model_new,
+                                             glue::GridapDistributed.RedistributeGlue;
+                                             reverse=false)
+  cell_dof_values_old = !isa(fv_old,Nothing) ? map_parts(scatter_free_and_dirichlet_values,local_views(Uh_old),local_views(fv_old),dv_old) : nothing
+  cell_dof_ids_new    = !isa(fv_new,Nothing) ? map_parts(get_cell_dof_ids, local_views(Uh_new)) : nothing
+  caches = get_redistribute_cell_dofs_cache(cell_dof_values_old,cell_dof_ids_new,model_new,glue;reverse=reverse)
+  
+  return caches
+end
+
 function redistribute_free_values!(fv_new::Union{PVector,Nothing},
                                   Uh_new::Union{GridapDistributed.DistributedSingleFieldFESpace,VoidDistributedFESpace},
                                   fv_old::Union{PVector,Nothing},
@@ -157,9 +197,23 @@ function redistribute_free_values!(fv_new::Union{PVector,Nothing},
                                   glue::GridapDistributed.RedistributeGlue;
                                   reverse=false)
 
+  caches = get_redistribute_free_values_cache(fv_new,Uh_new,fv_old,dv_old,Uh_old,model_new,glue;reverse=reverse)
+  return redistribute_free_values!(caches,fv_new,Uh_new,fv_old,dv_old,Uh_old,model_new,glue;reverse=reverse)
+end
+
+function redistribute_free_values!(caches,
+                                   fv_new::Union{PVector,Nothing},
+                                   Uh_new::Union{GridapDistributed.DistributedSingleFieldFESpace,VoidDistributedFESpace},
+                                   fv_old::Union{PVector,Nothing},
+                                   dv_old::Union{AbstractPData,Nothing},
+                                   Uh_old::Union{GridapDistributed.DistributedSingleFieldFESpace,VoidDistributedFESpace},
+                                   model_new,
+                                   glue::GridapDistributed.RedistributeGlue;
+                                   reverse=false)
+
   cell_dof_values_old = !isa(fv_old,Nothing) ? map_parts(scatter_free_and_dirichlet_values,local_views(Uh_old),local_views(fv_old),dv_old) : nothing
   cell_dof_ids_new    = !isa(fv_new,Nothing) ? map_parts(get_cell_dof_ids, local_views(Uh_new)) : nothing
-  cell_dof_values_new = redistribute_cell_dofs(cell_dof_values_old,cell_dof_ids_new,model_new,glue;reverse=reverse)
+  cell_dof_values_new = redistribute_cell_dofs!(caches,cell_dof_values_old,cell_dof_ids_new,model_new,glue;reverse=reverse)
 
   # Gather the new free dofs
   if !isa(fv_new,Nothing)
@@ -188,7 +242,6 @@ function redistribute_fe_function(uh_old::Union{GridapDistributed.DistributedSin
     return nothing
   end
 end
-
 
 function Gridap.FESpaces.gather_free_and_dirichlet_values(f::GridapDistributed.DistributedFESpace,cv)
   free_values, dirichlet_values = map_parts(local_views(f),cv) do f, cv
