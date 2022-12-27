@@ -90,14 +90,20 @@ function _get_projection_cache(lev::Int,sh::FESpaceHierarchy,qdegree::Int,mode::
 
     aH(u,v)  = ∫(v⋅u)*dΩH
     lH(v,uh) = ∫(v⋅uh)*dΩhH
-    AH = assemble_matrix(aH,UH,VH)
+    assem    = SparseMatrixAssembler(UH,VH)
+
+    AH = assemble_matrix(aH,assem,UH,VH)
     xH = PVector(0.0,AH.rows)
 
-    cache_refine = model_h, Uh, fv_h, dv_h, VH, AH, lH, xH
+    v  = get_fe_basis(VH)
+    vec_data = collect_cell_vector(VH,lH(v,1.0))
+    bH = allocate_vector(assem,vec_data)
+
+    cache_refine = model_h, Uh, fv_h, dv_h, VH, AH, lH, xH, bH, assem
   else
     model_h = get_model_before_redist(mh,lev)
     Uh      = get_fe_space_before_redist(sh,lev)
-    cache_refine = model_h, Uh, nothing, nothing, nothing, nothing, nothing, nothing
+    cache_refine = model_h, Uh, nothing, nothing, nothing, nothing, nothing, nothing, nothing, nothing
   end
 
   return cache_refine
@@ -175,14 +181,15 @@ end
 # B.2) Restriction, without redistribution, by projection
 function LinearAlgebra.mul!(y::PVector,A::DistributedGridTransferOperator{Val{:restriction},Val{false},Val{:projection}},x::PVector)
   cache_refine, cache_redist = A.cache
-  model_h, Uh, fv_h, dv_h, VH, AH, lH, xH = cache_refine
+  model_h, Uh, fv_h, dv_h, VH, AH, lH, xH, bH, assem = cache_refine
 
   copy!(fv_h,x) # Matrix layout -> FE layout
   uh = FEFunction(Uh,fv_h,dv_h)
-  rhs(v) = lH(v,uh)
-  bH = assemble_vector(rhs,VH) # Matrix layout
+  v  = get_fe_basis(VH)
+  vec_data = collect_cell_vector(VH,lH(v,uh))
+  assemble_vector!(bH,assem,vec_data) # Matrix layout
   IterativeSolvers.cg!(xH,AH,bH;reltol=1.0e-06)
-  copy!(y,xH) # TO UNDERSTAND: Why can't we use directly y instead of xH?
+  copy!(y,xH)
   
   return y
 end
@@ -230,7 +237,7 @@ end
 # D.2) Restriction, with redistribution, by projection
 function LinearAlgebra.mul!(y::Union{PVector,Nothing},A::DistributedGridTransferOperator{Val{:restriction},Val{true},Val{:projection}},x::PVector)
   cache_refine, cache_redist = A.cache
-  model_h, Uh, fv_h, dv_h, VH, AH, lH, xH = cache_refine
+  model_h, Uh, fv_h, dv_h, VH, AH, lH, xH, bH, assem = cache_refine
   fv_h_red, dv_h_red, Uh_red, model_h_red, glue, cache_exchange = cache_redist
 
   # 1 - Redistribute from fine partition to coarse partition
@@ -240,8 +247,9 @@ function LinearAlgebra.mul!(y::Union{PVector,Nothing},A::DistributedGridTransfer
   # 2 - Solve f2c projection coarse partition
   if !isa(y,Nothing)
     uh = FEFunction(Uh,fv_h,dv_h)
-    rhs(v) = lH(v,uh)
-    bH = assemble_vector(rhs,VH) # Matrix layout
+    v  = get_fe_basis(VH)
+    vec_data = collect_cell_vector(VH,lH(v,uh))
+    assemble_vector!(bH,assem,vec_data) # Matrix layout
     IterativeSolvers.cg!(xH,AH,bH;reltol=1.0e-06)
     copy!(y,xH)
   end
