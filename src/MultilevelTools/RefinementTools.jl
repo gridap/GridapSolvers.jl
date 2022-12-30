@@ -72,7 +72,7 @@ function restrict_dofs!(fv_c::PVector,
                         glue::AbstractPData{<:AdaptivityGlue})
 
   map_parts(restrict_dofs!,local_views(fv_c),local_views(fv_f),dv_f,local_views(U_f),local_views(U_c),glue)
-  async_exchange!(fv_c)
+  exchange!(fv_c)
 
   return fv_c
 end
