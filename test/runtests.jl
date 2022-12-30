@@ -37,7 +37,8 @@ function run_tests(testdir)
                  "GMGLinearSolversVectorLaplacianTests.jl",
                  "GMGLinearSolversHDivRTTests.jl",
                  "MUMPSSolversTests.jl",
-                 "GMGLinearSolversMUMPSTests.jl"]
+                 "GMGLinearSolversMUMPSTests.jl",
+                 "RestrictDofsTests.jl"]
           np = 4
           extra_args = "-s 2 2 -r 2"
         elseif f in ["ModelHierarchiesTests.jl"]

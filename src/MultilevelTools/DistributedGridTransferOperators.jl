@@ -30,10 +30,10 @@ function DistributedGridTransferOperator(lev::Int,sh::FESpaceHierarchy,qdegree::
   @check lev < num_levels(mh)
   @check op_type ∈ [:restriction, :prolongation]
   @check mode ∈ [:solution, :residual]
-  @check restriction_method ∈ [:projection, :interpolation]
+  @check restriction_method ∈ [:projection, :interpolation, :dof_mask]
 
   # Refinement
-  if (op_type == :prolongation) || (restriction_method == :interpolation)
+  if (op_type == :prolongation) || (restriction_method ∈ [:interpolation,:dof_mask])
     cache_refine = _get_interpolation_cache(lev,sh,qdegree,mode)
   else
     cache_refine = _get_projection_cache(lev,sh,qdegree,mode)
@@ -194,6 +194,18 @@ function LinearAlgebra.mul!(y::PVector,A::DistributedGridTransferOperator{Val{:r
   return y
 end
 
+# B.3) Restriction, without redistribution, by dof selection (only nodal dofs)
+function LinearAlgebra.mul!(y::PVector,A::DistributedGridTransferOperator{Val{:restriction},Val{false},Val{:dof_mask}},x::PVector)
+  cache_refine, cache_redist = A.cache
+  model_h, Uh, fv_h, dv_h, UH, fv_H, dv_H = cache_refine
+
+  copy!(fv_h,x) # Matrix layout -> FE layout
+  restrict_dofs!(fv_H,fv_h,dv_h,Uh,UH,get_adaptivity_glue(model_h))
+  copy!(y,fv_H) # FE layout -> Matrix layout
+  
+  return y
+end
+
 # C) Prolongation, with redistribution
 function LinearAlgebra.mul!(y::PVector,A::DistributedGridTransferOperator{Val{:prolongation},Val{true}},x::Union{PVector,Nothing})
   cache_refine, cache_redist = A.cache
@@ -252,6 +264,25 @@ function LinearAlgebra.mul!(y::Union{PVector,Nothing},A::DistributedGridTransfer
     assemble_vector!(bH,assem,vec_data) # Matrix layout
     IterativeSolvers.cg!(xH,AH,bH;reltol=1.0e-06)
     copy!(y,xH)
+  end
+
+  return y 
+end
+
+# D.3) Restriction, with redistribution, by dof selection (only nodal dofs)
+function LinearAlgebra.mul!(y::Union{PVector,Nothing},A::DistributedGridTransferOperator{Val{:restriction},Val{true},Val{:dof_mask}},x::PVector)
+  cache_refine, cache_redist = A.cache
+  model_h, Uh, fv_h, dv_h, UH, fv_H, dv_H = cache_refine
+  fv_h_red, dv_h_red, Uh_red, model_h_red, glue, cache_exchange = cache_redist
+
+  # 1 - Redistribute from fine partition to coarse partition
+  copy!(fv_h_red,x)
+  redistribute_free_values!(cache_exchange,fv_h,Uh,fv_h_red,dv_h_red,Uh_red,model_h,glue;reverse=true)
+
+  # 2 - Interpolate in coarse partition
+  if !isa(y,Nothing)
+    restrict_dofs!(fv_H,fv_h,dv_h,Uh,UH,get_adaptivity_glue(model_h))
+    copy!(y,fv_H) # FE layout -> Matrix layout
   end
 
   return y 

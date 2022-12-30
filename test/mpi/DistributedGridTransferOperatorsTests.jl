@@ -38,6 +38,8 @@ function run(parts,num_parts_x_level,coarse_grid_partition,num_refs_coarse)
   restrictions, prolongations = ops
   ops2 = setup_transfer_operators(trials, qdegree; restriction_method=:interpolation)
   restrictions2, prolongations2 = ops2
+  ops3 = setup_transfer_operators(trials, qdegree; restriction_method=:dof_mask)
+  restrictions3, prolongations3 = ops3
 
   a(u,v,dΩ) = ∫(∇(v)⋅∇(u))*dΩ
   l(v,dΩ)   = ∫(v⋅u)*dΩ
@@ -69,12 +71,18 @@ function run(parts,num_parts_x_level,coarse_grid_partition,num_refs_coarse)
       R2 = restrictions2[lev]
       mul!(yH,R2,xh)
 
+      R3 = restrictions3[lev]
+      mul!(yH,R3,xh)
+
       GridapP4est.i_am_main(parts_h) && println("  > Prolongation")
       P = prolongations[lev]
       mul!(yh,P,xH)
 
       P2 = prolongations2[lev]
       mul!(yh,P2,xH)
+
+      P3 = prolongations3[lev]
+      mul!(yh,P3,xH)
     end
   end
 
