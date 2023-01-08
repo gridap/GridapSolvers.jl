@@ -136,13 +136,18 @@ function convert_to_refined_models(mh::ModelHierarchy)
   nlevs  = num_levels(mh)
   levels = Vector{ModelHierarchyLevel}(undef,nlevs)
   for lev in 1:nlevs-1
-    model       = get_model_before_redist(mh,lev)
-    parent      = get_model(mh,lev+1)
-    ref_glue    = change_parts(mh.levels[lev].ref_glue,get_parts(model);default=void(AdaptivityGlue))
-    #ref_glue    = mh.levels[lev].ref_glue
-    model_ref   = DistributedAdaptedDiscreteModel(model,parent,ref_glue)
+    parts       = get_level_parts(mh,lev+1)
+    if i_am_in(parts)
+      model       = get_model_before_redist(mh,lev)
+      parent      = get_model(mh,lev+1)
+      ref_glue    = mh.levels[lev].ref_glue
+      model_ref   = DistributedAdaptedDiscreteModel(model,parent,ref_glue)
+    else
+      model     = get_model_before_redist(mh,lev)
+      model_ref = VoidDistributedDiscreteModel(model)
+    end
 
-    levels[lev] = ModelHierarchyLevel(lev,model_ref,ref_glue,mh.levels[lev].model_red,mh.levels[lev].red_glue)
+    levels[lev] = ModelHierarchyLevel(lev,model_ref,mh.levels[lev].ref_glue,mh.levels[lev].model_red,mh.levels[lev].red_glue)
   end
   levels[nlevs] = mh.levels[nlevs]
 

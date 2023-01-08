@@ -98,14 +98,12 @@ function get_test_space(U::GridapDistributed.DistributedSingleFieldFESpace)
   spaces = map_parts(local_views(U)) do U
     U.space
   end
-  gids = U.gids
-  vector_type = U.vector_type
-  return GridapDistributed.DistributedSingleFieldFESpace(spaces,gids,vector_type)
+  return GridapDistributed.DistributedSingleFieldFESpace(spaces,U.gids,U.vector_type)
 end
 
 function FESpaces.get_triangulation(f::GridapDistributed.DistributedSingleFieldFESpace,model::GridapDistributed.AbstractDistributedDiscreteModel)
   trians = map_parts(get_triangulation,local_views(f))
-  GridapDistributed.DistributedTriangulation(trians,model)
+  return GridapDistributed.DistributedTriangulation(trians,model)
 end
 
 # Void GridapDistributed structures

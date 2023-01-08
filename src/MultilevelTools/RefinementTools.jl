@@ -4,41 +4,21 @@
 const DistributedAdaptedDiscreteModel{Dc,Dp} = GridapDistributed.DistributedDiscreteModel{Dc,Dp,<:AbstractPData{<:AdaptedDiscreteModel{Dc,Dp}}}
 
 function DistributedAdaptedDiscreteModel(model::GridapDistributed.AbstractDistributedDiscreteModel,
-                                         parent_models::AbstractPData{<:DiscreteModel},
+                                         parent::GridapDistributed.AbstractDistributedDiscreteModel,
                                          glue::AbstractPData{<:AdaptivityGlue})
-  models = map_parts(local_views(model),parent_models,glue) do model, parent, glue
+  models = map_parts(local_views(model),local_views(parent),glue) do model, parent, glue
     AdaptedDiscreteModel(model,parent,glue)
   end
   return GridapDistributed.DistributedDiscreteModel(models,get_cell_gids(model))
-end
-
-function DistributedAdaptedDiscreteModel(model::GridapDistributed.AbstractDistributedDiscreteModel,
-                                         parent::GridapDistributed.AbstractDistributedDiscreteModel,
-                                         glue::AbstractPData{<:Union{AdaptivityGlue,Nothing}})
-  mparts = get_parts(model)
-  pparts = get_parts(parent)
-
-  !i_am_in(mparts)    && (return VoidDistributedDiscreteModel(model))
-  (mparts === pparts) && (return DistributedAdaptedDiscreteModel(model,local_views(parent),glue))
-
-  parent_models, glues = map_parts(local_views(model)) do m
-    if i_am_in(pparts)
-      parent_models = local_views(parent)
-      parent_models.part, glue.part
-    else
-      void(typeof(m)), void(AdaptivityGlue)
-    end
-  end
-  return DistributedAdaptedDiscreteModel(model,parent_models,glues)
 end
 
 function Gridap.Adaptivity.get_adaptivity_glue(model::DistributedAdaptedDiscreteModel)
   return map_parts(Gridap.Adaptivity.get_adaptivity_glue,local_views(model))
 end
 
-# DistributedRefinedTriangulations
+# DistributedAdaptedTriangulations
 
-const DistributedRefinedTriangulation{Dc,Dp} = GridapDistributed.DistributedTriangulation{Dc,Dp,<:AbstractPData{<:AdaptedTriangulation{Dc,Dp}}}
+const DistributedAdaptedTriangulation{Dc,Dp} = GridapDistributed.DistributedTriangulation{Dc,Dp,<:AbstractPData{<:AdaptedTriangulation{Dc,Dp}}}
 
 # ChangeDomain
 
