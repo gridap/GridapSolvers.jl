@@ -12,19 +12,16 @@ struct GMGLinearSolver{A,B,C,D,E,F,G,H} <: Gridap.Algebra.LinearSolver
   mode            :: Symbol
 end
 
-function GMGLinearSolver(mh,
-      smatrices,
-      interp,
-      restrict;
-      pre_smoothers=Fill(RichardsonSmoother(JacobiLinearSolver(),10),num_levels(mh)-1),
-      post_smoothers=pre_smoothers,
-      coarsest_solver=Gridap.Algebra.BackslashSolver(),
-      maxiter=100,
-      rtol=1.0e-06,
-      verbose::Bool=false,
-      mode=:preconditioner)
+function GMGLinearSolver(mh,smatrices,interp,restrict;
+      pre_smoothers   = Fill(RichardsonSmoother(JacobiLinearSolver(),10),num_levels(mh)-1),
+      post_smoothers  = pre_smoothers,
+      coarsest_solver = Gridap.Algebra.BackslashSolver(),
+      maxiter         = 100,
+      rtol            = 1.0e-06,
+      verbose::Bool   = false,
+      mode            = :preconditioner)
 
-  Gridap.Helpers.@check mode ∈ [:preconditioner, :solver]
+  Gridap.Helpers.@check mode ∈ [:preconditioner,:solver]
   Gridap.Helpers.@check isa(maxiter,Integer)
   Gridap.Helpers.@check isa(rtol,Real)
 
@@ -36,17 +33,8 @@ function GMGLinearSolver(mh,
   F=typeof(coarsest_solver)
   G=typeof(maxiter)
   H=typeof(rtol)
-  GMGLinearSolver{A,B,C,D,E,F,G,H}(mh,
-                   smatrices,
-                   interp,
-                   restrict,
-                   pre_smoothers,
-                   post_smoothers,
-                   coarsest_solver,
-                   maxiter,
-                   rtol,
-                   verbose,
-                   mode)
+  return GMGLinearSolver{A,B,C,D,E,F,G,H}(mh,smatrices,interp,restrict,pre_smoothers,post_smoothers,
+                                          coarsest_solver,maxiter,rtol,verbose,mode)
 end
 
 struct GMGSymbolicSetup <: Gridap.Algebra.SymbolicSetup
@@ -95,13 +83,12 @@ function Gridap.Algebra.numerical_setup(ss::GMGSymbolicSetup,mat::AbstractMatrix
   return GMGNumericalSetup(ss)
 end
 
-function setup_smoothers_caches(mh,smoothers,smatrices)
+function setup_smoothers_caches(mh::ModelHierarchy,smoothers::AbstractVector{<:LinearSolver},smatrices::Vector{<:AbstractMatrix})
   Gridap.Helpers.@check length(smoothers) == num_levels(mh)-1
   nlevs = num_levels(mh)
   # Last (i.e., coarsest) level does not need pre-/post-smoothing
   caches = Vector{Any}(undef,nlevs-1)
   for i = 1:nlevs-1
-    model = get_model(mh,i)
     parts = get_level_parts(mh,i)
     if (GridapP4est.i_am_in(parts))
       ss = symbolic_setup(smoothers[i], smatrices[i])
@@ -111,32 +98,58 @@ function setup_smoothers_caches(mh,smoothers,smatrices)
   return caches
 end
 
-function setup_coarsest_solver_cache(mh,coarsest_solver,smatrices)
+function setup_coarsest_solver_cache(mh::ModelHierarchy,coarsest_solver::LinearSolver,smatrices::Vector{<:AbstractMatrix})
   cache = nothing
   nlevs = num_levels(mh)
   parts = get_level_parts(mh,nlevs)
-  model = get_model(mh,nlevs)
   if (GridapP4est.i_am_in(parts))
-    if (num_parts(parts) == 1)
-      cache = map_parts(smatrices[nlevs].owned_owned_values) do Ah
+    mat = smatrices[nlevs]
+    if (num_parts(parts) == 1) # Serial
+      cache = map_parts(mat.owned_owned_values) do Ah
         ss  = symbolic_setup(coarsest_solver, Ah)
         numerical_setup(ss, Ah)
       end
       cache = cache.part
-    else
-      ss = symbolic_setup(coarsest_solver, smatrices[nlevs])
-      cache = numerical_setup(ss, smatrices[nlevs])
+    else # Parallel
+      ss = symbolic_setup(coarsest_solver, mat)
+      cache = numerical_setup(ss, mat)
     end
   end
   return cache
 end
 
-function allocate_level_work_vectors(mh,smatrices,lev)
-  parts = get_level_parts(mh,lev+1)
+function setup_coarsest_solver_cache(mh::ModelHierarchy,coarsest_solver::PETScLinearSolver,smatrices::Vector{<:AbstractMatrix})
+  cache = nothing
+  nlevs = num_levels(mh)
+  parts = get_level_parts(mh,nlevs)
+  if (GridapP4est.i_am_in(parts))
+    mat   = smatrices[nlevs]
+    if (num_parts(parts) == 1) # Serial
+      cache = map_parts(mat.owned_owned_values) do Ah
+        rh  = convert(PETScVector,fill(0.0,size(A,2)))
+        xh  = convert(PETScVector,fill(0.0,size(A,2)))
+        ss  = symbolic_setup(coarsest_solver, Ah)
+        ns  = numerical_setup(ss, Ah)
+        return ns, xh, rh
+      end
+      cache = cache.part
+    else # Parallel
+      rh = convert(PETScVector,PVector(0.0,mat.cols))
+      xh = convert(PETScVector,PVector(0.0,mat.cols))
+      ss = symbolic_setup(coarsest_solver, mat)
+      ns = numerical_setup(ss, mat)
+      cache = ns, xh, rh
+    end
+  end
+  return cache
+end
+
+function allocate_level_work_vectors(mh::ModelHierarchy,smatrices::Vector{<:AbstractMatrix},lev::Integer)
   dxh   = PVector(0.0, smatrices[lev].cols)
   Adxh  = PVector(0.0, smatrices[lev].rows)
-  rh    = PVector(0.0, smatrices[lev].rows)
-  if (GridapP4est.i_am_in(parts))
+
+  cparts = get_level_parts(mh,lev+1)
+  if (GridapP4est.i_am_in(cparts))
     AH  = smatrices[lev+1]
     rH  = PVector(0.0,AH.cols)
     dxH = PVector(0.0,AH.cols)
@@ -147,7 +160,7 @@ function allocate_level_work_vectors(mh,smatrices,lev)
   return dxh, Adxh, dxH, rH
 end
 
-function allocate_work_vectors(mh,smatrices)
+function allocate_work_vectors(mh::ModelHierarchy,smatrices::Vector{<:AbstractMatrix})
   nlevs = num_levels(mh)
   work_vectors = Vector{Any}(undef,nlevs-1)
   for i = 1:nlevs-1
@@ -159,59 +172,58 @@ function allocate_work_vectors(mh,smatrices)
   return work_vectors
 end
 
-function apply_GMG_level!(xh,
-                          rh,
-                          lev,
-                          mh,
-                          smatrices,
-                          restrictions,
-                          interpolations,
-                          pre_smoothers_caches,
-                          post_smoothers_caches,
-                          coarsest_solver_cache,
-                          work_vectors;
-                          verbose=false)
+function solve_coarsest_level!(parts::AbstractPData,::LinearSolver,xh::PVector,rh::PVector,caches)
+  if (GridapP4est.num_parts(parts) == 1)
+    map_parts(xh.owned_values,rh.owned_values) do xh, rh
+       solve!(xh,caches,rh)
+    end
+  else
+    solve!(xh,caches,rh)
+  end
+end
 
+function solve_coarsest_level!(parts::AbstractPData,::PETScLinearSolver,xh::PVector,rh::PVector,caches)
+  solver_ns, xh_petsc, rh_petsc = caches
+  if (GridapP4est.num_parts(parts) == 1)
+    map_parts(xh.owned_values,rh.owned_values) do xh, rh
+      copy!(rh_petsc,rh)
+      solve!(xh_petsc,solver_ns,rh_petsc)
+      copy!(xh,xh_petsc)
+    end
+  else
+    copy!(rh_petsc,rh)
+    solve!(xh_petsc,solver_ns,rh_petsc)
+    copy!(xh,xh_petsc)
+  end
+end
+
+function apply_GMG_level!(lev::Integer,xh::Union{PVector,Nothing},rh::Union{PVector,Nothing},ns::GMGNumericalSetup;verbose=false)
+  mh = ns.solver.mh
   parts = get_level_parts(mh,lev)
   if GridapP4est.i_am_in(parts)
-    if (lev == num_levels(mh))
-      if (GridapP4est.num_parts(parts) == 1)
-         map_parts(xh.owned_values,rh.owned_values) do xh, rh
-            solve!(xh,coarsest_solver_cache,rh)
-         end
-      else
-        solve!(xh,coarsest_solver_cache,rh)
-      end
-    else
-      Ah = smatrices[lev]
-      dxh, Adxh, dxH, rH = work_vectors[lev]
+    if (lev == num_levels(mh)) 
+      ## Coarsest level
+      coarsest_solver = ns.solver.coarsest_solver
+      coarsest_solver_cache = ns.coarsest_solver_cache
+      solve_coarsest_level!(parts,coarsest_solver,xh,rh,coarsest_solver_cache)
+    else 
+      ## General case
+      Ah   = ns.solver.smatrices[lev]
+      restrict, interp = ns.solver.restrict[lev], ns.solver.interp[lev]
+      dxh, Adxh, dxH, rH = ns.work_vectors[lev]
 
       # Pre-smooth current solution
-      solve!(xh, pre_smoothers_caches[lev], rh)
+      solve!(xh, ns.pre_smoothers_caches[lev], rh)
 
       # Restrict the residual
-      mul!(rH,restrictions[lev],rh)
-
-      if !isa(dxH,Nothing)
-        fill!(dxH,0.0)
-      end
+      mul!(rH,restrict,rh)
 
       # Apply next_level
-      apply_GMG_level!(dxH,
-                      rH,
-                      lev+1,
-                      mh,
-                      smatrices,
-                      restrictions,
-                      interpolations,
-                      pre_smoothers_caches,
-                      post_smoothers_caches,
-                      coarsest_solver_cache,
-                      work_vectors;
-                      verbose=verbose)
+      !isa(dxH,Nothing) && fill!(dxH,0.0)
+      apply_GMG_level!(lev+1,dxH,rH,ns;verbose=verbose)
 
       # Interpolate dxH in finer space
-      mul!(dxh,interpolations[lev],dxH)
+      mul!(dxh,interp,dxH)
 
       # Update solution
       xh .= xh .+ dxh
@@ -220,33 +232,26 @@ function apply_GMG_level!(xh,
       rh .= rh .- Adxh
 
       # Post-smooth current solution
-      solve!(xh, post_smoothers_caches[lev], rh)
+      solve!(xh, ns.post_smoothers_caches[lev], rh)
     end
   end
 end
 
-function Gridap.Algebra.solve!(
-  x::AbstractVector,ns::GMGNumericalSetup,b::AbstractVector)
+function Gridap.Algebra.solve!(x::AbstractVector,ns::GMGNumericalSetup,b::AbstractVector)
 
-  smatrices      = ns.solver.smatrices
-  mh             = ns.solver.mh
-  maxiter        = ns.solver.maxiter
-  rtol           = ns.solver.rtol
-  restrictions   = ns.solver.restrict
-  interpolations = ns.solver.interp
-  verbose        = ns.solver.verbose
-  mode           = ns.solver.mode
+  mh      = ns.solver.mh
+  maxiter = ns.solver.maxiter
+  rtol    = ns.solver.rtol
+  verbose = ns.solver.verbose
+  mode    = ns.solver.mode
 
-  pre_smoothers_caches  = ns.pre_smoothers_caches
-  post_smoothers_caches = ns.post_smoothers_caches
-  coarsest_solver_cache = ns.coarsest_solver_cache
-  work_vectors          = ns.work_vectors
-
-  if (mode==:preconditioner)
+  # TODO: rh could definitely be cached
+  # TODO: When running in preconditioner mode, do we really need to compute the norm? It's a global com....
+  if (mode == :preconditioner)
     fill!(x,0.0)
     rh = copy(b)
   else
-    Ah = smatrices[1]
+    Ah = ns.solver.smatrices[1]
     rh = PVector(0.0,Ah.rows)
     rh .= b .- Ah*x
   end
@@ -263,19 +268,9 @@ function Gridap.Algebra.solve!(
   end
 
   while (current_iter < maxiter) && (rel_res > rtol)
-    apply_GMG_level!(x,
-                     rh,
-                     1,
-                     mh,
-                     smatrices,
-                     restrictions,
-                     interpolations,
-                     pre_smoothers_caches,
-                     post_smoothers_caches,
-                     coarsest_solver_cache,
-                     work_vectors;
-                     verbose=verbose)
-    nrm_r = norm(rh)
+    apply_GMG_level!(1,x,rh,ns;verbose=verbose)
+
+    nrm_r   = norm(rh)
     rel_res = nrm_r / nrm_r0
     current_iter += 1
     if GridapP4est.i_am_main(parts)

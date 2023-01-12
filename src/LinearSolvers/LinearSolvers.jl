@@ -6,6 +6,7 @@ using Gridap
 using Gridap.Algebra
 using PartitionedArrays
 using GridapP4est
+using GridapPETSc
 
 using GridapSolvers.MultilevelTools
 
