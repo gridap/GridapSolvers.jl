@@ -45,12 +45,13 @@ function Gridap.Algebra.symbolic_setup(solver::GMGLinearSolver,mat::AbstractMatr
   return GMGSymbolicSetup(solver)
 end
 
-struct GMGNumericalSetup{A,B,C,D} <: Gridap.Algebra.NumericalSetup
+struct GMGNumericalSetup{A,B,C,D,E} <: Gridap.Algebra.NumericalSetup
   solver                 :: GMGLinearSolver
-  pre_smoothers_caches   :: A
-  post_smoothers_caches  :: B
-  coarsest_solver_cache  :: C
-  work_vectors           :: D
+  finest_level_cache     :: A
+  pre_smoothers_caches   :: B
+  post_smoothers_caches  :: C
+  coarsest_solver_cache  :: D
+  work_vectors           :: E
 
   function GMGNumericalSetup(ss::GMGSymbolicSetup)
     mh              = ss.solver.mh
@@ -59,6 +60,7 @@ struct GMGNumericalSetup{A,B,C,D} <: Gridap.Algebra.NumericalSetup
     smatrices       = ss.solver.smatrices
     coarsest_solver = ss.solver.coarsest_solver
 
+    finest_level_cache = setup_finest_level_cache(mh,smatrices)
     work_vectors = allocate_work_vectors(mh,smatrices)
     pre_smoothers_caches = setup_smoothers_caches(mh,pre_smoothers,smatrices)
     if (!(pre_smoothers === post_smoothers))
@@ -67,20 +69,29 @@ struct GMGNumericalSetup{A,B,C,D} <: Gridap.Algebra.NumericalSetup
       post_smoothers_caches = pre_smoothers_caches
     end
     coarsest_solver_cache = setup_coarsest_solver_cache(mh,coarsest_solver,smatrices)
-    A = typeof(pre_smoothers_caches)
-    B = typeof(post_smoothers_caches)
-    C = typeof(coarsest_solver_cache)
-    D = typeof(work_vectors)
-    new{A,B,C,D}(ss.solver,
-                 pre_smoothers_caches,
-                 post_smoothers_caches,
-                 coarsest_solver_cache,
-                 work_vectors)
+
+    A = typeof(finest_level_cache)
+    B = typeof(pre_smoothers_caches)
+    C = typeof(post_smoothers_caches)
+    D = typeof(coarsest_solver_cache)
+    E = typeof(work_vectors)
+    return new{A,B,C,D,E}(ss.solver,finest_level_cache,pre_smoothers_caches,post_smoothers_caches,coarsest_solver_cache,work_vectors)
   end
 end
 
 function Gridap.Algebra.numerical_setup(ss::GMGSymbolicSetup,mat::AbstractMatrix)
   return GMGNumericalSetup(ss)
+end
+
+function setup_finest_level_cache(mh::ModelHierarchy,smatrices::Vector{<:AbstractMatrix})
+  cache = nothing
+  parts = get_level_parts(mh,1)
+  if (GridapP4est.i_am_in(parts))
+    Ah = smatrices[1]
+    rh = PVector(0.0, Ah.cols)
+    cache = rh
+  end
+  return cache
 end
 
 function setup_smoothers_caches(mh::ModelHierarchy,smoothers::AbstractVector{<:LinearSolver},smatrices::Vector{<:AbstractMatrix})
@@ -245,15 +256,15 @@ function Gridap.Algebra.solve!(x::AbstractVector,ns::GMGNumericalSetup,b::Abstra
   verbose = ns.solver.verbose
   mode    = ns.solver.mode
 
-  # TODO: rh could definitely be cached
   # TODO: When running in preconditioner mode, do we really need to compute the norm? It's a global com....
+  rh = ns.finest_level_cache
   if (mode == :preconditioner)
     fill!(x,0.0)
-    rh = copy(b)
+    copy!(rh,b)
   else
     Ah = ns.solver.smatrices[1]
-    rh = PVector(0.0,Ah.rows)
-    rh .= b .- Ah*x
+    mul!(rh,Ah,x)
+    rh .= b .- rh
   end
 
   nrm_r0 = norm(rh)
