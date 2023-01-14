@@ -219,7 +219,7 @@ function apply_GMG_level!(lev::Integer,xh::Union{PVector,Nothing},rh::Union{PVec
       solve_coarsest_level!(parts,coarsest_solver,xh,rh,coarsest_solver_cache)
     else 
       ## General case
-      Ah   = ns.solver.smatrices[lev]
+      Ah = ns.solver.smatrices[lev]
       restrict, interp = ns.solver.restrict[lev], ns.solver.interp[lev]
       dxh, Adxh, dxH, rH = ns.work_vectors[lev]
 
