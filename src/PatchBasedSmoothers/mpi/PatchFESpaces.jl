@@ -25,20 +25,22 @@ function PatchFESpace(model::GridapDistributed.DistributedDiscreteModel,
                  patches_mask=patches_mask)
   end
 
-  spaces=map_parts(f,
+  spaces = map_parts(f,
                    model.models,
                    patch_decomposition.patch_decompositions,
                    Vh.spaces,
                    root_gids.partition)
-  parts=get_part_ids(model.models)
-  nodofs=map_parts(spaces) do space
+  
+  parts  = get_part_ids(model.models)
+  nodofs = map_parts(spaces) do space
     num_free_dofs(space)
   end
-  ngdofs=sum(nodofs)
+  ngdofs = sum(nodofs)
+
   first_gdof, _ = xscan(+,reduce,nodofs,init=1)
   # This PRange has no ghost dofs
   gids = PRange(parts,ngdofs,nodofs,first_gdof)
-  GridapDistributed.DistributedSingleFieldFESpace(spaces,gids,get_vector_type(Vh))
+  return GridapDistributed.DistributedSingleFieldFESpace(spaces,gids,get_vector_type(Vh))
 end
 
 # x \in  PatchFESpace
@@ -48,6 +50,7 @@ function prolongate!(x::PVector,
                      y::PVector)
    parts=get_part_ids(x.owned_values)
    Gridap.Helpers.@notimplementedif num_parts(parts)!=1
+   
    map_parts(x.owned_values,Ph.spaces,y.owned_values) do x,Ph,y
      prolongate!(x,Ph,y)
    end
@@ -57,20 +60,21 @@ function inject!(x::PVector,
                  Ph::GridapDistributed.DistributedSingleFieldFESpace,
                  y::PVector,
                  w::PVector)
-  parts=get_part_ids(x.owned_values)
+  parts = get_part_ids(x.owned_values)
   Gridap.Helpers.@notimplementedif num_parts(parts)!=1
+  
   map_parts(x.owned_values,Ph.spaces,y.owned_values,w.owned_values) do x,Ph,y,w
     inject!(x,Ph,y,w)
   end
 end
 
 function compute_weight_operators(Ph::GridapDistributed.DistributedSingleFieldFESpace)
-  parts=get_part_ids(Ph.spaces)
-  Gridap.Helpers.@notimplementedif num_parts(parts)!=1
-  w=PVector(0.0,Ph.gids)
-  map_parts(w.owned_values,Ph.spaces) do w,Ph
+  parts = get_part_ids(Ph.spaces)
+  Gridap.Helpers.@notimplementedif num_parts(parts) != 1
+  
+  w = PVector(0.0,Ph.gids)
+  map_parts(w.owned_values,Ph.spaces) do w, Ph
     w .= compute_weight_operators(Ph)
-    #println(w)
   end
-  w
+  return w
 end

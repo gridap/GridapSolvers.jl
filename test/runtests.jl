@@ -63,5 +63,9 @@ function run_tests(testdir)
     end
 end
 
+# MPI tests
 run_tests(@__DIR__)
 run_tests(joinpath(@__DIR__, "mpi"))
+
+# Sequential tests
+@time @testset "PatchLinearSolverTests" begin include("seq/PatchLinearSolverTests.jl") end

@@ -2,6 +2,7 @@ module GridapSolvers
 
   include("MultilevelTools/MultilevelTools.jl")
   include("LinearSolvers/LinearSolvers.jl")
+  include("PatchBasedSmoothers/PatchBasedSmoothers.jl")
 
   using GridapSolvers.MultilevelTools
   using GridapSolvers.LinearSolvers

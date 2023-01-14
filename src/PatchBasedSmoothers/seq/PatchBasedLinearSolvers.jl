@@ -36,15 +36,15 @@ struct PatchBasedSmootherNumericalSetup{A,B,C,D,E} <: Gridap.Algebra.NumericalSe
 end
 
 function Gridap.Algebra.numerical_setup(ss::PatchBasedSymbolicSetup,A::AbstractMatrix)
-  Ph=ss.solver.Ph
-  assembler=SparseMatrixAssembler(Ph,Ph)
-  Ap=assemble_matrix(ss.solver.bilinear_form,assembler,Ph,Ph)
+  Ph = ss.solver.Ph
+  assembler = SparseMatrixAssembler(Ph,Ph)
+  Ap     = assemble_matrix(ss.solver.bilinear_form,assembler,Ph,Ph)
   solver = ss.solver.M
   ssAp   = symbolic_setup(solver,Ap)
   nsAp   = numerical_setup(ssAp,Ap)
-  rp  = _allocate_row_vector(Ap)
-  dxp = _allocate_col_vector(Ap)
-  w   = compute_weight_operators(Ph)
+  rp     = _allocate_row_vector(Ap)
+  dxp    = _allocate_col_vector(Ap)
+  w      = compute_weight_operators(Ph)
   PatchBasedSmootherNumericalSetup(ss.solver,Ap,nsAp,rp,dxp,w)
 end
 
@@ -68,9 +68,9 @@ function Gridap.Algebra.numerical_setup!(ns::PatchBasedSmootherNumericalSetup, A
   Gridap.Helpers.@notimplemented
 end
 
-function Gridap.Algebra.solve!(
-  x::AbstractVector,ns::PatchBasedSmootherNumericalSetup,r::AbstractVector)
-  Ap,nsAp,rp,dxp,w=ns.Ap,ns.nsAp,ns.rp,ns.dxp,ns.w
+function Gridap.Algebra.solve!(x::AbstractVector,ns::PatchBasedSmootherNumericalSetup,r::AbstractVector)
+  Ap, nsAp, rp, dxp, w = ns.Ap, ns.nsAp, ns.rp, ns.dxp, ns.w
+
   prolongate!(rp,ns.solver.Ph,r)
   solve!(dxp,nsAp,rp)
   inject!(x,ns.solver.Ph,dxp,w)

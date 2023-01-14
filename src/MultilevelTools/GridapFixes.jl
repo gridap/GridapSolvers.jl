@@ -30,7 +30,6 @@ function Gridap.Adaptivity.FineToCoarseField(fine_fields::AbstractArray{<:Gridap
 end
 
 
-"""
 function Base.map(::typeof(Gridap.Arrays.testitem),
   a::Tuple{<:AbstractVector{<:AbstractVector{<:VectorValue}},<:AbstractVector{<:Gridap.Fields.LinearCombinationFieldVector}})
   a2=Gridap.Arrays.testitem(a[2])
@@ -52,4 +51,3 @@ function Gridap.Geometry.get_glue(trian::BodyFittedTriangulation{Dt},::Val{Dt}) 
   end
   FaceToFaceGlue(tface_to_mface,tface_to_mface_map,mface_to_tface)
 end
-"""
