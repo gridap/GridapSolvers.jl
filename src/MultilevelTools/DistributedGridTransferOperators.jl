@@ -51,7 +51,7 @@ function _get_interpolation_cache(lev::Int,sh::FESpaceHierarchy,qdegree::Int,mod
   mh = sh.mh
   cparts = get_level_parts(mh,lev+1)
 
-  if GridapP4est.i_am_in(cparts)
+  if i_am_in(cparts)
     model_h = get_model_before_redist(mh,lev)
     Uh = get_fe_space_before_redist(sh,lev)
     fv_h = PVector(0.0,Uh.gids)
@@ -75,7 +75,7 @@ function _get_projection_cache(lev::Int,sh::FESpaceHierarchy,qdegree::Int,mode::
   mh = sh.mh
   cparts = get_level_parts(mh,lev+1)
 
-  if GridapP4est.i_am_in(cparts)
+  if i_am_in(cparts)
     model_h = get_model_before_redist(mh,lev)
     Uh = get_fe_space_before_redist(sh,lev)
     Ωh = get_triangulation(Uh,get_model_before_redist(mh,lev))
@@ -142,7 +142,7 @@ function setup_transfer_operators(sh::FESpaceHierarchy,qdegree::Int;kwargs...)
   prolongations = Vector{DistributedGridTransferOperator}(undef,num_levels(sh)-1)
   for lev in 1:num_levels(sh)-1
     parts = get_level_parts(mh,lev)
-    if GridapP4est.i_am_in(parts)
+    if i_am_in(parts)
       restrictions[lev]  = RestrictionOperator(lev,sh,qdegree;kwargs...)
       prolongations[lev] = ProlongationOperator(lev,sh,qdegree;kwargs...)
     end

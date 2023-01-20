@@ -86,7 +86,7 @@ end
 function setup_finest_level_cache(mh::ModelHierarchy,smatrices::Vector{<:AbstractMatrix})
   cache = nothing
   parts = get_level_parts(mh,1)
-  if (GridapP4est.i_am_in(parts))
+  if i_am_in(parts)
     Ah = smatrices[1]
     rh = PVector(0.0, Ah.cols)
     cache = rh
@@ -101,7 +101,7 @@ function setup_smoothers_caches(mh::ModelHierarchy,smoothers::AbstractVector{<:L
   caches = Vector{Any}(undef,nlevs-1)
   for i = 1:nlevs-1
     parts = get_level_parts(mh,i)
-    if (GridapP4est.i_am_in(parts))
+    if i_am_in(parts)
       ss = symbolic_setup(smoothers[i], smatrices[i])
       caches[i] = numerical_setup(ss, smatrices[i])
     end
@@ -113,7 +113,7 @@ function setup_coarsest_solver_cache(mh::ModelHierarchy,coarsest_solver::LinearS
   cache = nothing
   nlevs = num_levels(mh)
   parts = get_level_parts(mh,nlevs)
-  if (GridapP4est.i_am_in(parts))
+  if i_am_in(parts)
     mat = smatrices[nlevs]
     if (num_parts(parts) == 1) # Serial
       cache = map_parts(mat.owned_owned_values) do Ah
@@ -133,7 +133,7 @@ function setup_coarsest_solver_cache(mh::ModelHierarchy,coarsest_solver::PETScLi
   cache = nothing
   nlevs = num_levels(mh)
   parts = get_level_parts(mh,nlevs)
-  if (GridapP4est.i_am_in(parts))
+  if i_am_in(parts)
     mat   = smatrices[nlevs]
     if (num_parts(parts) == 1) # Serial
       cache = map_parts(mat.owned_owned_values) do Ah
@@ -160,7 +160,7 @@ function allocate_level_work_vectors(mh::ModelHierarchy,smatrices::Vector{<:Abst
   Adxh  = PVector(0.0, smatrices[lev].rows)
 
   cparts = get_level_parts(mh,lev+1)
-  if (GridapP4est.i_am_in(cparts))
+  if i_am_in(cparts)
     AH  = smatrices[lev+1]
     rH  = PVector(0.0,AH.cols)
     dxH = PVector(0.0,AH.cols)
@@ -176,7 +176,7 @@ function allocate_work_vectors(mh::ModelHierarchy,smatrices::Vector{<:AbstractMa
   work_vectors = Vector{Any}(undef,nlevs-1)
   for i = 1:nlevs-1
     parts = get_level_parts(mh,i)
-    if GridapP4est.i_am_in(parts)
+    if i_am_in(parts)
       work_vectors[i] = allocate_level_work_vectors(mh,smatrices,i)
     end
   end
@@ -184,7 +184,7 @@ function allocate_work_vectors(mh::ModelHierarchy,smatrices::Vector{<:AbstractMa
 end
 
 function solve_coarsest_level!(parts::AbstractPData,::LinearSolver,xh::PVector,rh::PVector,caches)
-  if (GridapP4est.num_parts(parts) == 1)
+  if (num_parts(parts) == 1)
     map_parts(xh.owned_values,rh.owned_values) do xh, rh
        solve!(xh,caches,rh)
     end
@@ -195,7 +195,7 @@ end
 
 function solve_coarsest_level!(parts::AbstractPData,::PETScLinearSolver,xh::PVector,rh::PVector,caches)
   solver_ns, xh_petsc, rh_petsc = caches
-  if (GridapP4est.num_parts(parts) == 1)
+  if (num_parts(parts) == 1)
     map_parts(xh.owned_values,rh.owned_values) do xh, rh
       copy!(rh_petsc,rh)
       solve!(xh_petsc,solver_ns,rh_petsc)
@@ -211,7 +211,7 @@ end
 function apply_GMG_level!(lev::Integer,xh::Union{PVector,Nothing},rh::Union{PVector,Nothing},ns::GMGNumericalSetup;verbose=false)
   mh = ns.solver.mh
   parts = get_level_parts(mh,lev)
-  if GridapP4est.i_am_in(parts)
+  if i_am_in(parts)
     if (lev == num_levels(mh)) 
       ## Coarsest level
       coarsest_solver = ns.solver.coarsest_solver
@@ -273,7 +273,7 @@ function Gridap.Algebra.solve!(x::AbstractVector,ns::GMGNumericalSetup,b::Abstra
   rel_res = nrm_r / nrm_r0
   parts = get_level_parts(mh,1)
 
-  if GridapP4est.i_am_main(parts)
+  if i_am_main(parts)
     @printf "%6s  %12s" "Iter" "Rel res\n"
     @printf "%6i  %12.4e\n" current_iter rel_res
   end
@@ -284,7 +284,7 @@ function Gridap.Algebra.solve!(x::AbstractVector,ns::GMGNumericalSetup,b::Abstra
     nrm_r   = norm(rh)
     rel_res = nrm_r / nrm_r0
     current_iter += 1
-    if GridapP4est.i_am_main(parts)
+    if i_am_main(parts)
       @printf "%6i  %12.4e\n" current_iter rel_res
     end
   end

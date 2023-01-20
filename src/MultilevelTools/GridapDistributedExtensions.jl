@@ -70,28 +70,6 @@ function void(::Type{IndexSet})
 end
 """
 
-# get_parts
-
-function get_parts(x::GridapDistributed.DistributedDiscreteModel)
-  return PartitionedArrays.get_part_ids(x.models)
-end
-
-function get_parts(x::GridapDistributed.DistributedTriangulation)
-  return PartitionedArrays.get_part_ids(x.trians)
-end
-
-function get_parts(x::GridapP4est.OctreeDistributedDiscreteModel)
-  return x.parts
-end
-
-function get_parts(x::GridapDistributed.RedistributeGlue)
-  return PartitionedArrays.get_part_ids(x.old2new)
-end
-
-function get_parts(x::GridapDistributed.DistributedSingleFieldFESpace)
-  return PartitionedArrays.get_part_ids(x.spaces)
-end
-
 # DistributedFESpaces
 
 function get_test_space(U::GridapDistributed.DistributedSingleFieldFESpace)
@@ -120,11 +98,11 @@ function VoidDistributedDiscreteModel(model::GridapDistributed.AbstractDistribut
   return VoidDistributedDiscreteModel(Dc,Dp,get_parts(model))
 end
 
-function get_parts(x::VoidDistributedDiscreteModel)
+function GridapDistributed.get_parts(x::VoidDistributedDiscreteModel)
   return x.parts
 end
 
-struct VoidDistributedTriangulation{Dc,Dp,A} <: GridapType
+struct VoidDistributedTriangulation{Dc,Dp,A} <: GridapDistributed.DistributedGridapType
   parts::A
   function VoidDistributedTriangulation(Dc::Int,Dp::Int,parts)
     A = typeof(parts)
@@ -132,7 +110,7 @@ struct VoidDistributedTriangulation{Dc,Dp,A} <: GridapType
   end
 end
 
-function get_parts(x::VoidDistributedTriangulation)
+function GridapDistributed.get_parts(x::VoidDistributedTriangulation)
   return x.parts
 end
 
@@ -144,11 +122,11 @@ function Gridap.Geometry.Triangulation(model::VoidDistributedDiscreteModel{Dc,Dp
   return VoidDistributedTriangulation(Dc,Dp,get_parts(model))
 end
 
-struct VoidDistributedFESpace{A} <: GridapType
+struct VoidDistributedFESpace{A} <: GridapDistributed.DistributedGridapType
   parts::A
 end
 
-function get_parts(x::VoidDistributedFESpace)
+function GridapDistributed.get_parts(x::VoidDistributedFESpace)
   return x.parts
 end
 
