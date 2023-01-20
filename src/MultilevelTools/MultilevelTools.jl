@@ -12,7 +12,6 @@ using Gridap.FESpaces
 using Gridap.Adaptivity
 using PartitionedArrays
 using GridapDistributed
-using GridapP4est
 
 import LinearAlgebra: mul!
 import GridapDistributed: local_views
@@ -39,7 +38,7 @@ export RestrictionOperator, ProlongationOperator
 export setup_transfer_operators
 export mul!
 
-include("PartitionedArraysExtensions.jl")
+include("SubpartitioningTools.jl")
 include("GridapDistributedExtensions.jl")
 include("GridapFixes.jl")
 include("RefinementTools.jl")

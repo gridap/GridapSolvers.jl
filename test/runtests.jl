@@ -40,7 +40,8 @@ function run_tests(testdir)
                  "GMGLinearSolversMUMPSTests.jl",
                  "RestrictDofsTests.jl"]
           np = 4
-          extra_args = "-s 2 2 -r 2"
+          #extra_args = "-s 2 2 -r 2"
+          extra_args = ""
         elseif f in ["ModelHierarchiesTests.jl"]
           np = 6
           extra_args = ""
@@ -63,5 +64,8 @@ function run_tests(testdir)
     end
 end
 
-run_tests(@__DIR__)
+# MPI tests
 run_tests(joinpath(@__DIR__, "mpi"))
+
+# Sequential tests
+@time @testset "PatchLinearSolverTests" begin include("seq/PatchLinearSolverTests.jl") end

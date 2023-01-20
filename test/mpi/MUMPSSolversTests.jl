@@ -5,7 +5,6 @@ using MPI
 using Gridap
 using GridapDistributed
 using PartitionedArrays
-using GridapP4est
 using IterativeSolvers
 
 using GridapSolvers
@@ -65,7 +64,7 @@ function main(parts,partition)
     uh = FEFunction(Uh,x)
     eh = uh - u
     E  = sum(∫(eh*eh)*dΩ)
-    if GridapP4est.i_am_main(parts)
+    if i_am_main(parts)
       println("L2 Error: ", E)
     end
     
@@ -75,7 +74,7 @@ end
 
 partition = (32,32)
 ranks = (2,2)
-prun(main,mpi,ranks,partition)
+with_backend(main,MPIBackend(),ranks,partition)
 MPI.Finalize()
 
 end

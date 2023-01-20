@@ -165,7 +165,7 @@ function redistribute_cell_dofs!(caches,
   # Now that every part knows it's new owned dofs, exchange ghosts
   new_parts = get_parts(model_new)
   cell_dof_values_new = change_parts(cell_dof_values_new,new_parts)
-  if GridapP4est.i_am_in(new_parts)
+  if i_am_in(new_parts)
     fgids = get_cell_gids(model_new)
     exchange!(cell_dof_values_new,fgids.exchanger)
   end
@@ -233,7 +233,7 @@ function redistribute_fe_function(uh_old::Union{GridapDistributed.DistributedSin
   cell_dof_values_new = redistribute_cell_dofs(cell_dof_values_old,cell_dof_ids_new,model_new,glue;reverse=reverse)
 
   # Assemble the new FEFunction
-  if GridapP4est.i_am_in(get_parts(Uh_new))
+  if i_am_in(get_parts(Uh_new))
     free_values, dirichlet_values = Gridap.FESpaces.gather_free_and_dirichlet_values(Uh_new,cell_dof_values_new)
     free_values = PVector(free_values,Uh_new.gids)
     uh_new = FEFunction(Uh_new,free_values,dirichlet_values)
