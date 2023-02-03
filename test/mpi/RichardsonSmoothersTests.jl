@@ -22,7 +22,7 @@ function main(parts,partition)
     order  = 1
     qorder = order*2 + 1
     reffe  = ReferenceFE(lagrangian,Float64,order)
-    Vh     = TestFESpace(model,reffe,conformity=:H1,dirichlet_tags="boundary")
+    Vh     = TestFESpace(model,reffe;conformity=:H1,dirichlet_tags="boundary")
     Uh     = TrialFESpace(Vh,sol)
     u      = interpolate(sol,Uh)
 

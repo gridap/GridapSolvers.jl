@@ -29,7 +29,7 @@ function main(parts, coarse_grid_partition, num_parts_x_level, num_refs_coarse, 
 
     qdegree   = 2*(order+1)
     reffe     = ReferenceFE(raviart_thomas,Float64,order)
-    tests     = TestFESpace(mh,reffe,dirichlet_tags="boundary")
+    tests     = TestFESpace(mh,reffe;dirichlet_tags="boundary")
     trials    = TrialFESpace(tests,u)
 
     biform(u,v,dΩ)  = ∫(v⋅u)dΩ + ∫(α*divergence(v)⋅divergence(u))dΩ

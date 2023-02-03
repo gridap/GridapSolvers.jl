@@ -15,7 +15,6 @@ using GridapDistributed
 
 import LinearAlgebra: mul!
 import GridapDistributed: local_views
-import GridapP4est: i_am_in, i_am_main
 
 
 export change_parts
