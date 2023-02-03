@@ -236,9 +236,8 @@ function apply_GMG_level!(lev::Integer,xh::Union{PVector,Nothing},rh::Union{PVec
       # Interpolate dxH in finer space
       mul!(dxh,interp,dxH)
 
-      # Update solution
+      # Update solution & residual
       xh .= xh .+ dxh
-      # Update residual
       mul!(Adxh, Ah, dxh)
       rh .= rh .- Adxh
 

@@ -1,21 +1,4 @@
 
-# DistributedRefinedDiscreteModels
-
-const DistributedAdaptedDiscreteModel{Dc,Dp} = GridapDistributed.DistributedDiscreteModel{Dc,Dp,<:AbstractPData{<:AdaptedDiscreteModel{Dc,Dp}}}
-
-function DistributedAdaptedDiscreteModel(model::GridapDistributed.AbstractDistributedDiscreteModel,
-                                         parent::GridapDistributed.AbstractDistributedDiscreteModel,
-                                         glue::AbstractPData{<:AdaptivityGlue})
-  models = map_parts(local_views(model),local_views(parent),glue) do model, parent, glue
-    AdaptedDiscreteModel(model,parent,glue)
-  end
-  return GridapDistributed.DistributedDiscreteModel(models,get_cell_gids(model))
-end
-
-function Gridap.Adaptivity.get_adaptivity_glue(model::DistributedAdaptedDiscreteModel)
-  return map_parts(Gridap.Adaptivity.get_adaptivity_glue,local_views(model))
-end
-
 # DistributedAdaptedTriangulations
 
 const DistributedAdaptedTriangulation{Dc,Dp} = GridapDistributed.DistributedTriangulation{Dc,Dp,<:AbstractPData{<:AdaptedTriangulation{Dc,Dp}}}

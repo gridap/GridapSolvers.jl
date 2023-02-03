@@ -136,13 +136,20 @@ function _get_redistribution_cache(lev::Int,sh::FESpaceHierarchy,mode::Symbol,op
   return cache_redist
 end
 
-function setup_transfer_operators(sh::FESpaceHierarchy,qdegree::Int;kwargs...)
+function setup_transfer_operators(sh::FESpaceHierarchy,qdegree::Integer;kwargs...)
+  qdegrees = Fill(qdegree,num_levels(sh))
+  return setup_transfer_operators(sh,qdegrees;kwargs...)
+end
+
+function setup_transfer_operators(sh::FESpaceHierarchy,qdegrees::AbstractArray{<:Integer};kwargs...)
+  @check length(qdegrees) == num_levels(sh)
   mh = sh.mh
   restrictions  = Vector{DistributedGridTransferOperator}(undef,num_levels(sh)-1)
   prolongations = Vector{DistributedGridTransferOperator}(undef,num_levels(sh)-1)
   for lev in 1:num_levels(sh)-1
     parts = get_level_parts(mh,lev)
     if i_am_in(parts)
+      qdegree = qdegrees[lev]
       restrictions[lev]  = RestrictionOperator(lev,sh,qdegree;kwargs...)
       prolongations[lev] = ProlongationOperator(lev,sh,qdegree;kwargs...)
     end

@@ -34,42 +34,6 @@ function change_parts(::Type{<:GridapDistributed.DistributedCellField},x,new_par
   return GridapDistributed.DistributedCellField(fields)
 end
 
-"""
-function change_parts(::Type{<:GridapDistributed.DistributedSingleFieldFEFunction},x,new_parts)
-  if isa(x,GridapDistributed.DistributedSingleFieldFEFunction)
-    fields   = change_parts(local_views(x),new_parts)
-    metadata = GridapDistributed.DistributedFEFunctionData(change_parts(x.metadata.free_values,new_parts))
-  else
-    fields   = change_parts(nothing,new_parts;default=void(CellField))
-    metadata = GridapDistributed.DistributedFEFunctionData(change_parts(nothing,new_parts;default=Float64[]))
-  end
-  return GridapDistributed.DistributedCellField(fields,metadata)
-end
-"""
-
-"""
-function change_parts(::Type{<:PRange},x::Union{PRange,Nothing}, new_parts)
-  if isa(x,PRange)
-    ngids = x.ngids
-    partition = change_parts(x.partition,new_parts;default=void(IndexSet))
-    exchanger = x.exchanger
-    gid_to_part = x.gid_to_part
-    ghost = x.ghost
-  else
-    ngids = 0
-    partition = change_parts(nothing,new_parts;default=void(IndexSet))
-    exchanger = empty_exchanger(new_parts)
-    gid_to_part = nothing
-    ghost = false
-  end
-  return PRange(ngids,partition,exchanger,gid_to_part,ghost)
-end
-
-function void(::Type{IndexSet})
-  return IndexSet(0,Int[],Int32[],Int32[],Int32[],Int32[],Dict{Int,Int32}())
-end
-"""
-
 # DistributedFESpaces
 
 function get_test_space(U::GridapDistributed.DistributedSingleFieldFESpace)

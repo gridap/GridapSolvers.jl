@@ -23,7 +23,7 @@ function run(parts,num_parts_x_level,coarse_grid_partition,num_refs_coarse)
     order  = 1
     sol(x) = x[1] + x[2]
     reffe  = ReferenceFE(lagrangian,Float64,order)
-    tests  = TestFESpace(mh,reffe,conformity=:H1,dirichlet_tags="boundary")
+    tests  = TestFESpace(mh,reffe;conformity=:H1,dirichlet_tags="boundary")
     trials = TrialFESpace(tests,sol)
 
     quad_order = 3*order+1

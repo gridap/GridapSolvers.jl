@@ -23,7 +23,7 @@ function run(parts,num_parts_x_level,coarse_grid_partition,num_refs_coarse)
     u(x)  = x[1] + x[2]
     reffe = ReferenceFE(lagrangian,Float64,order)
 
-    tests  = TestFESpace(mh,reffe,dirichlet_tags="boundary")
+    tests  = TestFESpace(mh,reffe;dirichlet_tags="boundary")
     trials = TrialFESpace(tests,u)
 
     qdegree = order*2+1
