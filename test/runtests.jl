@@ -38,7 +38,8 @@ function run_tests(testdir)
                  "GMGLinearSolversHDivRTTests.jl",
                  "MUMPSSolversTests.jl",
                  "GMGLinearSolversMUMPSTests.jl",
-                 "RestrictDofsTests.jl"]
+                 "RestrictDofsTests.jl",
+                 "PRefinementGMGLinearSolversPoissonTests.jl"]
           np = 4
           #extra_args = "-s 2 2 -r 2"
           extra_args = ""
