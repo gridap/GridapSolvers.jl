@@ -71,13 +71,13 @@ function PatchFESpace(model::DiscreteModel,
   return PatchFESpace(num_dofs,patch_cell_dofs_ids,Vh,patch_decomposition)
 end
 
-Gridap.FESpaces.get_dof_value_type(a::PatchFESpace)=Gridap.FESpaces.get_dof_value_type(a.Vh)
-Gridap.FESpaces.get_free_dof_ids(a::PatchFESpace)=Base.OneTo(a.num_dofs)
-Gridap.FESpaces.get_cell_dof_ids(a::PatchFESpace)=a.patch_cell_dofs_ids
-Gridap.FESpaces.get_cell_dof_ids(a::PatchFESpace,::Triangulation)=a.patch_cell_dofs_ids
-Gridap.FESpaces.get_fe_basis(a::PatchFESpace)=get_fe_basis(a.Vh)
-Gridap.FESpaces.ConstraintStyle(a::PatchFESpace)=Gridap.FESpaces.UnConstrained()
-Gridap.FESpaces.get_vector_type(a::PatchFESpace)=get_vector_type(a.Vh)
+Gridap.FESpaces.get_dof_value_type(a::PatchFESpace) = Gridap.FESpaces.get_dof_value_type(a.Vh)
+Gridap.FESpaces.get_free_dof_ids(a::PatchFESpace)   = Base.OneTo(a.num_dofs)
+Gridap.FESpaces.get_cell_dof_ids(a::PatchFESpace)   = a.patch_cell_dofs_ids
+Gridap.FESpaces.get_cell_dof_ids(a::PatchFESpace,::Triangulation) = a.patch_cell_dofs_ids
+Gridap.FESpaces.get_fe_basis(a::PatchFESpace)       = get_fe_basis(a.Vh)
+Gridap.FESpaces.ConstraintStyle(::PatchFESpace)     = Gridap.FESpaces.UnConstrained()
+Gridap.FESpaces.get_vector_type(a::PatchFESpace)    = get_vector_type(a.Vh)
 
 function Gridap.FESpaces.scatter_free_and_dirichlet_values(f::PatchFESpace,free_values,dirichlet_values)
   cell_vals = Gridap.Fields.PosNegReindex(free_values,dirichlet_values)

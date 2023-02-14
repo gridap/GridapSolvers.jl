@@ -12,7 +12,7 @@ function PatchFESpace(model::GridapDistributed.DistributedDiscreteModel,
                       conformity::Gridap.FESpaces.Conformity,
                       patch_decomposition::DistributedPatchDecomposition,
                       Vh::GridapDistributed.DistributedSingleFieldFESpace)
-  root_gids=get_face_gids(model,get_patch_root_dim(patch_decomposition))
+  root_gids = get_face_gids(model,get_patch_root_dim(patch_decomposition))
 
   function f(model,patch_decomposition,Vh,partition)
     patches_mask = fill(false,length(partition.lid_to_gid))
