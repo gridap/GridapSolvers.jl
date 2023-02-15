@@ -1,6 +1,6 @@
 # Rationale behind distributed PatchFESpace:
 # 1. Patches have an owner. Only owners compute subspace correction.
-#    If am not owner of a patch, all dofs in my patch become -1.
+#    If am not owner of a patch, all dofs in my patch become -1. [DONE]
 # 2. Subspace correction on an owned patch may affect DoFs  which
 #    are non-owned. These corrections should be sent to the owner
 #    process. I.e., NO -> O (reversed) communication. [PENDING]
@@ -48,10 +48,7 @@ end
 function prolongate!(x::PVector,
                      Ph::GridapDistributed.DistributedSingleFieldFESpace,
                      y::PVector)
-   parts=get_part_ids(x.owned_values)
-   Gridap.Helpers.@notimplementedif num_parts(parts)!=1
-   
-   map_parts(x.owned_values,Ph.spaces,y.owned_values) do x,Ph,y
+   map_parts(x.values,Ph.spaces,y.values) do x,Ph,y
      prolongate!(x,Ph,y)
    end
 end
@@ -59,22 +56,32 @@ end
 function inject!(x::PVector,
                  Ph::GridapDistributed.DistributedSingleFieldFESpace,
                  y::PVector,
-                 w::PVector)
-  parts = get_part_ids(x.owned_values)
-  Gridap.Helpers.@notimplementedif num_parts(parts)!=1
-  
-  map_parts(x.owned_values,Ph.spaces,y.owned_values,w.owned_values) do x,Ph,y,w
-    inject!(x,Ph,y,w)
+                 w::PVector,
+                 w_sums::PVector)
+
+  map_parts(x.values,Ph.spaces,y.values,w.values,w_sums.values) do x,Ph,y,w,w_sums
+    inject!(x,Ph,y,w,w_sums)
   end
+
+  # Exchange local contributions 
+  assemble!(x)
+  exchange!(x) # TO CONSIDER: Is this necessary? Do we need ghosts for later?
+  return x
 end
 
-function compute_weight_operators(Ph::GridapDistributed.DistributedSingleFieldFESpace)
-  parts = get_part_ids(Ph.spaces)
-  Gridap.Helpers.@notimplementedif num_parts(parts) != 1
-  
+function compute_weight_operators(Ph::GridapDistributed.DistributedSingleFieldFESpace,Vh)
+  # Local weights and partial sums
   w = PVector(0.0,Ph.gids)
-  map_parts(w.owned_values,Ph.spaces) do w, Ph
-    w .= compute_weight_operators(Ph)
+  w_sums = PVector(0.0,Vh.gids)
+  map_parts(w.values,w_sums.values,Ph.spaces) do w, w_sums, Ph
+    _w, _w_sums = compute_weight_operators(Ph)
+    w .= _w
+    w_sums .= _w_sums
   end
-  return w
+  
+  # partial sums -> global sums
+  assemble!(w_sums) # ghost -> owners
+  exchange!(w_sums) # repopulate ghosts with owner info
+
+  return w, w_sums
 end

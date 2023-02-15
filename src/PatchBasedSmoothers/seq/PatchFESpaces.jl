@@ -78,6 +78,7 @@ Gridap.FESpaces.get_cell_dof_ids(a::PatchFESpace,::Triangulation) = a.patch_cell
 Gridap.FESpaces.get_fe_basis(a::PatchFESpace)       = get_fe_basis(a.Vh)
 Gridap.FESpaces.ConstraintStyle(::PatchFESpace)     = Gridap.FESpaces.UnConstrained()
 Gridap.FESpaces.get_vector_type(a::PatchFESpace)    = get_vector_type(a.Vh)
+Gridap.FESpaces.get_fe_dof_basis(a::PatchFESpace)   = get_fe_dof_basis(a.Vh)
 
 function Gridap.FESpaces.scatter_free_and_dirichlet_values(f::PatchFESpace,free_values,dirichlet_values)
   cell_vals = Gridap.Fields.PosNegReindex(free_values,dirichlet_values)
@@ -140,7 +141,7 @@ end
 
 # TO-THINK/STRESS:
 #  1. MultiFieldFESpace case?
-#  2. FESpaces which are directly defined on physical space? We think this cased is covered by
+#  2. FESpaces which are directly defined on physical space? We think this case is covered by
 #     the fact that we are using a CellConformity instance to rely on ownership info.
 # free_dofs_offset     : the ID from which we start to assign free DoF IDs upwards
 # Note: we do not actually need to generate a global numbering for Dirichlet DoFs. We can
@@ -255,8 +256,8 @@ end
 # x \in  SingleFESpace
 # y \in  PatchFESpace
 function inject!(x,Ph::PatchFESpace,y)
-  w = compute_weight_operators(Ph)
-  inject!(x,Ph::PatchFESpace,y,w)
+  w, w_sums = compute_weight_operators(Ph)
+  inject!(x,Ph::PatchFESpace,y,w,w_sums)
 end
 
 function inject!(x,Ph::PatchFESpace,y,w)
@@ -288,14 +289,14 @@ function inject!(x,Ph::PatchFESpace,y,w)
   end
 end
 
-function compute_weight_operators(Ph::PatchFESpace)
-  cell_dof_ids = get_cell_dof_ids(Ph.Vh)
-  cache_cell_dof_ids = array_cache(cell_dof_ids)
-  cache_patch_cells  = array_cache(Ph.patch_decomposition.patch_cells)
-
-  w = zeros(num_free_dofs(Ph.Vh))
+function inject!(x,Ph::PatchFESpace,y,w,w_sums)
   touched = Dict{Int,Bool}()
   cell_mesh_overlapped = 1
+  cache_patch_cells  = array_cache(Ph.patch_decomposition.patch_cells)
+  cell_dof_ids       = get_cell_dof_ids(Ph.Vh)
+  cache_cell_dof_ids = array_cache(cell_dof_ids)
+  
+  fill!(x,0.0)
   for patch = 1:length(Ph.patch_decomposition.patch_cells)
     current_patch_cells = getindex!(cache_patch_cells,
                                   Ph.patch_decomposition.patch_cells,
@@ -306,17 +307,25 @@ function compute_weight_operators(Ph::PatchFESpace)
       e = Ph.patch_cell_dofs_ids.ptrs[cell_mesh_overlapped+1]-1
       current_patch_cell_dof_ids = view(Ph.patch_cell_dofs_ids.data,s:e)
       for (dof,pdof) in zip(current_cell_dof_ids,current_patch_cell_dof_ids)
-        if pdof > 0 && !(dof in keys(touched))
+        if pdof > 0 && !(dof ∈ keys(touched))
           touched[dof] = true
-          w[dof] += 1.0
+          x[dof] += y[pdof] * w[pdof] / w_sums[dof]
         end
       end
-      cell_mesh_overlapped+=1
+      cell_mesh_overlapped += 1
     end
     empty!(touched)
   end
-  w .= 1.0 ./ w
-  w_Ph = similar(w,num_free_dofs(Ph))
-  prolongate!(w_Ph,Ph,w)
-  return w_Ph
+end
+
+function compute_weight_operators(Ph::PatchFESpace)
+  w = Fill(1.0,num_free_dofs(Ph))
+  w_sums = compute_partial_sums(Ph,w)
+  return w, w_sums
+end
+
+function compute_partial_sums(Ph::PatchFESpace,x)
+  x_sums = zeros(num_free_dofs(Ph.Vh))
+  inject!(x_sums,Ph,x,Fill(1.0,num_free_dofs(Ph)))
+  return x_sums
 end
