@@ -256,7 +256,7 @@ end
 # x \in  SingleFESpace
 # y \in  PatchFESpace
 function inject!(x,Ph::PatchFESpace,y)
-  w, w_sums = compute_weight_operators(Ph)
+  w, w_sums = compute_weight_operators(Ph,Ph.Vh)
   inject!(x,Ph::PatchFESpace,y,w,w_sums)
 end
 
@@ -318,7 +318,7 @@ function inject!(x,Ph::PatchFESpace,y,w,w_sums)
   end
 end
 
-function compute_weight_operators(Ph::PatchFESpace)
+function compute_weight_operators(Ph::PatchFESpace,Vh)
   w = Fill(1.0,num_free_dofs(Ph))
   w_sums = compute_partial_sums(Ph,w)
   return w, w_sums

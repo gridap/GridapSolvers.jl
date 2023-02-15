@@ -25,7 +25,7 @@ function Gridap.Geometry.Triangulation(a::DistributedPatchDecomposition)
 end
 
 function get_patch_root_dim(a::DistributedPatchDecomposition)
-  patch_root_dim = 0
+  patch_root_dim = -1
   map_parts(a.patch_decompositions) do patch_decomposition
     patch_root_dim = patch_decomposition.Dr
   end

@@ -1,13 +1,21 @@
 module DistributedPatchFESpacesTests
 
+using LinearAlgebra
 using Test
-using Gridap
-using GridapDistributed
 using PartitionedArrays
+using Gridap
+using Gridap.Helpers
+using Gridap.Geometry
+using GridapDistributed
 using FillArrays
 
 include("../../src/PatchBasedSmoothers/PatchBasedSmoothers.jl")
 import .PatchBasedSmoothers as PBS
+
+# This is needed for assembly
+include("../../src/MultilevelTools/GridapFixes.jl")
+
+include("../../src/LinearSolvers/RichardsonSmoothers.jl")
 
 backend = SequentialBackend()
 ranks = (1,2)
@@ -32,17 +40,25 @@ y = PVector(0.0,Vh.gids)
 
 PBS.prolongate!(yP,Ph,x)
 PBS.inject!(y,Ph,yP,w,w_sums)
+@test x ≈ y
 
+PBS.inject!(x,Ph,xP,w,w_sums)
+PBS.prolongate!(yP,Ph,x)
+@test xP ≈ yP
 
-assembler = SparseMatrixAssembler(Ph,Ph)
 Ωₚ  = Triangulation(PD)
 dΩₚ = Measure(Ωₚ,2*order+1)
 a(u,v) = ∫(∇(v)⋅∇(u))*dΩₚ
 l(v) = ∫(1*v)*dΩₚ
 
-Ah = assemble_matrix(a,assembler,Ph,Ph)
-fh = assemble_vector(l,assembler,Ph)
+assembler = SparseMatrixAssembler(Vh,Vh)
+Ah = assemble_matrix(a,assembler,Vh,Vh)
+fh = assemble_vector(l,assembler,Vh)
 
-
+M = PBS.PatchBasedLinearSolver(a,Ph,Vh,LUSolver())
+s = RichardsonSmoother(M,10,1.0/3.0)
+x = PBS._allocate_col_vector(Ah)
+r = fh-Ah*x
+solve!(x,s,Ah,r)
 
 end
