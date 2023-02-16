@@ -27,27 +27,45 @@ function Gridap.Algebra.symbolic_setup(ls::PatchBasedLinearSolver,mat::AbstractM
   return PatchBasedSymbolicSetup(ls)
 end
 
-struct PatchBasedSmootherNumericalSetup{A,B,C,D,E,F} <: Gridap.Algebra.NumericalSetup
-  solver         :: PatchBasedLinearSolver
-  Ap             :: A
-  nsAp           :: B
-  rp             :: C
-  dxp            :: D
-  w              :: E
-  w_sums         :: F
+struct PatchBasedSmootherNumericalSetup{A,B,C,D} <: Gridap.Algebra.NumericalSetup
+  solver   :: PatchBasedLinearSolver
+  Ap       :: A
+  Ap_ns    :: B
+  weights  :: C
+  caches   :: D
 end
 
 function Gridap.Algebra.numerical_setup(ss::PatchBasedSymbolicSetup,A::AbstractMatrix)
   Ph, Vh = ss.solver.Ph, ss.solver.Vh
+  weights = compute_weight_operators(Ph,Vh)
+
+  # Assemble patch system
   assembler = SparseMatrixAssembler(Ph,Ph)
   Ap        = assemble_matrix(ss.solver.bilinear_form,assembler,Ph,Ph)
-  solver    = ss.solver.M
-  ssAp      = symbolic_setup(solver,Ap)
-  nsAp      = numerical_setup(ssAp,Ap)
+
+  # Patch system solver
+  Ap_solver = ss.solver.M
+  Ap_ss     = symbolic_setup(Ap_solver,Ap)
+  Ap_ns     = numerical_setup(Ap_ss,Ap)
+
+  # Caches
+  caches = _patch_based_solver_caches(Ph,Ap)
+  
+  return PatchBasedSmootherNumericalSetup(ss.solver,Ap,Ap_ns,weights,caches)
+end
+
+function _patch_based_solver_caches(Ph::PatchFESpace,Ap::AbstractMatrix)
   rp        = _allocate_row_vector(Ap)
   dxp       = _allocate_col_vector(Ap)
-  w, w_sums = compute_weight_operators(Ph,Vh)
-  return PatchBasedSmootherNumericalSetup(ss.solver,Ap,nsAp,rp,dxp,w,w_sums)
+  return rp, dxp
+end
+
+function _patch_based_solver_caches(Ph::GridapDistributed.DistributedSingleFieldFESpace,Ap::PSparseMatrix)
+  rp_mat  = _allocate_row_vector(Ap)
+  dxp_mat = _allocate_col_vector(Ap)
+  rp      = PVector(0.0,Ph.gids)
+  dxp     = PVector(0.0,Ph.gids)
+  return rp_mat, dxp_mat, rp, dxp
 end
 
 function _allocate_col_vector(A::AbstractMatrix)
@@ -71,11 +89,31 @@ function Gridap.Algebra.numerical_setup!(ns::PatchBasedSmootherNumericalSetup, A
 end
 
 function Gridap.Algebra.solve!(x::AbstractVector,ns::PatchBasedSmootherNumericalSetup,r::AbstractVector)
-  Ap, nsAp, rp, dxp, w, w_sums = ns.Ap, ns.nsAp, ns.rp, ns.dxp, ns.w, ns.w_sums
+  Ap_ns, weights, caches = ns.Ap_ns, ns.weights, ns.caches
+  
   Ph = ns.solver.Ph
+  w, w_sums = weights
+  rp, dxp = caches
 
   prolongate!(rp,Ph,r)
   solve!(dxp,nsAp,rp)
   inject!(x,Ph,dxp,w,w_sums)
+
+  return x
+end
+
+function Gridap.Algebra.solve!(x::PVector,ns::PatchBasedSmootherNumericalSetup,r::PVector)
+  Ap_ns, weights, caches = ns.Ap_ns, ns.weights, ns.caches
+  
+  Ph = ns.solver.Ph
+  w, w_sums = weights
+  rp_mat, dxp_mat, rp, dxp = caches
+
+  prolongate!(rp,Ph,r)
+  copy!(rp_mat,rp)
+  solve!(dxp_mat,Ap_ns,rp_mat)
+  copy!(dxp,dxp_mat)
+  inject!(x,Ph,dxp,w,w_sums)
+
   return x
 end

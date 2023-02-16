@@ -1,5 +1,8 @@
 module DistributedPatchFESpacesTests
 
+ENV["JULIA_MPI_BINARY"] = "system"
+ENV["JULIA_MPI_PATH"] = "/usr/lib/x86_64-linux-gnu"
+
 using LinearAlgebra
 using Test
 using PartitionedArrays
@@ -28,7 +31,7 @@ model = CartesianDiscreteModel(parts,domain,partition)
 order = 1
 reffe = ReferenceFE(lagrangian,Float64,order)
 Vh = TestFESpace(model,reffe)
-PD = PBS.PatchDecomposition(model,patch_boundary_style=PBS.PatchBoundaryInclude())
+PD = PBS.PatchDecomposition(model)#,patch_boundary_style=PBS.PatchBoundaryInclude())
 Ph = PBS.PatchFESpace(model,reffe,Gridap.ReferenceFEs.H1Conformity(),PD,Vh)
 
 w, w_sums = PBS.compute_weight_operators(Ph,Vh);
@@ -56,9 +59,40 @@ Ah = assemble_matrix(a,assembler,Vh,Vh)
 fh = assemble_vector(l,assembler,Vh)
 
 M = PBS.PatchBasedLinearSolver(a,Ph,Vh,LUSolver())
-s = RichardsonSmoother(M,10,1.0/3.0)
+R = RichardsonSmoother(M,10,1.0/3.0)
+Rss = symbolic_setup(R,Ah)
+Rns = numerical_setup(Rss,Ah)
+
 x = PBS._allocate_col_vector(Ah)
 r = fh-Ah*x
-solve!(x,s,Ah,r)
+exchange!(r)
+solve!(x,Rns,r)
+
+Mss = symbolic_setup(M,Ah)
+Mns = numerical_setup(Mss,Ah)
+solve!(x,Mns,r)
+
+assembler_P = SparseMatrixAssembler(Ph,Ph)
+Ahp = assemble_matrix(a,assembler_P,Ph,Ph)
+fhp = assemble_vector(l,assembler_P,Ph)
+
+lu = LUSolver()
+luss = symbolic_setup(lu,Ahp)
+luns = numerical_setup(luss,Ahp)
+
+rp = PVector(0.0,Ph.gids)
+PBS.prolongate!(rp,Ph,r)
+
+rp_mat = PVector(0.0,Ahp.cols)
+copy!(rp_mat,rp)
+xp_mat = PVector(0.0,Ahp.cols)
+
+solve!(xp_mat,luns,rp_mat)
+
+xp = PVector(0.0,Ph.gids)
+copy!(xp,xp_mat)
+
+w, w_sums = PBS.compute_weight_operators(Ph,Vh);
+PBS.inject!(x,Ph,xp,w,w_sums)
 
 end

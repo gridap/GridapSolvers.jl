@@ -51,6 +51,7 @@ function prolongate!(x::PVector,
    map_parts(x.values,Ph.spaces,y.values) do x,Ph,y
      prolongate!(x,Ph,y)
    end
+   exchange!(x)
 end
 
 function inject!(x::PVector,
@@ -59,6 +60,7 @@ function inject!(x::PVector,
                  w::PVector,
                  w_sums::PVector)
 
+  exchange!(y)
   map_parts(x.values,Ph.spaces,y.values,w.values,w_sums.values) do x,Ph,y,w,w_sums
     inject!(x,Ph,y,w,w_sums)
   end
