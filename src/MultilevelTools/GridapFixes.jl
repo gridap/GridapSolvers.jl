@@ -1,34 +1,34 @@
 
+function Gridap.Adaptivity.change_domain_n2o(f_fine,ftrian::Gridap.Adaptivity.AdaptedTriangulation{Dc},ctrian::Gridap.Geometry.Triangulation,glue::Gridap.Adaptivity.AdaptivityGlue{<:Gridap.Adaptivity.RefinementGlue}) where Dc
+  fglue = Gridap.Geometry.get_glue(ftrian,Val(Dc))
+  cglue = Gridap.Geometry.get_glue(ctrian,Val(Dc))
 
-function Gridap.Adaptivity.change_domain_n2o(f_fine,ctrian::Gridap.Geometry.Triangulation{Dc},glue::Gridap.Adaptivity.AdaptivityGlue{<:Gridap.Adaptivity.RefinementGlue,Dc}) where Dc
-  @notimplementedif num_dims(ctrian) != Dc
-  msg = "Evaluating a fine CellField in the coarse mesh is costly! If you are using this feature 
-         to integrate, consider using a CompositeMeasure instead (see test/AdaptivityTests/GridTransferTests.jl)."
-  @warn msg
+  @notimplementedif Gridap.Geometry.num_point_dims(ftrian) != Dc
+  @notimplementedif isa(cglue,Nothing)
 
   if (num_cells(ctrian) != 0)
+    ### New Triangulation -> New Model
+    fine_tface_to_field = Gridap.CellData.get_data(f_fine)
+    fine_mface_to_field = Gridap.Geometry.extend(fine_tface_to_field,fglue.mface_to_tface)
+
+    ### New Model -> Old Model
     # f_c2f[i_coarse] = [f_fine[i_fine_1], ..., f_fine[i_fine_nChildren]]
-    f_c2f = Gridap.Adaptivity.f2c_reindex(f_fine,glue)
+    f_c2f = Gridap.Adaptivity.f2c_reindex(fine_mface_to_field,glue)
 
     child_ids = Gridap.Adaptivity.f2c_reindex(glue.n2o_cell_to_child_id,glue)
     rrules    = Gridap.Adaptivity.get_old_cell_refinement_rules(glue)
-    f_coarse  = lazy_map(Gridap.Adaptivity.FineToCoarseField,f_c2f,rrules,child_ids)
-    return Gridap.CellData.GenericCellField(f_coarse,ctrian,ReferenceDomain())
+    coarse_mface_to_field = lazy_map(Gridap.Adaptivity.FineToCoarseField,f_c2f,rrules,child_ids)
+
+    ### Old Model -> Old Triangulation
+    coarse_tface_to_field = lazy_map(Reindex(coarse_mface_to_field),cglue.tface_to_mface)
+    f_coarse = lazy_map(Broadcasting(∘),coarse_tface_to_field,cglue.tface_to_mface_map)
+
+    return Gridap.CellData.similar_cell_field(f_fine,f_coarse,ctrian,ReferenceDomain())
   else
-    f_coarse = Fill(Gridap.Fields.ConstantField(0.0),num_cells(ftrian))
-    return Gridap.CellData.GenericCellField(f_coarse,ctrian,ReferenceDomain())
+    f_coarse = Fill(Gridap.Fields.ConstantField(0.0),num_cells(fcoarse))
+    return Gridap.CellData.similar_cell_field(f_fine,f_coarse,ctrian,ReferenceDomain())
   end
 end
-
-function Gridap.Adaptivity.FineToCoarseField(fine_fields::AbstractArray{<:Gridap.Fields.Field},rrule::Gridap.Adaptivity.RefinementRule,child_ids::AbstractArray{<:Integer})
-  fields = Vector{Gridap.Fields.Field}(undef,Gridap.Adaptivity.num_subcells(rrule))
-  fields = fill!(fields,Gridap.Fields.ConstantField(0.0))
-  for (k,id) in enumerate(child_ids)
-    fields[id] = fine_fields[k]
-  end
-  return Gridap.Adaptivity.FineToCoarseField(fields,rrule)
-end
-
 
 function Base.map(::typeof(Gridap.Arrays.testitem),
   a::Tuple{<:AbstractVector{<:AbstractVector{<:VectorValue}},<:AbstractVector{<:Gridap.Fields.LinearCombinationFieldVector}})

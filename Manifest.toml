@@ -215,8 +215,8 @@ uuid = "9fa8497b-333b-5362-9e8d-4d0656e87820"
 
 [[deps.Gridap]]
 deps = ["AbstractTrees", "BSON", "BlockArrays", "Combinatorics", "DataStructures", "DocStringExtensions", "FastGaussQuadrature", "FileIO", "FillArrays", "ForwardDiff", "JLD2", "JSON", "LineSearches", "LinearAlgebra", "NLsolve", "NearestNeighbors", "PolynomialBases", "QuadGK", "Random", "SparseArrays", "SparseMatricesCSR", "StaticArrays", "Test", "WriteVTK"]
-git-tree-sha1 = "f3f4a94f53fdfcda51e9cafc2d83ca9b229d6ea7"
-repo-rev = "refined-discrete-models"
+git-tree-sha1 = "ddd11e52330f755829ccc36e40c50d98a400c42c"
+repo-rev = "adaptivity"
 repo-url = "https://github.com/gridap/Gridap.jl.git"
 uuid = "56d4f2e9-7ea1-5844-9cf6-b9c51ca7ce8e"
 version = "0.17.16"

@@ -38,7 +38,7 @@ function run(parts,num_parts_x_level,coarse_grid_partition,num_refs_coarse)
     l(v,dΩ)   = ∫(v⋅u)*dΩ
     mats, A, b = compute_hierarchy_matrices(trials,a,l,qdegree)
 
-    for lev in 1:1#num_levels-1
+    for lev in 1:num_levels-1
       parts_h = get_level_parts(mh,lev)
       parts_H = get_level_parts(mh,lev+1)
 
@@ -52,44 +52,6 @@ function run(parts,num_parts_x_level,coarse_grid_partition,num_refs_coarse)
           AH = mats[lev+1]
           xH = PVector(1.0,AH.cols)
           yH = PVector(0.0,AH.cols)
-
-          model_h = get_model_before_redist(mh,lev)
-          model_H = get_model(mh,lev+1)
-
-          display(map_parts(num_cells,local_views(model_h)))
-          display(map_parts(num_cells,local_views(model_H)))
-
-          Uh = get_fe_space_before_redist(trials,lev)
-          Ωh = GridapSolvers.MultilevelTools.get_triangulation(Uh,model_h)
-
-          UH   = get_fe_space(trials,lev+1)
-          VH   = GridapSolvers.MultilevelTools.get_test_space(UH)
-          ΩH   = GridapSolvers.MultilevelTools.get_triangulation(UH,model_H)
-          dΩH  = Measure(ΩH,qdegree)
-          dΩhH = Measure(ΩH,Ωh,qdegree)
-
-          uH = interpolate(u,UH)
-          uh = interpolate(u,Uh)
-
-          aH(u,v) = ∫(v⋅u)*dΩH
-          lh(v)   = ∫(v⋅uh)*dΩhH
-          lH(v)   = ∫(v⋅uH)*dΩH
-          assem   = SparseMatrixAssembler(UH,VH)
-          
-          u_dir = interpolate(0.0,UH)
-          u,v   = get_trial_fe_basis(UH), get_fe_basis(VH)
-          data  = Gridap.FESpaces.collect_cell_matrix_and_vector(UH,VH,aH(u,v),lh(v),u_dir)
-          AH,bH = Gridap.FESpaces.assemble_matrix_and_vector(assem,data)
-
-          data2  = Gridap.FESpaces.collect_cell_matrix_and_vector(UH,VH,aH(u,v),lH(v),u_dir)
-          AH2,bH2 = Gridap.FESpaces.assemble_matrix_and_vector(assem,data2)
-
-          vecdata = Gridap.FESpaces.collect_cell_vector(VH,lh(v))
-          display(vecdata)
-
-          display(bH.values)
-          display(bH2.values)
-
         else
           xH = nothing
           yH = nothing

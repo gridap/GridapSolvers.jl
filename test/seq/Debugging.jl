@@ -6,6 +6,8 @@ using Gridap
 using Gridap.Adaptivity
 using Gridap.FESpaces
 
+using GridapDistributed
+using PartitionedArrays
 
 function assemble_matrix_and_vector_bis(a,l,U,V)
   u_dir = zero(UH)
@@ -20,55 +22,41 @@ function assemble_matrix_and_vector_bis(a,l,U,V)
   return A,b
 end
 
-"""
-function Gridap.Adaptivity.FineToCoarseField(fine_fields,rrule::RefinementRule)
-  return Gridap.Adaptivity.FineToCoarseField(collect(fine_fields),rrule)
-end
-"""
+
+
+backend = SequentialBackend()
+parts   = get_part_ids(backend,(1,2))
 
 domain = (0,1,0,1)
 partition = Tuple(fill(4,2))
-model_H = CartesianDiscreteModel(domain,partition)
-model_h = refine(model_H)
+model = CartesianDiscreteModel(parts,domain,partition)
 
 order = 1
 u(x)  = 1.0
 reffe = ReferenceFE(lagrangian,Float64,order)
 
-VH = TestFESpace(model_H,reffe;dirichlet_tags="boundary")
-UH = TrialFESpace(VH,u)
-Vh = TestFESpace(model_h,reffe;dirichlet_tags="boundary")
-Uh = TrialFESpace(Vh,u)
+V = TestFESpace(model,reffe;dirichlet_tags="boundary")
+U = TrialFESpace(V,u)
 
-uh = interpolate(u,Uh)
-uH = interpolate(u,UH)
+uh = interpolate(u,U)
 
 qorder = order*2+1
-ΩH  = Triangulation(model_H)
-dΩH = Measure(ΩH,qorder)
-Ωh  = Triangulation(model_h)
-dΩh = Measure(Ωh,qorder)
+Ω  = Triangulation(model)
+dΩ = Measure(Ω,qorder)
 
-dΩHh = Measure(ΩH,Ωh,qorder)
+a(u,v) = ∫(v⋅u)*dΩ
+l(v)   = ∫(v⋅uh)*dΩ
+h(v)   = ∫(v⋅v)*dΩ
 
-a(u,v) = ∫(v⋅u)*dΩH
-lh(v)  = ∫(v⋅uh)*dΩHh
-lH(v)  = ∫(v⋅uH)*dΩH
 
-op = AffineFEOperator(a,lH,UH,VH)
+SAR = SparseMatrixAssembler(U,V)
+FAR = SparseMatrixAssembler(U,V,FullyAssembledRows())
 
-AH, bH = assemble_matrix_and_vector_bis(a,lh,UH,VH)
+v = get_fe_basis(V)
+vecdata = collect_cell_vector(V,l(v))
 
-xH = zeros(size(bH))
-rH = AH*xH - bH
-xH, hist = cg!(xH,AH,bH;log=true)
-xH
-
-uH2 = FEFunction(UH,xH)
-
-pts = get_cell_points(dΩH)
-uH(pts)
-uH2(pts)
+v_sar = assemble_vector(SAR,vecdata)
+v_far = assemble_vector(FAR,vecdata)
 
 
 end

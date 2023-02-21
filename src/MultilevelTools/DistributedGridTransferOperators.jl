@@ -77,14 +77,15 @@ function _get_projection_cache(lev::Int,sh::FESpaceHierarchy,qdegree::Int,mode::
 
   if i_am_in(cparts)
     model_h = get_model_before_redist(mh,lev)
-    Uh = get_fe_space_before_redist(sh,lev)
-    Ωh = get_triangulation(Uh,get_model_before_redist(mh,lev))
+    Uh   = get_fe_space_before_redist(sh,lev)
+    Ωh   = Triangulation(model_h)
     fv_h = PVector(0.0,Uh.gids)
     dv_h = (mode == :solution) ? get_dirichlet_dof_values(Uh) : zero_dirichlet_values(Uh)
 
+    model_H = get_model(mh,lev+1)
     UH   = get_fe_space(sh,lev+1)
     VH   = get_test_space(UH)
-    ΩH   = get_triangulation(UH,get_model(mh,lev+1))
+    ΩH   = Triangulation(model_H)
     dΩH  = Measure(ΩH,qdegree)
     dΩhH = Measure(ΩH,Ωh,qdegree)
 
@@ -96,7 +97,7 @@ function _get_projection_cache(lev::Int,sh::FESpaceHierarchy,qdegree::Int,mode::
     u,v   = get_trial_fe_basis(UH), get_fe_basis(VH)
     data  = collect_cell_matrix_and_vector(UH,VH,aH(u,v),lH(v,0.0),u_dir)
     AH,bH = assemble_matrix_and_vector(assem,data)
-    xH    = PVector(0.0,AH.rows)
+    xH    = PVector(0.0,AH.cols)
 
     cache_refine = model_h, Uh, fv_h, dv_h, VH, AH, lH, xH, bH, assem
   else
@@ -167,7 +168,7 @@ function LinearAlgebra.mul!(y::PVector,A::DistributedGridTransferOperator{Val{:p
   uH = FEFunction(UH,fv_H,dv_H)
   uh = interpolate!(uH,fv_h,Uh)
   copy!(y,fv_h) # FE layout -> Matrix layout
-  exchange!(y)
+
   return y
 end
 
@@ -180,7 +181,7 @@ function LinearAlgebra.mul!(y::PVector,A::DistributedGridTransferOperator{Val{:r
   uh = FEFunction(Uh,fv_h,dv_h)
   uH = interpolate!(uh,fv_H,UH)
   copy!(y,fv_H) # FE layout -> Matrix layout
-  exchange!(y)
+
   return y
 end
 
@@ -194,10 +195,8 @@ function LinearAlgebra.mul!(y::PVector,A::DistributedGridTransferOperator{Val{:r
   v  = get_fe_basis(VH)
   vec_data = collect_cell_vector(VH,lH(v,uh))
   assemble_vector_add!(bH,assem,vec_data) # Matrix layout
-  display(bH.values)
   IterativeSolvers.cg!(xH,AH,bH;reltol=1.0e-06)
   copy!(y,xH)
-  exchange!(y)
   
   return y
 end
@@ -211,7 +210,6 @@ function LinearAlgebra.mul!(y::PVector,A::DistributedGridTransferOperator{Val{:r
   exchange!(fv_h)
   restrict_dofs!(fv_H,fv_h,dv_h,Uh,UH,get_adaptivity_glue(model_h))
   copy!(y,fv_H) # FE layout -> Matrix layout
-  exchange!(y)
 
   return y
 end
@@ -252,7 +250,6 @@ function LinearAlgebra.mul!(y::Union{PVector,Nothing},A::DistributedGridTransfer
     uh = FEFunction(Uh,fv_h,dv_h)
     uH = interpolate!(uh,fv_H,UH)
     copy!(y,fv_H) # FE layout -> Matrix layout
-    exchange!(y)
   end
 
   return y 
@@ -271,15 +268,13 @@ function LinearAlgebra.mul!(y::Union{PVector,Nothing},A::DistributedGridTransfer
 
   # 2 - Solve f2c projection coarse partition
   if !isa(y,Nothing)
-    exchange!(fv_h)
+    #exchange!(fv_h)
     uh = FEFunction(Uh,fv_h,dv_h)
     v  = get_fe_basis(VH)
     vec_data = collect_cell_vector(VH,lH(v,uh))
     assemble_vector_add!(bH,assem,vec_data) # Matrix layout
-    display(bH.values)
     IterativeSolvers.cg!(xH,AH,bH;reltol=1.0e-06)
     copy!(y,xH)
-    exchange!(y)
   end
 
   return y 
@@ -300,7 +295,6 @@ function LinearAlgebra.mul!(y::Union{PVector,Nothing},A::DistributedGridTransfer
   if !isa(y,Nothing)
     restrict_dofs!(fv_H,fv_h,dv_h,Uh,UH,get_adaptivity_glue(model_h))
     copy!(y,fv_H) # FE layout -> Matrix layout
-    exchange!(y)
   end
 
   return y 
