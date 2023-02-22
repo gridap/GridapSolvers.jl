@@ -20,18 +20,18 @@ function run(parts,num_parts_x_level,coarse_grid_partition,num_refs_coarse)
 
     # Create Operators: 
     order = 1
-    u(x)  = x[1] + x[2]
+    u(x)  = 1.0
     reffe = ReferenceFE(lagrangian,Float64,order)
 
     tests  = TestFESpace(mh,reffe;dirichlet_tags="boundary")
     trials = TrialFESpace(tests,u)
 
     qdegree = order*2+1
-    ops = setup_transfer_operators(trials, qdegree; restriction_method=:projection)
-    restrictions, prolongations = ops
-    ops2 = setup_transfer_operators(trials, qdegree; restriction_method=:interpolation)
+    ops1 = setup_transfer_operators(trials, qdegree; restriction_method=:projection, mode=:solution)
+    restrictions1, prolongations1 = ops1
+    ops2 = setup_transfer_operators(trials, qdegree; restriction_method=:interpolation, mode=:solution)
     restrictions2, prolongations2 = ops2
-    ops3 = setup_transfer_operators(trials, qdegree; restriction_method=:dof_mask)
+    ops3 = setup_transfer_operators(trials, qdegree; restriction_method=:dof_mask, mode=:solution)
     restrictions3, prolongations3 = ops3
 
     a(u,v,dΩ) = ∫(∇(v)⋅∇(u))*dΩ
@@ -44,38 +44,61 @@ function run(parts,num_parts_x_level,coarse_grid_partition,num_refs_coarse)
 
       if i_am_in(parts_h)
         i_am_main(parts_h) && println("Lev : ", lev)
-        Ah = mats[lev]
-        xh = PVector(1.0,Ah.cols)
-        yh = PVector(0.0,Ah.rows)
+        Ah  = mats[lev]
+        xh  = PVector(1.0,Ah.cols)
+        yh1 = PVector(0.0,Ah.cols)
+        yh2 = PVector(0.0,Ah.cols)
+        yh3 = PVector(0.0,Ah.cols)
 
         if i_am_in(parts_H)
-          AH = mats[lev+1]
-          xH = PVector(1.0,AH.cols)
-          yH = PVector(0.0,AH.rows)
+          AH  = mats[lev+1]
+          xH  = PVector(1.0,AH.cols)
+          yH1 = PVector(0.0,AH.cols)
+          yH2 = PVector(0.0,AH.cols)
+          yH3 = PVector(0.0,AH.cols)
         else
-          xH = nothing
-          yH = nothing
+          xH  = nothing
+          yH1 = nothing
+          yH2 = nothing
+          yH3 = nothing
         end
 
+        # ----    Restriction    ----
         i_am_main(parts_h) && println("  > Restriction")
-        R = restrictions[lev]
-        mul!(yH,R,xh)
+        R1 = restrictions1[lev]
+        mul!(yH1,R1,xh)
 
         R2 = restrictions2[lev]
-        mul!(yH,R2,xh)
+        mul!(yH2,R2,xh)
 
         R3 = restrictions3[lev]
-        mul!(yH,R3,xh)
+        mul!(yH3,R3,xh)
 
+        if i_am_in(parts_H)
+          y_ref = PVector(1.0,AH.cols)
+          tests = map_parts(y_ref.owned_values,yH1.owned_values,yH2.owned_values,yH3.owned_values) do y_ref,y1,y2,y3
+            map(y -> norm(y-y_ref) < 1.e-3 ,[y1,y2,y3])
+          end
+          @test all(tests.part)
+        end
+
+        # ----    Prolongation    ----
         i_am_main(parts_h) && println("  > Prolongation")
-        P = prolongations[lev]
-        mul!(yh,P,xH)
+        P1 = prolongations1[lev]
+        mul!(yh1,P1,xH)
 
         P2 = prolongations2[lev]
-        mul!(yh,P2,xH)
+        mul!(yh2,P2,xH)
 
         P3 = prolongations3[lev]
-        mul!(yh,P3,xH)
+        mul!(yh3,P3,xH)
+
+        y_ref = PVector(1.0,Ah.cols)
+        tests = map_parts(y_ref.owned_values,yh1.owned_values,yh2.owned_values,yh2.owned_values) do y_ref,y1,y2,y3
+          map(y -> norm(y-y_ref) < 1.e-3 ,[y1,y2,y3])
+        end
+        @test all(tests.part)
+
       end
     end
   end

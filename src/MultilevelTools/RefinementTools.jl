@@ -3,28 +3,6 @@
 
 const DistributedAdaptedTriangulation{Dc,Dp} = GridapDistributed.DistributedTriangulation{Dc,Dp,<:AbstractPData{<:AdaptedTriangulation{Dc,Dp}}}
 
-# ChangeDomain
-
-function Gridap.Adaptivity.change_domain_o2n(c_cell_field,
-              ftrian::GridapDistributed.DistributedTriangulation{Dc,Dp},
-              glue::AbstractPData{Gridap.Adaptivity.AdaptivityGlue}) where {Dc,Dp}
-
-  i_am_in_coarse = !isa(c_cell_field, Nothing)
-
-  fields = map_parts(local_views(ftrian)) do Ω
-    if (i_am_in_coarse)
-      c_cell_field.fields.part
-    else
-      Gridap.Helpers.@check num_cells(Ω) == 0
-      Gridap.CellData.GenericCellField(Fill(Gridap.Fields.ConstantField(0.0),num_cells(Ω)),Ω,ReferenceDomain())
-    end
-  end
-  c_cell_field_fine = GridapDistributed.DistributedCellField(fields)
-
-  dfield = map_parts(Gridap.Adaptivity.change_domain_o2n,local_views(c_cell_field_fine),local_views(ftrian),glue)
-  return GridapDistributed.DistributedCellField(dfield)
-end
-
 # Restriction of dofs
 
 function restrict_dofs!(fv_c::PVector,
