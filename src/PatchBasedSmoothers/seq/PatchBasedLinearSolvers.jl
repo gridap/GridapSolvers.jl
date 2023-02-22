@@ -49,23 +49,27 @@ function Gridap.Algebra.numerical_setup(ss::PatchBasedSymbolicSetup,A::AbstractM
   Ap_ns     = numerical_setup(Ap_ss,Ap)
 
   # Caches
-  caches = _patch_based_solver_caches(Ph,Ap)
+  caches = _patch_based_solver_caches(Ph,Vh,Ap)
   
   return PatchBasedSmootherNumericalSetup(ss.solver,Ap,Ap_ns,weights,caches)
 end
 
-function _patch_based_solver_caches(Ph::PatchFESpace,Ap::AbstractMatrix)
+function _patch_based_solver_caches(Ph::PatchFESpace,Vh::FESpace,Ap::AbstractMatrix)
   rp        = _allocate_row_vector(Ap)
   dxp       = _allocate_col_vector(Ap)
   return rp, dxp
 end
 
-function _patch_based_solver_caches(Ph::GridapDistributed.DistributedSingleFieldFESpace,Ap::PSparseMatrix)
+function _patch_based_solver_caches(Ph::GridapDistributed.DistributedSingleFieldFESpace,
+                                    Vh::GridapDistributed.DistributedSingleFieldFESpace,
+                                    Ap::PSparseMatrix)
   rp_mat  = _allocate_row_vector(Ap)
   dxp_mat = _allocate_col_vector(Ap)
   rp      = PVector(0.0,Ph.gids)
   dxp     = PVector(0.0,Ph.gids)
-  return rp_mat, dxp_mat, rp, dxp
+  r       = PVector(0.0,Vh.gids)
+  x       = PVector(0.0,Vh.gids)
+  return rp_mat, dxp_mat, rp, dxp, r, x
 end
 
 function _allocate_col_vector(A::AbstractMatrix)
@@ -102,18 +106,21 @@ function Gridap.Algebra.solve!(x::AbstractVector,ns::PatchBasedSmootherNumerical
   return x
 end
 
-function Gridap.Algebra.solve!(x::PVector,ns::PatchBasedSmootherNumericalSetup,r::PVector)
+function Gridap.Algebra.solve!(x_mat::PVector,ns::PatchBasedSmootherNumericalSetup,r_mat::PVector)
   Ap_ns, weights, caches = ns.Ap_ns, ns.weights, ns.caches
   
   Ph = ns.solver.Ph
   w, w_sums = weights
-  rp_mat, dxp_mat, rp, dxp = caches
+  rp_mat, dxp_mat, rp, dxp, r, x = caches
 
+  copy!(r,r_mat)
+  exchange!(r)
   prolongate!(rp,Ph,r)
   copy!(rp_mat,rp)
   solve!(dxp_mat,Ap_ns,rp_mat)
   copy!(dxp,dxp_mat)
   inject!(x,Ph,dxp,w,w_sums)
+  copy!(x_mat,x)
 
-  return x
+  return x_mat
 end

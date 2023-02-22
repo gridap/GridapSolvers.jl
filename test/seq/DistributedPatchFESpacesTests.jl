@@ -1,8 +1,5 @@
 module DistributedPatchFESpacesTests
 
-ENV["JULIA_MPI_BINARY"] = "system"
-ENV["JULIA_MPI_PATH"] = "/usr/lib/x86_64-linux-gnu"
-
 using LinearAlgebra
 using Test
 using PartitionedArrays
@@ -12,13 +9,8 @@ using Gridap.Geometry
 using GridapDistributed
 using FillArrays
 
-include("../../src/PatchBasedSmoothers/PatchBasedSmoothers.jl")
-import .PatchBasedSmoothers as PBS
-
-# This is needed for assembly
-include("../../src/MultilevelTools/GridapFixes.jl")
-
-include("../../src/LinearSolvers/RichardsonSmoothers.jl")
+using GridapSolvers
+import GridapSolvers.PatchBasedSmoothers as PBS
 
 backend = SequentialBackend()
 ranks = (1,2)
@@ -34,6 +26,7 @@ Vh = TestFESpace(model,reffe)
 PD = PBS.PatchDecomposition(model)#,patch_boundary_style=PBS.PatchBoundaryInclude())
 Ph = PBS.PatchFESpace(model,reffe,Gridap.ReferenceFEs.H1Conformity(),PD,Vh)
 
+# ---- Testing Prolongation and Injection ---- #
 w, w_sums = PBS.compute_weight_operators(Ph,Vh);
 
 xP = PVector(1.0,Ph.gids)
@@ -49,50 +42,77 @@ PBS.inject!(x,Ph,xP,w,w_sums)
 PBS.prolongate!(yP,Ph,x)
 @test xP ≈ yP
 
-Ωₚ  = Triangulation(PD)
-dΩₚ = Measure(Ωₚ,2*order+1)
-a(u,v) = ∫(∇(v)⋅∇(u))*dΩₚ
-l(v) = ∫(1*v)*dΩₚ
+# ---- Assemble systems ---- #
+Ω  = Triangulation(model)
+dΩ = Measure(Ω,2*order+1)
+a(u,v) = ∫(v⋅u)*dΩ
+l(v) = ∫(1*v)*dΩ
 
 assembler = SparseMatrixAssembler(Vh,Vh)
 Ah = assemble_matrix(a,assembler,Vh,Vh)
 fh = assemble_vector(l,assembler,Vh)
 
-M = PBS.PatchBasedLinearSolver(a,Ph,Vh,LUSolver())
-R = RichardsonSmoother(M,10,1.0/3.0)
+sol_h = solve(LUSolver(),Ah,fh)
+
+Ωₚ  = Triangulation(PD)
+dΩₚ = Measure(Ωₚ,2*order+1)
+ap(u,v) = ∫(v⋅u)*dΩₚ
+lp(v) = ∫(1*v)*dΩₚ
+
+assembler_P = SparseMatrixAssembler(Ph,Ph)
+Ahp = assemble_matrix(ap,assembler_P,Ph,Ph)
+fhp = assemble_vector(lp,assembler_P,Ph)
+
+# ---- Define solvers ---- #
+LU   = LUSolver()
+LUss = symbolic_setup(LU,Ahp)
+LUns = numerical_setup(LUss,Ahp)
+
+M   = PBS.PatchBasedLinearSolver(ap,Ph,Vh,LU)
+Mss = symbolic_setup(M,Ah)
+Mns = numerical_setup(Mss,Ah)
+
+R   = RichardsonSmoother(M,10,1.0/3.0)
 Rss = symbolic_setup(R,Ah)
 Rns = numerical_setup(Rss,Ah)
 
-x = PBS._allocate_col_vector(Ah)
-r = fh-Ah*x
-exchange!(r)
-solve!(x,Rns,r)
+# ---- Manual solve using LU ---- # 
 
-Mss = symbolic_setup(M,Ah)
-Mns = numerical_setup(Mss,Ah)
-solve!(x,Mns,r)
+x1_mat = PVector(0.5,Ah.cols)
+r1_mat = fh-Ah*x1_mat
+exchange!(r1_mat)
 
-assembler_P = SparseMatrixAssembler(Ph,Ph)
-Ahp = assemble_matrix(a,assembler_P,Ph,Ph)
-fhp = assemble_vector(l,assembler_P,Ph)
-
-lu = LUSolver()
-luss = symbolic_setup(lu,Ahp)
-luns = numerical_setup(luss,Ahp)
-
+r1 = PVector(0.0,Vh.gids)
+x1 = PVector(0.0,Vh.gids)
 rp = PVector(0.0,Ph.gids)
-PBS.prolongate!(rp,Ph,r)
-
+xp = PVector(0.0,Ph.gids)
 rp_mat = PVector(0.0,Ahp.cols)
-copy!(rp_mat,rp)
 xp_mat = PVector(0.0,Ahp.cols)
 
-solve!(xp_mat,luns,rp_mat)
+copy!(r1,r1_mat)
+exchange!(r1)
+PBS.prolongate!(rp,Ph,r1)
 
-xp = PVector(0.0,Ph.gids)
+copy!(rp_mat,rp)
+solve!(xp_mat,LUns,rp_mat)
 copy!(xp,xp_mat)
 
 w, w_sums = PBS.compute_weight_operators(Ph,Vh);
-PBS.inject!(x,Ph,xp,w,w_sums)
+PBS.inject!(x1,Ph,xp,w,w_sums)
+copy!(x1_mat,x1)
+
+# ---- Same using the PatchBasedSmoother ---- #
+
+x2_mat = PVector(0.5,Ah.cols)
+r2_mat = fh-Ah*x2_mat
+exchange!(r2_mat)
+solve!(x2_mat,Mns,r2_mat)
+
+# ---- Smoother inside Richardson
+x3_mat = PVector(0.5,Ah.cols)
+r3_mat = fh-Ah*x3_mat
+exchange!(r3_mat)
+solve!(x3_mat,Rns,r3_mat)
+exchange!(x3_mat)
 
 end
