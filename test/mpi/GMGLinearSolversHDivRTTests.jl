@@ -13,10 +13,32 @@ using GridapP4est
 
 using GridapSolvers
 using GridapSolvers.LinearSolvers
+using GridapSolvers.MultilevelTools
+using GridapSolvers.PatchBasedSmoothers
 
 
 u(x) = VectorValue(x[1],x[2])
 f(x) = VectorValue(2.0*x[2]*(1.0-x[1]*x[1]),2.0*x[1]*(1-x[2]*x[2]))
+
+function get_patch_smoothers(tests,patch_spaces,patch_decompositions,biform,qdegree)
+  mh = tests.mh
+  nlevs = num_levels(mh)
+  smoothers = Vector{RichardsonSmoother}(undef,nlevs-1)
+  for lev in 1:nlevs-1
+    parts = get_level_parts(mh,lev)
+    if i_am_in(parts)
+      PD = patch_decompositions[lev]
+      Ph = get_fe_space(patch_spaces,lev)
+      Vh = get_fe_space(tests,lev)
+      Ω  = Triangulation(PD)
+      dΩ = Measure(Ω,qdegree)
+      a(u,v) = biform(u,v,dΩ) 
+      patch_smoother = PatchBasedLinearSolver(a,Ph,Vh,LUSolver())
+      smoothers[lev] = RichardsonSmoother(patch_smoother,1,1.0/3.0)
+    end
+  end
+  return smoothers
+end
 
 function main(parts, coarse_grid_partition, num_parts_x_level, num_refs_coarse, order, α)
   GridapP4est.with(parts) do
@@ -32,12 +54,15 @@ function main(parts, coarse_grid_partition, num_parts_x_level, num_refs_coarse, 
     tests     = TestFESpace(mh,reffe;dirichlet_tags="boundary")
     trials    = TrialFESpace(tests,u)
 
+    patch_decompositions = PatchDecomposition(mh)
+    patch_spaces = PatchFESpace(mh,reffe,DivConformity(),patch_decompositions,tests)
+
     biform(u,v,dΩ)  = ∫(v⋅u)dΩ + ∫(α*divergence(v)⋅divergence(u))dΩ
     liform(v,dΩ)    = ∫(v⋅f)dΩ
     smatrices, A, b = compute_hierarchy_matrices(trials,biform,liform,qdegree)
 
     # Preconditioner
-    smoothers = Fill(RichardsonSmoother(JacobiLinearSolver(),10,2.0/3.0),num_levels-1)
+    smoothers = get_patch_smoothers(tests,patch_spaces,patch_decompositions,biform,qdegree)
     restrictions, prolongations = setup_transfer_operators(trials,qdegree;mode=:residual)
 
     gmg = GMGLinearSolver(mh,
@@ -57,9 +82,10 @@ function main(parts, coarse_grid_partition, num_parts_x_level, num_refs_coarse, 
     x = PVector(0.0,A.cols)
     x, history = IterativeSolvers.cg!(x,A,b;
                           verbose=i_am_main(parts),
-                          reltol=1.0e-12,
+                          reltol=1.0e-8,
                           Pl=ns,
-                          log=true)
+                          log=true,
+                          maxiter=10)
 
     # Error norms and print solution
     model = get_model(mh,1)
@@ -93,7 +119,7 @@ num_refs_coarse = 2
 α = 1.0
 num_parts_x_level = [4,2,1]
 ranks = num_parts_x_level[1]
-#num_iters, num_free_dofs2 = with_backend(main,MPIBackend(),ranks,coarse_grid_partition,num_parts_x_level,num_refs_coarse,order,α)
+num_iters, num_free_dofs2 = with_backend(main,MPIBackend(),ranks,coarse_grid_partition,num_parts_x_level,num_refs_coarse,order,α)
 
 """
 
