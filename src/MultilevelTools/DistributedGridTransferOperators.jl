@@ -79,7 +79,7 @@ function _get_projection_cache(lev::Int,sh::FESpaceHierarchy,qdegree::Int,mode::
     model_h = get_model_before_redist(mh,lev)
     Uh   = get_fe_space_before_redist(sh,lev)
     Ωh   = Triangulation(model_h)
-    fv_h = PVector(0.0,Uh.gids)
+    fv_h = zero_free_values(Uh)
     dv_h = (mode == :solution) ? get_dirichlet_dof_values(Uh) : zero_dirichlet_values(Uh)
 
     model_H = get_model(mh,lev+1)
@@ -92,10 +92,15 @@ function _get_projection_cache(lev::Int,sh::FESpaceHierarchy,qdegree::Int,mode::
     aH(u,v)  = ∫(v⋅u)*dΩH
     lH(v,uh) = ∫(v⋅uh)*dΩhH
     assem    = SparseMatrixAssembler(UH,VH)
-    
-    u_dir  = (mode == :solution) ? interpolate(0.0,UH) : interpolate_everywhere(0.0,UH)
+
+    fv_H   = zero_free_values(UH)
+    dv_H   = zero_dirichlet_values(UH)
+    u0     = FEFunction(UH,fv_H,true)      # Zero at free dofs
+    u00    = FEFunction(UH,fv_H,dv_H,true) # Zero everywhere
+
+    u_dir  = (mode == :solution) ? u0 : u00
     u,v    = get_trial_fe_basis(UH), get_fe_basis(VH)
-    data   = collect_cell_matrix_and_vector(UH,VH,aH(u,v),lH(v,0.0),u_dir)
+    data   = collect_cell_matrix_and_vector(UH,VH,aH(u,v),lH(v,u00),u_dir)
     AH,bH0 = assemble_matrix_and_vector(assem,data)
     xH     = PVector(0.0,AH.cols)
     bH     = copy(bH0)
