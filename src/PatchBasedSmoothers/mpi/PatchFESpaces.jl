@@ -7,7 +7,7 @@
 # 3. Each processor needs to know how many patches "touch" its owned DoFs.
 #    This requires NO->O communication as well. [PENDING]
 
-function PatchFESpace(model::GridapDistributed.DistributedDiscreteModel,
+function PatchFESpace(model::GridapDistributed.AbstractDistributedDiscreteModel,
                       reffe::Tuple{<:Gridap.FESpaces.ReferenceFEName,Any,Any},
                       conformity::Gridap.FESpaces.Conformity,
                       patch_decomposition::DistributedPatchDecomposition,
@@ -26,12 +26,12 @@ function PatchFESpace(model::GridapDistributed.DistributedDiscreteModel,
   end
 
   spaces = map_parts(f,
-                   model.models,
-                   patch_decomposition.patch_decompositions,
-                   Vh.spaces,
+                   local_views(model),
+                   local_views(patch_decomposition),
+                   local_views(Vh),
                    root_gids.partition)
   
-  parts  = get_part_ids(model.models)
+  parts  = get_parts(model)
   nodofs = map_parts(spaces) do space
     num_free_dofs(space)
   end
@@ -41,6 +41,26 @@ function PatchFESpace(model::GridapDistributed.DistributedDiscreteModel,
   # This PRange has no ghost dofs
   gids = PRange(parts,ngdofs,nodofs,first_gdof)
   return GridapDistributed.DistributedSingleFieldFESpace(spaces,gids,get_vector_type(Vh))
+end
+
+function PatchFESpace(mh::ModelHierarchy,
+                      reffe::Tuple{<:Gridap.FESpaces.ReferenceFEName,Any,Any},
+                      conformity::Gridap.FESpaces.Conformity,
+                      patch_decompositions::AbstractArray{<:DistributedPatchDecomposition},
+                      sh::FESpaceHierarchy)
+  nlevs = num_levels(mh)
+  levels = Vector{MultilevelTools.FESpaceHierarchyLevel}(undef,nlevs)
+  for lev in 1:nlevs-1
+    parts = get_level_parts(mh,lev)
+    if i_am_in(parts)
+      model  = get_model(mh,lev)
+      space  = MultilevelTools.get_fe_space(sh,lev)
+      decomp = patch_decompositions[lev]
+      patch_space = PatchFESpace(model,reffe,conformity,decomp,space)
+      levels[lev] = MultilevelTools.FESpaceHierarchyLevel(lev,nothing,patch_space)
+    end
+  end
+  return FESpaceHierarchy(mh,levels)
 end
 
 # x \in  PatchFESpace

@@ -12,6 +12,8 @@ using Gridap.FESpaces
 using PartitionedArrays
 using GridapDistributed
 
+using GridapSolvers.MultilevelTools
+
 export PatchDecomposition
 export PatchFESpace
 export PatchBasedLinearSolver
