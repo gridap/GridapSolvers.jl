@@ -51,7 +51,7 @@ has_refinement(a::ModelHierarchyLevel{A,Nothing}) where A = false
                          the number of parts of `model`.
 """
 function ModelHierarchy(root_parts        ::AbstractPData,
-                        model             ::GridapDistributed.AbstractDistributedDiscreteModel,
+                        model             ::GridapDistributed.DistributedDiscreteModel,
                         num_procs_x_level ::Vector{<:Integer};
                         mesh_refinement = true,
                         kwargs...)
@@ -81,7 +81,7 @@ function ModelHierarchy(root_parts        ::AbstractPData,
 end
 
 function _model_hierarchy_without_refinement_bottom_up(root_parts::AbstractPData,
-                                                       bottom_model::GridapDistributed.AbstractDistributedDiscreteModel,
+                                                       bottom_model::GridapDistributed.DistributedDiscreteModel,
                                                        num_procs_x_level::Vector{<:Integer})
   num_levels         = length(num_procs_x_level)
   level_parts        = Vector{typeof(root_parts)}(undef,num_levels)
@@ -107,7 +107,7 @@ function _model_hierarchy_without_refinement_bottom_up(root_parts::AbstractPData
 end
 
 function _model_hierarchy_without_refinement_top_down(root_parts::AbstractPData,
-                                                      top_model::GridapDistributed.AbstractDistributedDiscreteModel,
+                                                      top_model::GridapDistributed.DistributedDiscreteModel,
                                                       num_procs_x_level::Vector{<:Integer})
   num_levels         = length(num_procs_x_level)
   level_parts        = Vector{typeof(root_parts)}(undef,num_levels)
@@ -133,7 +133,7 @@ function _model_hierarchy_without_refinement_top_down(root_parts::AbstractPData,
 end
 
 function _model_hierarchy_by_refinement(root_parts::AbstractPData,
-                                        coarsest_model::GridapDistributed.AbstractDistributedDiscreteModel,
+                                        coarsest_model::GridapDistributed.DistributedDiscreteModel,
                                         num_procs_x_level::Vector{<:Integer}; 
                                         num_refs_x_level=nothing)
   # TODO: Implement support for num_refs_x_level? (future work)
@@ -165,7 +165,7 @@ function _model_hierarchy_by_refinement(root_parts::AbstractPData,
 end
 
 function _model_hierarchy_by_coarsening(root_parts::AbstractPData,
-                                        finest_model::GridapDistributed.AbstractDistributedDiscreteModel,
+                                        finest_model::GridapDistributed.DistributedDiscreteModel,
                                         num_procs_x_level::Vector{<:Integer}; 
                                         num_refs_x_level=nothing)
   # TODO: Implement support for num_refs_x_level? (future work)

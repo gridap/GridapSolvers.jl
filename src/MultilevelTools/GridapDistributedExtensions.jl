@@ -45,7 +45,7 @@ end
 
 # Void GridapDistributed structures
 
-struct VoidDistributedDiscreteModel{Dc,Dp,A} <: GridapDistributed.AbstractDistributedDiscreteModel{Dc,Dp}
+struct VoidDistributedDiscreteModel{Dc,Dp,A} <: GridapDistributed.DistributedDiscreteModel{Dc,Dp}
   parts::A
   function VoidDistributedDiscreteModel(Dc::Int,Dp::Int,parts)
     A = typeof(parts)
@@ -53,7 +53,7 @@ struct VoidDistributedDiscreteModel{Dc,Dp,A} <: GridapDistributed.AbstractDistri
   end
 end
 
-function VoidDistributedDiscreteModel(model::GridapDistributed.AbstractDistributedDiscreteModel{Dc,Dp}) where {Dc,Dp}
+function VoidDistributedDiscreteModel(model::GridapDistributed.DistributedDiscreteModel{Dc,Dp}) where {Dc,Dp}
   return VoidDistributedDiscreteModel(Dc,Dp,get_parts(model))
 end
 

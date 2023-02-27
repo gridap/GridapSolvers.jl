@@ -17,6 +17,8 @@ PartitionedArrays = "5a9dfac6-5c52-46f7-8278-5e2210713be9"
 Printf = "de0858da-6303-5e67-8744-51eddeeeb8d7"
 
 [compat]
+Gridap = "0.17.17"
+GridapDistributed = "0.2.7"
 PartitionedArrays = "0.2.15"
 julia = "1.7"
 
