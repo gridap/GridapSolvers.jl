@@ -7,7 +7,7 @@
 # 3. Each processor needs to know how many patches "touch" its owned DoFs.
 #    This requires NO->O communication as well. [PENDING]
 
-function PatchFESpace(model::GridapDistributed.AbstractDistributedDiscreteModel,
+function PatchFESpace(model::GridapDistributed.DistributedDiscreteModel,
                       reffe::Tuple{<:Gridap.FESpaces.ReferenceFEName,Any,Any},
                       conformity::Gridap.FESpaces.Conformity,
                       patch_decomposition::DistributedPatchDecomposition,

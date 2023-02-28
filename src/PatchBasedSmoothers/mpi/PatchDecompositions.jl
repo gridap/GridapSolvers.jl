@@ -6,7 +6,7 @@ end
 
 GridapDistributed.local_views(a::DistributedPatchDecomposition) = a.patch_decompositions
 
-function PatchDecomposition(model::GridapDistributed.AbstractDistributedDiscreteModel{Dc,Dp};
+function PatchDecomposition(model::GridapDistributed.DistributedDiscreteModel{Dc,Dp};
                             Dr=0,
                             patch_boundary_style::PatchBoundaryStyle=PatchBoundaryExclude()) where {Dc,Dp}
   patch_decompositions = map_parts(local_views(model)) do lmodel
