@@ -20,7 +20,8 @@ Gridap.Geometry.num_cells(a::PatchDecomposition) = a.patch_cells_overlapped_mesh
 function PatchDecomposition(
   model::DiscreteModel{Dc,Dp};
   Dr=0,
-  patch_boundary_style::PatchBoundaryStyle=PatchBoundaryExclude()) where {Dc,Dp}
+  patch_boundary_style::PatchBoundaryStyle=PatchBoundaryExclude(),
+  boundary_tag_names::AbstractArray{String}=["boundary"]) where {Dc,Dp}
   Gridap.Helpers.@check 0 <= Dr <= Dc-1
 
   grid               = get_grid(model)
@@ -41,12 +42,13 @@ function PatchDecomposition(
                                           patch_cells,
                                           patch_cells_overlapped_mesh)
 
-  generate_patch_boundary_faces!(model,
-                                 patch_cells_faces_on_boundary,
+  generate_patch_boundary_faces!(patch_cells_faces_on_boundary,
+                                 model,
                                  patch_cells,
                                  patch_cells_overlapped_mesh,
                                  patch_facets,
-                                 patch_boundary_style)
+                                 patch_boundary_style,
+                                 boundary_tag_names)
 
   return PatchDecomposition{Dc,Dp}(model, Dr,
                                    patch_cells,
@@ -112,47 +114,45 @@ function allocate_cell_overlapped_mesh_lface(::Type{T},
    return Gridap.Arrays.Table(data,ptrs)
 end
 
-function generate_patch_boundary_faces!(model,
-                                        patch_cells_faces_on_boundary,
+function generate_patch_boundary_faces!(patch_cells_faces_on_boundary,
+                                        model::DiscreteModel,
                                         patch_cells,
                                         patch_cells_overlapped_mesh,
                                         patch_facets,
-                                        patch_boundary_style)
-    Dc = num_cell_dims(model)
-    topology    = get_grid_topology(model)
-    labeling    = get_face_labeling(model)
-    num_patches = length(patch_cells.ptrs)-1
+                                        patch_boundary_style,
+                                        boundary_tag_names)
 
+    num_patches = length(patch_cells.ptrs)-1
     cache_patch_cells  = array_cache(patch_cells)
     cache_patch_facets = array_cache(patch_facets)
     for patch = 1:num_patches
       current_patch_cells  = getindex!(cache_patch_cells,patch_cells,patch)
       current_patch_facets = getindex!(cache_patch_facets,patch_facets,patch)
       generate_patch_boundary_faces!(patch_cells_faces_on_boundary,
-                                     Dc,
-                                     topology,
-                                     labeling,
+                                     model,
                                      patch,
                                      current_patch_cells,
                                      patch_cells_overlapped_mesh,
                                      current_patch_facets,
-                                     patch_boundary_style)
+                                     patch_boundary_style,
+                                     boundary_tag_names)
     end
 end
 
 function generate_patch_boundary_faces!(patch_cells_faces_on_boundary,
-                                        Dc,
-                                        topology,
-                                        face_labeling,
+                                        model::DiscreteModel{Dc},
                                         patch,
                                         patch_cells,
                                         patch_cells_overlapped_mesh,
                                         patch_facets,
-                                        patch_boundary_style)
+                                        patch_boundary_style,
+                                        boundary_tag_names) where Dc
+  face_labeling = get_face_labeling(model)
+  topology = get_grid_topology(model)
 
-  boundary_tag = findfirst(x->(x=="boundary"),face_labeling.tag_to_name)
-  Gridap.Helpers.@check !isa(boundary_tag, Nothing)
-  boundary_entities = face_labeling.tag_to_entities[boundary_tag]
+  boundary_tags = findall(x -> (x ∈ boundary_tag_names), face_labeling.tag_to_name)
+  Gridap.Helpers.@check !isempty(boundary_tags)
+  boundary_entities = vcat(face_labeling.tag_to_entities[boundary_tags]...)
 
   # Cells facets
   Df = Dc-1
@@ -184,7 +184,7 @@ function generate_patch_boundary_faces!(patch_cells_faces_on_boundary,
       facet_at_global_boundary = (facet_entity ∈ boundary_entities)
       A = (facet_at_global_boundary) && (facet ∉ patch_facets)
       B = (patch_boundary_style isa PatchBoundaryExclude) && cell_not_in_patch_found
-      facet_at_patch_boundary  = A || B
+      facet_at_patch_boundary = (A || B)
 
       if (facet_at_patch_boundary)
 

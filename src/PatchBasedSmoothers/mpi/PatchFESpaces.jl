@@ -1,6 +1,6 @@
 # Rationale behind distributed PatchFESpace:
 # 1. Patches have an owner. Only owners compute subspace correction.
-#    If am not owner of a patch, all dofs in my patch become -1.
+#    If am not owner of a patch, all dofs in my patch become -1. [DONE]
 # 2. Subspace correction on an owned patch may affect DoFs  which
 #    are non-owned. These corrections should be sent to the owner
 #    process. I.e., NO -> O (reversed) communication. [PENDING]
@@ -12,7 +12,7 @@ function PatchFESpace(model::GridapDistributed.DistributedDiscreteModel,
                       conformity::Gridap.FESpaces.Conformity,
                       patch_decomposition::DistributedPatchDecomposition,
                       Vh::GridapDistributed.DistributedSingleFieldFESpace)
-  root_gids=get_face_gids(model,get_patch_root_dim(patch_decomposition))
+  root_gids = get_face_gids(model,get_patch_root_dim(patch_decomposition))
 
   function f(model,patch_decomposition,Vh,partition)
     patches_mask = fill(false,length(partition.lid_to_gid))
@@ -26,12 +26,12 @@ function PatchFESpace(model::GridapDistributed.DistributedDiscreteModel,
   end
 
   spaces = map_parts(f,
-                   model.models,
-                   patch_decomposition.patch_decompositions,
-                   Vh.spaces,
+                   local_views(model),
+                   local_views(patch_decomposition),
+                   local_views(Vh),
                    root_gids.partition)
   
-  parts  = get_part_ids(model.models)
+  parts  = get_parts(model)
   nodofs = map_parts(spaces) do space
     num_free_dofs(space)
   end
@@ -43,38 +43,69 @@ function PatchFESpace(model::GridapDistributed.DistributedDiscreteModel,
   return GridapDistributed.DistributedSingleFieldFESpace(spaces,gids,get_vector_type(Vh))
 end
 
+function PatchFESpace(mh::ModelHierarchy,
+                      reffe::Tuple{<:Gridap.FESpaces.ReferenceFEName,Any,Any},
+                      conformity::Gridap.FESpaces.Conformity,
+                      patch_decompositions::AbstractArray{<:DistributedPatchDecomposition},
+                      sh::FESpaceHierarchy)
+  nlevs = num_levels(mh)
+  levels = Vector{MultilevelTools.FESpaceHierarchyLevel}(undef,nlevs)
+  for lev in 1:nlevs-1
+    parts = get_level_parts(mh,lev)
+    if i_am_in(parts)
+      model  = get_model(mh,lev)
+      space  = MultilevelTools.get_fe_space(sh,lev)
+      decomp = patch_decompositions[lev]
+      patch_space = PatchFESpace(model,reffe,conformity,decomp,space)
+      levels[lev] = MultilevelTools.FESpaceHierarchyLevel(lev,nothing,patch_space)
+    end
+  end
+  return FESpaceHierarchy(mh,levels)
+end
+
 # x \in  PatchFESpace
 # y \in  SingleFESpace
 function prolongate!(x::PVector,
                      Ph::GridapDistributed.DistributedSingleFieldFESpace,
                      y::PVector)
-   parts=get_part_ids(x.owned_values)
-   Gridap.Helpers.@notimplementedif num_parts(parts)!=1
-   
-   map_parts(x.owned_values,Ph.spaces,y.owned_values) do x,Ph,y
+   map_parts(x.values,Ph.spaces,y.values) do x,Ph,y
      prolongate!(x,Ph,y)
    end
+   exchange!(x)
 end
 
+# x \in  SingleFESpace
+# y \in  PatchFESpace
 function inject!(x::PVector,
                  Ph::GridapDistributed.DistributedSingleFieldFESpace,
                  y::PVector,
-                 w::PVector)
-  parts = get_part_ids(x.owned_values)
-  Gridap.Helpers.@notimplementedif num_parts(parts)!=1
-  
-  map_parts(x.owned_values,Ph.spaces,y.owned_values,w.owned_values) do x,Ph,y,w
-    inject!(x,Ph,y,w)
+                 w::PVector,
+                 w_sums::PVector)
+
+  #exchange!(y)
+  map_parts(x.values,Ph.spaces,y.values,w.values,w_sums.values) do x,Ph,y,w,w_sums
+    inject!(x,Ph,y,w,w_sums)
   end
+
+  # Exchange local contributions 
+  assemble!(x)
+  exchange!(x) # TO CONSIDER: Is this necessary? Do we need ghosts for later?
+  return x
 end
 
-function compute_weight_operators(Ph::GridapDistributed.DistributedSingleFieldFESpace)
-  parts = get_part_ids(Ph.spaces)
-  Gridap.Helpers.@notimplementedif num_parts(parts) != 1
-  
+function compute_weight_operators(Ph::GridapDistributed.DistributedSingleFieldFESpace,Vh)
+  # Local weights and partial sums
   w = PVector(0.0,Ph.gids)
-  map_parts(w.owned_values,Ph.spaces) do w, Ph
-    w .= compute_weight_operators(Ph)
+  w_sums = PVector(0.0,Vh.gids)
+  map_parts(w.values,w_sums.values,Ph.spaces) do w, w_sums, Ph
+    _w, _w_sums = compute_weight_operators(Ph,Ph.Vh)
+    w .= _w
+    w_sums .= _w_sums
   end
-  return w
+  
+  # partial sums -> global sums
+  assemble!(w_sums) # ghost -> owners
+  exchange!(w_sums) # repopulate ghosts with owner info
+
+  return w, w_sums
 end

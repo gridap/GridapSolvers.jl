@@ -12,6 +12,10 @@ function Gridap.CellData.Measure(tt::GridapDistributed.DistributedTriangulation{
   return GridapDistributed.DistributedMeasure(measures)
 end
 
+function GridapDistributed.get_parts(x::GridapDistributed.DistributedFESpace)
+  PartitionedArrays.get_part_ids(local_views(x))
+end
+
 # change_parts
 
 function change_parts(x::Union{AbstractPData,Nothing}, new_parts; default=nothing)

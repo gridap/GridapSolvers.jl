@@ -1,6 +1,6 @@
+authors = ["Santiago Badia <santiago.badia@monash.edu>", "Jordi Manyer <jordi.manyer@monash.edu>", "Alberto F. Martin <alberto.martin@monash.edu>", "Javier Principe <principe@cimne.upc.edu>"]
 name = "GridapSolvers"
 uuid = "6d3209ee-5e3c-4db7-a716-942eb12ed534"
-authors = ["Santiago Badia <santiago.badia@monash.edu>", "Jordi Manyer <jordi.manyer@monash.edu>", "Alberto F. Martin <alberto.martin@monash.edu>", "Javier Principe <principe@cimne.upc.edu>"]
 version = "0.1.0"
 
 [deps]
@@ -23,6 +23,7 @@ PartitionedArrays = "0.2.15"
 julia = "1.7"
 
 [extras]
+MPIPreferences = "3da0fdf6-3ccc-4f1b-acd9-58baa6c99267"
 Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
 
 [targets]
