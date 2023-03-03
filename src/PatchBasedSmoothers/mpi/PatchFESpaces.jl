@@ -74,13 +74,15 @@ function prolongate!(x::PVector,
    exchange!(x)
 end
 
+# x \in  SingleFESpace
+# y \in  PatchFESpace
 function inject!(x::PVector,
                  Ph::GridapDistributed.DistributedSingleFieldFESpace,
                  y::PVector,
                  w::PVector,
                  w_sums::PVector)
 
-  exchange!(y)
+  #exchange!(y)
   map_parts(x.values,Ph.spaces,y.values,w.values,w_sums.values) do x,Ph,y,w,w_sums
     inject!(x,Ph,y,w,w_sums)
   end

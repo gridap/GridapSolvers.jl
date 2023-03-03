@@ -320,12 +320,12 @@ end
 
 function compute_weight_operators(Ph::PatchFESpace,Vh)
   w = Fill(1.0,num_free_dofs(Ph))
-  w_sums = compute_partial_sums(Ph,w)
+  w_sums = compute_partial_sums(Ph,Vh,w)
   return w, w_sums
 end
 
-function compute_partial_sums(Ph::PatchFESpace,x)
-  x_sums = zeros(num_free_dofs(Ph.Vh))
+function compute_partial_sums(Ph::PatchFESpace,Vh,x)
+  x_sums = zeros(num_free_dofs(Vh))
   inject!(x_sums,Ph,x,Fill(1.0,num_free_dofs(Ph)))
   return x_sums
 end

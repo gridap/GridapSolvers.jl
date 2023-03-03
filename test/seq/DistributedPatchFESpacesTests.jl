@@ -6,6 +6,7 @@ using PartitionedArrays
 using Gridap
 using Gridap.Helpers
 using Gridap.Geometry
+using Gridap.ReferenceFEs
 using GridapDistributed
 using FillArrays
 
@@ -20,13 +21,16 @@ domain = (0.0,1.0,0.0,1.0)
 partition = (2,4)
 model = CartesianDiscreteModel(parts,domain,partition)
 
-order = 1
-reffe = ReferenceFE(lagrangian,Float64,order)
+# order = 1
+# reffe = ReferenceFE(lagrangian,Float64,order)
+order = 0
+reffe = ReferenceFE(raviart_thomas,Float64,order)
 Vh = TestFESpace(model,reffe)
-PD = PBS.PatchDecomposition(model)#,patch_boundary_style=PBS.PatchBoundaryInclude())
-Ph = PBS.PatchFESpace(model,reffe,Gridap.ReferenceFEs.H1Conformity(),PD,Vh)
+PD = PBS.PatchDecomposition(model)
+Ph = PBS.PatchFESpace(model,reffe,DivConformity(),PD,Vh)
 
 # ---- Testing Prolongation and Injection ---- #
+
 w, w_sums = PBS.compute_weight_operators(Ph,Vh);
 
 xP = PVector(1.0,Ph.gids)
@@ -42,7 +46,9 @@ PBS.inject!(x,Ph,xP,w,w_sums)
 PBS.prolongate!(yP,Ph,x)
 @test xP ≈ yP
 
+
 # ---- Assemble systems ---- #
+
 Ω  = Triangulation(model)
 dΩ = Measure(Ω,2*order+1)
 a(u,v) = ∫(v⋅u)*dΩ
@@ -63,7 +69,9 @@ assembler_P = SparseMatrixAssembler(Ph,Ph)
 Ahp = assemble_matrix(ap,assembler_P,Ph,Ph)
 fhp = assemble_vector(lp,assembler_P,Ph)
 
+
 # ---- Define solvers ---- #
+
 LU   = LUSolver()
 LUss = symbolic_setup(LU,Ahp)
 LUns = numerical_setup(LUss,Ahp)
@@ -75,6 +83,7 @@ Mns = numerical_setup(Mss,Ah)
 R   = RichardsonSmoother(M,10,1.0/3.0)
 Rss = symbolic_setup(R,Ah)
 Rns = numerical_setup(Rss,Ah)
+
 
 # ---- Manual solve using LU ---- # 
 
@@ -101,6 +110,7 @@ w, w_sums = PBS.compute_weight_operators(Ph,Vh);
 PBS.inject!(x1,Ph,xp,w,w_sums)
 copy!(x1_mat,x1)
 
+
 # ---- Same using the PatchBasedSmoother ---- #
 
 x2_mat = PVector(0.5,Ah.cols)
@@ -108,7 +118,9 @@ r2_mat = fh-Ah*x2_mat
 exchange!(r2_mat)
 solve!(x2_mat,Mns,r2_mat)
 
+
 # ---- Smoother inside Richardson
+
 x3_mat = PVector(0.5,Ah.cols)
 r3_mat = fh-Ah*x3_mat
 exchange!(r3_mat)
