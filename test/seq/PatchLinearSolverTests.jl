@@ -82,7 +82,7 @@ module PatchLinearSolverTests
   A,b = compute_matrix_vector(model,Vh)
   x   = test_smoother(PD,Ph,Vh,A,b)
 
-  parts  = get_part_ids(sequential,(1,1))
+  parts  = get_part_ids(SequentialBackend(),(1,1))
   dmodel = CartesianDiscreteModel(parts,domain,partition)
   dPD,dPh,dxh,dVh = returns_PD_Ph_xh_Vh(dmodel);
   dA,db = compute_matrix_vector(dmodel,dVh);

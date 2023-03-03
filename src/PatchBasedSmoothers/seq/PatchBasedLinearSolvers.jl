@@ -100,7 +100,7 @@ function Gridap.Algebra.solve!(x::AbstractVector,ns::PatchBasedSmootherNumerical
   rp, dxp = caches
 
   prolongate!(rp,Ph,r)
-  solve!(dxp,nsAp,rp)
+  solve!(dxp,Ap_ns,rp)
   inject!(x,Ph,dxp,w,w_sums)
 
   return x
