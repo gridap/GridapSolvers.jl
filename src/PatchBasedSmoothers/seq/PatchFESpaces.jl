@@ -3,6 +3,7 @@ struct PatchFESpace  <: Gridap.FESpaces.SingleFieldFESpace
   patch_cell_dofs_ids :: Gridap.Arrays.Table
   Vh                  :: Gridap.FESpaces.SingleFieldFESpace
   patch_decomposition :: PatchDecomposition
+  dof_to_pdof         :: Gridap.Arrays.Table
 end
 
 # INPUT
@@ -68,7 +69,10 @@ function PatchFESpace(model::DiscreteModel,
                                          cell_conformity,
                                          patches_mask)
 
-  return PatchFESpace(num_dofs,patch_cell_dofs_ids,Vh,patch_decomposition)
+  dof_to_pdof = allocate_dof_to_pdof(Vh,patch_decomposition,patch_cell_dofs_ids)
+  generate_dof_to_pdof!(dof_to_pdof,Vh,patch_decomposition,patch_cell_dofs_ids)
+
+  return PatchFESpace(num_dofs,patch_cell_dofs_ids,Vh,patch_decomposition,dof_to_pdof)
 end
 
 Gridap.FESpaces.get_dof_value_type(a::PatchFESpace) = Gridap.FESpaces.get_dof_value_type(a.Vh)
@@ -106,7 +110,7 @@ function allocate_patch_cell_dofs_ids(num_cells_overlapped_mesh,cell_patches,cel
     end
   end
 
-  Gridap.Helpers.@check num_cells_overlapped_mesh+1 == gcell_overlapped_mesh
+  @check num_cells_overlapped_mesh+1 == gcell_overlapped_mesh
   data = Vector{Int}(undef,ptrs[end]-1)
   return Gridap.Arrays.Table(data,ptrs)
 end
@@ -159,9 +163,6 @@ function generate_patch_cell_dofs_ids!(patch_cell_dofs_ids,
                                        free_dofs_offset=1,
                                        mask=false)
 
-  patch_global_space_cell_dofs_ids=
-     lazy_map(Broadcasting(Reindex(global_space_cell_dofs_ids)),patch_cells)
-
   o  = patch_cells_overlapped_mesh.ptrs[patch]
   if mask
     for lpatch_cell = 1:length(patch_cells)
@@ -186,8 +187,9 @@ function generate_patch_cell_dofs_ids!(patch_cell_dofs_ids,
         cells_d_faces = Gridap.Geometry.get_faces(topology,Dc,d)
         cell_d_face   = cells_d_faces[patch_cell]
 
+        # 1) DoFs belonging to faces (Df < Dc)
         for (lf,f) in enumerate(cell_d_face)
-          # If current face is on the patch boundary
+          # A) If current face is on the patch boundary
           if (patch_cells_faces_on_boundary[d+1][cell_overlapped_mesh][lf])
             # assign negative indices to DoFs owned by face
             for ldof in cell_conformity.ctype_lface_own_ldofs[ctype][face_offset+lf]
@@ -195,6 +197,7 @@ function generate_patch_cell_dofs_ids!(patch_cell_dofs_ids,
               current_patch_cell_dofs_ids[ldof] = -1
             end
           else
+            # B) If current face is not in patch boundary,
             # rely on the existing glued info (available at global_space_cell_dof_ids)
             # (we will need a Dict{Int,Int} to hold the correspondence among global
             # space and patch cell dofs IDs)
@@ -217,7 +220,7 @@ function generate_patch_cell_dofs_ids!(patch_cell_dofs_ids,
         face_offset += cell_conformity.d_ctype_num_dfaces[d+1][ctype]
       end
 
-      # Interior DoFs
+      # 2) Interior DoFs
       for ldof in cell_conformity.ctype_lface_own_ldofs[ctype][face_offset+1]
         current_patch_cell_dofs_ids[ldof] = free_dofs_offset
         free_dofs_offset += 1
@@ -227,6 +230,68 @@ function generate_patch_cell_dofs_ids!(patch_cell_dofs_ids,
   return free_dofs_offset
 end
 
+function allocate_dof_to_pdof(Vh,PD,patch_cell_dofs_ids)
+  touched = Dict{Int,Bool}()
+  cell_mesh_overlapped = 1
+  cache_patch_cells  = array_cache(PD.patch_cells)
+  cell_dof_ids       = get_cell_dof_ids(Vh)
+  cache_cell_dof_ids = array_cache(cell_dof_ids)
+
+  ptrs = fill(0,num_free_dofs(Vh)+1)
+  for patch = 1:length(PD.patch_cells)
+    current_patch_cells = getindex!(cache_patch_cells,PD.patch_cells,patch)
+    for cell in current_patch_cells
+      current_cell_dof_ids = getindex!(cache_cell_dof_ids,cell_dof_ids,cell)
+      s = patch_cell_dofs_ids.ptrs[cell_mesh_overlapped]
+      e = patch_cell_dofs_ids.ptrs[cell_mesh_overlapped+1]-1
+      current_patch_cell_dof_ids = view(patch_cell_dofs_ids.data,s:e)
+      for (dof,pdof) in zip(current_cell_dof_ids,current_patch_cell_dof_ids)
+        if pdof > 0 && !(dof ∈ keys(touched))
+          touched[dof] = true
+          ptrs[dof+1] += 1
+        end
+      end
+      cell_mesh_overlapped += 1
+    end
+    empty!(touched)
+  end
+  PartitionedArrays.length_to_ptrs!(ptrs)
+
+  data = fill(0,ptrs[end]-1)
+  return Gridap.Arrays.Table(data,ptrs)
+end
+
+function generate_dof_to_pdof!(dof_to_pdof,Vh,PD,patch_cell_dofs_ids)
+  touched = Dict{Int,Bool}()
+  cell_mesh_overlapped = 1
+  cache_patch_cells  = array_cache(PD.patch_cells)
+  cell_dof_ids       = get_cell_dof_ids(Vh)
+  cache_cell_dof_ids = array_cache(cell_dof_ids)
+
+  ptrs = dof_to_pdof.ptrs
+  data = dof_to_pdof.data
+  local_ptrs = fill(Int32(0),num_free_dofs(Vh))
+  for patch = 1:length(PD.patch_cells)
+    current_patch_cells = getindex!(cache_patch_cells,PD.patch_cells,patch)
+    for cell in current_patch_cells
+      current_cell_dof_ids = getindex!(cache_cell_dof_ids,cell_dof_ids,cell)
+      s = patch_cell_dofs_ids.ptrs[cell_mesh_overlapped]
+      e = patch_cell_dofs_ids.ptrs[cell_mesh_overlapped+1]-1
+      current_patch_cell_dof_ids = view(patch_cell_dofs_ids.data,s:e)
+      for (dof,pdof) in zip(current_cell_dof_ids,current_patch_cell_dof_ids)
+        if pdof > 0 && !(dof ∈ keys(touched))
+          touched[dof] = true
+          idx = ptrs[dof] + local_ptrs[dof]
+          @check idx < ptrs[dof+1]
+          data[idx] = pdof
+          local_ptrs[dof] += 1
+        end
+      end
+      cell_mesh_overlapped += 1
+    end
+    empty!(touched)
+  end
+end
 
 # x \in  PatchFESpace
 # y \in  SingleFESpace
@@ -261,60 +326,28 @@ function inject!(x,Ph::PatchFESpace,y)
 end
 
 function inject!(x,Ph::PatchFESpace,y,w)
-  touched = Dict{Int,Bool}()
-  cell_mesh_overlapped = 1
-  cache_patch_cells  = array_cache(Ph.patch_decomposition.patch_cells)
-  cell_dof_ids       = get_cell_dof_ids(Ph.Vh)
-  cache_cell_dof_ids = array_cache(cell_dof_ids)
-  
-  fill!(x,0.0)
-  for patch = 1:length(Ph.patch_decomposition.patch_cells)
-    current_patch_cells = getindex!(cache_patch_cells,
-                                  Ph.patch_decomposition.patch_cells,
-                                  patch)
-    for cell in current_patch_cells
-      current_cell_dof_ids = getindex!(cache_cell_dof_ids,cell_dof_ids,cell)
-      s = Ph.patch_cell_dofs_ids.ptrs[cell_mesh_overlapped]
-      e = Ph.patch_cell_dofs_ids.ptrs[cell_mesh_overlapped+1]-1
-      current_patch_cell_dof_ids = view(Ph.patch_cell_dofs_ids.data,s:e)
-      for (dof,pdof) in zip(current_cell_dof_ids,current_patch_cell_dof_ids)
-        if pdof > 0 && !(dof ∈ keys(touched))
-          touched[dof] = true
-          x[dof] += y[pdof] * w[pdof]
-        end
-      end
-      cell_mesh_overlapped += 1
+  dof_to_pdof = Ph.dof_to_pdof
+  cache = array_cache(dof_to_pdof)
+
+  for dof in 1:length(dof_to_pdof)
+    x[dof] = 0.0
+    pdofs = getindex!(cache,dof_to_pdof,dof)
+    for pdof in pdofs
+      x[dof] += y[pdof] * w[pdof]
     end
-    empty!(touched)
   end
 end
 
 function inject!(x,Ph::PatchFESpace,y,w,w_sums)
-  touched = Dict{Int,Bool}()
-  cell_mesh_overlapped = 1
-  cache_patch_cells  = array_cache(Ph.patch_decomposition.patch_cells)
-  cell_dof_ids       = get_cell_dof_ids(Ph.Vh)
-  cache_cell_dof_ids = array_cache(cell_dof_ids)
-  
-  fill!(x,0.0)
-  for patch = 1:length(Ph.patch_decomposition.patch_cells)
-    current_patch_cells = getindex!(cache_patch_cells,
-                                  Ph.patch_decomposition.patch_cells,
-                                  patch)
-    for cell in current_patch_cells
-      current_cell_dof_ids = getindex!(cache_cell_dof_ids,cell_dof_ids,cell)
-      s = Ph.patch_cell_dofs_ids.ptrs[cell_mesh_overlapped]
-      e = Ph.patch_cell_dofs_ids.ptrs[cell_mesh_overlapped+1]-1
-      current_patch_cell_dof_ids = view(Ph.patch_cell_dofs_ids.data,s:e)
-      for (dof,pdof) in zip(current_cell_dof_ids,current_patch_cell_dof_ids)
-        if pdof > 0 && !(dof ∈ keys(touched))
-          touched[dof] = true
-          x[dof] += y[pdof] * w[pdof] / w_sums[dof]
-        end
-      end
-      cell_mesh_overlapped += 1
+  dof_to_pdof = Ph.dof_to_pdof
+  cache = array_cache(dof_to_pdof)
+
+  for dof in 1:length(dof_to_pdof)
+    x[dof] = 0.0
+    pdofs = getindex!(cache,dof_to_pdof,dof)
+    for pdof in pdofs
+      x[dof] += y[pdof] * w[pdof] / w_sums[dof]
     end
-    empty!(touched)
   end
 end
 
