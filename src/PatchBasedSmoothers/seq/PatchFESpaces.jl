@@ -327,12 +327,13 @@ end
 
 function inject!(x,Ph::PatchFESpace,y,w)
   dof_to_pdof = Ph.dof_to_pdof
-  cache = array_cache(dof_to_pdof)
 
+  ptrs = dof_to_pdof.ptrs
+  data = dof_to_pdof.data
   for dof in 1:length(dof_to_pdof)
     x[dof] = 0.0
-    pdofs = getindex!(cache,dof_to_pdof,dof)
-    for pdof in pdofs
+    for k in ptrs[dof]:ptrs[dof+1]-1
+      pdof = data[k]
       x[dof] += y[pdof] * w[pdof]
     end
   end
@@ -340,12 +341,13 @@ end
 
 function inject!(x,Ph::PatchFESpace,y,w,w_sums)
   dof_to_pdof = Ph.dof_to_pdof
-  cache = array_cache(dof_to_pdof)
-
+  
+  ptrs = dof_to_pdof.ptrs
+  data = dof_to_pdof.data
   for dof in 1:length(dof_to_pdof)
     x[dof] = 0.0
-    pdofs = getindex!(cache,dof_to_pdof,dof)
-    for pdof in pdofs
+    for k in ptrs[dof]:ptrs[dof+1]-1
+      pdof = data[k]
       x[dof] += y[pdof] * w[pdof] / w_sums[dof]
     end
   end
