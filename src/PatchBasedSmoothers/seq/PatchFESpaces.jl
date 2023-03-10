@@ -355,12 +355,12 @@ end
 
 function compute_weight_operators(Ph::PatchFESpace,Vh)
   w = Fill(1.0,num_free_dofs(Ph))
-  w_sums = compute_partial_sums(Ph,Vh,w)
+  w_sums = zeros(num_free_dofs(Vh))
+  inject!(w_sums,Ph,w,Fill(1.0,num_free_dofs(Vh)))
   return w, w_sums
 end
 
-function compute_partial_sums(Ph::PatchFESpace,Vh,x)
-  x_sums = zeros(num_free_dofs(Vh))
-  inject!(x_sums,Ph,x,Fill(1.0,num_free_dofs(Ph)))
-  return x_sums
+function compute_weight_operators!(Ph::PatchFESpace,Vh,w,w_sums)
+  fill!(w,1.0)
+  inject!(w_sums,Ph,w,Fill(1.0,num_free_dofs(Ph)))
 end
