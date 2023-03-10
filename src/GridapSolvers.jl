@@ -6,6 +6,7 @@ module GridapSolvers
 
   using GridapSolvers.MultilevelTools
   using GridapSolvers.LinearSolvers
+  using GridapSolvers.PatchBasedSmoothers
 
   # MultilevelTools
   export get_parts, generate_level_parts, generate_subparts
@@ -26,5 +27,10 @@ module GridapSolvers
   export JacobiLinearSolver
   export RichardsonSmoother
   export GMGLinearSolver
+
+  # PatchBasedSmoothers
+  export PatchDecomposition
+  export PatchFESpace
+  export PatchBasedLinearSolver
 
 end
