@@ -63,13 +63,11 @@ end
 function _patch_based_solver_caches(Ph::GridapDistributed.DistributedSingleFieldFESpace,
                                     Vh::GridapDistributed.DistributedSingleFieldFESpace,
                                     Ap::PSparseMatrix)
-  rp_mat  = _allocate_row_vector(Ap)
-  dxp_mat = _allocate_col_vector(Ap)
   rp      = PVector(0.0,Ph.gids)
   dxp     = PVector(0.0,Ph.gids)
   r       = PVector(0.0,Vh.gids)
   x       = PVector(0.0,Vh.gids)
-  return rp_mat, dxp_mat, rp, dxp, r, x
+  return rp, dxp, r, x
 end
 
 function _allocate_col_vector(A::AbstractMatrix)
@@ -111,14 +109,12 @@ function Gridap.Algebra.solve!(x_mat::PVector,ns::PatchBasedSmootherNumericalSet
   
   Ph = ns.solver.Ph
   w, w_sums = weights
-  rp_mat, dxp_mat, rp, dxp, r, x = caches
+  rp, dxp, r, x = caches
 
   copy!(r,r_mat)
   exchange!(r)
   prolongate!(rp,Ph,r)
-  copy!(rp_mat,rp)
-  solve!(dxp_mat,Ap_ns,rp_mat)
-  copy!(dxp,dxp_mat)
+  solve!(dxp,Ap_ns,rp)
   inject!(x,Ph,dxp,w,w_sums)
   copy!(x_mat,x)
 

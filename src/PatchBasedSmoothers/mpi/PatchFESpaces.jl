@@ -14,32 +14,21 @@ function PatchFESpace(model::GridapDistributed.DistributedDiscreteModel,
                       Vh::GridapDistributed.DistributedSingleFieldFESpace)
   root_gids = get_face_gids(model,get_patch_root_dim(patch_decomposition))
 
-  function f(model,patch_decomposition,Vh,partition)
+  spaces = map_parts(local_views(model),
+                     local_views(patch_decomposition),
+                     local_views(Vh),
+                     root_gids.partition) do model, patch_decomposition, Vh, partition
     patches_mask = fill(false,length(partition.lid_to_gid))
     patches_mask[partition.hid_to_lid] .= true # Mask ghost patch roots
-    PatchFESpace(model,
-                 reffe,
-                 conformity,
-                 patch_decomposition,
-                 Vh;
-                 patches_mask=patches_mask)
+    PatchFESpace(model,reffe,conformity,patch_decomposition,Vh;patches_mask=patches_mask)
   end
-
-  spaces = map_parts(f,
-                   local_views(model),
-                   local_views(patch_decomposition),
-                   local_views(Vh),
-                   root_gids.partition)
   
   parts  = get_parts(model)
-  nodofs = map_parts(spaces) do space
-    num_free_dofs(space)
-  end
-  ngdofs = sum(nodofs)
-
-  first_gdof, _ = xscan(+,reduce,nodofs,init=1)
+  local_ndofs  = map_parts(num_free_dofs,spaces)
+  global_ndofs = sum(local_ndofs)
+  first_gdof, _ = xscan(+,reduce,local_ndofs,init=1)
   # This PRange has no ghost dofs
-  gids = PRange(parts,ngdofs,nodofs,first_gdof)
+  gids = PRange(parts,global_ndofs,local_ndofs,first_gdof)
   return GridapDistributed.DistributedSingleFieldFESpace(spaces,gids,get_vector_type(Vh))
 end
 
@@ -98,9 +87,7 @@ function compute_weight_operators(Ph::GridapDistributed.DistributedSingleFieldFE
   w = PVector(0.0,Ph.gids)
   w_sums = PVector(0.0,Vh.gids)
   map_parts(w.values,w_sums.values,Ph.spaces) do w, w_sums, Ph
-    _w, _w_sums = compute_weight_operators(Ph,Ph.Vh)
-    w .= _w
-    w_sums .= _w_sums
+    compute_weight_operators!(Ph,Ph.Vh,w,w_sums)
   end
   
   # partial sums -> global sums
