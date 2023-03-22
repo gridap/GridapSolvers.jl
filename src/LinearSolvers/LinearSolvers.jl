@@ -2,6 +2,7 @@ module LinearSolvers
 
 using Printf
 using LinearAlgebra
+using BlockArrays
 
 using Gridap
 using Gridap.Helpers
