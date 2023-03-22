@@ -2,7 +2,9 @@ module LinearSolvers
 
 using Printf
 using LinearAlgebra
+
 using Gridap
+using Gridap.Helpers
 using Gridap.Algebra
 using PartitionedArrays
 using GridapPETSc
@@ -14,9 +16,11 @@ import LinearAlgebra: mul!, ldiv!
 export JacobiLinearSolver
 export RichardsonSmoother
 export GMGLinearSolver
+export BlockDiagonalSmoother
 
 include("JacobiLinearSolvers.jl")
 include("RichardsonSmoothers.jl")
 include("GMGLinearSolvers.jl")
+include("BlockDiagonalSmoothers.jl")
 
 end

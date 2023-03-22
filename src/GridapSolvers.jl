@@ -27,6 +27,7 @@ module GridapSolvers
   export JacobiLinearSolver
   export RichardsonSmoother
   export GMGLinearSolver
+  export BlockDiagonalSmoother
 
   # PatchBasedSmoothers
   export PatchDecomposition
