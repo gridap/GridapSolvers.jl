@@ -29,6 +29,10 @@ module GridapSolvers
   export GMGLinearSolver
   export BlockDiagonalSmoother
 
+  export ConjugateGradientSolver
+  export GMRESSolver
+  export MINRESSolver
+
   # PatchBasedSmoothers
   export PatchDecomposition
   export PatchFESpace

@@ -59,8 +59,6 @@ GridapPETSc.with() do
   Ω  = Triangulation(model)
   dΩ = Measure(Ω,degree)
 
-
-  # Global problem
   a((u,p),(v,q)) = ∫( v⊙u + ∇(v)⊙∇(u) + q⋅p + ∇(q)⊙∇(p))dΩ
   l((v,q)) = ∫( v⋅f + q⋅g)dΩ
 
@@ -73,8 +71,7 @@ GridapPETSc.with() do
   ranges  = map(i->dof_ids[Block(i)],1:blocklength(dof_ids))
   solvers = Fill(PETScLinearSolver(set_ksp_options),2)
 
-  # Build using the global matrix
-  BDS   = BlockDiagonalSmoother(A,ranges,solvers)
+  BDS   = BlockDiagonalSmoother(A,ranges,solvers;lazy_mode=true)
   BDSss = symbolic_setup(BDS,A)
   BDSns = numerical_setup(BDSss,A)
 
