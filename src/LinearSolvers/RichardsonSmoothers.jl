@@ -20,28 +20,21 @@ struct RichardsonSmootherSymbolicSetup{A} <: Gridap.Algebra.SymbolicSetup
 end
 
 function Gridap.Algebra.symbolic_setup(smoother::RichardsonSmoother,mat::AbstractMatrix)
-  Mss=symbolic_setup(smoother.M,mat)
+  Mss = symbolic_setup(smoother.M,mat)
   return RichardsonSmootherSymbolicSetup(smoother,Mss)
 end
 
 mutable struct RichardsonSmootherNumericalSetup{A,B,C,D} <: Gridap.Algebra.NumericalSetup
-  smoother       :: RichardsonSmoother
-  A              :: A
-  Adx            :: B
-  dx             :: C
-  Mns            :: D
+  smoother :: RichardsonSmoother
+  A        :: A
+  Adx      :: B
+  dx       :: C
+  Mns      :: D
 end
 
-function Gridap.Algebra.numerical_setup(ss::RichardsonSmootherSymbolicSetup, A::AbstractMatrix{T}) where T
-  Adx = zeros(size(A,1))
-  dx  = zeros(size(A,2))
-  Mns = numerical_setup(ss.Mss,A)
-  return RichardsonSmootherNumericalSetup(ss.smoother,A,Adx,dx,Mns)
-end
-
-function Gridap.Algebra.numerical_setup(ss::RichardsonSmootherSymbolicSetup, A::PSparseMatrix)
-  Adx = PVector(0.0,A.rows)
-  dx  = PVector(0.0,A.cols)
+function Gridap.Algebra.numerical_setup(ss::RichardsonSmootherSymbolicSetup, A::AbstractMatrix)
+  Adx = allocate_row_vector(A)
+  dx  = allocate_col_vector(A)
   Mns = numerical_setup(ss.Mss,A)
   return RichardsonSmootherNumericalSetup(ss.smoother,A,Adx,dx,Mns)
 end

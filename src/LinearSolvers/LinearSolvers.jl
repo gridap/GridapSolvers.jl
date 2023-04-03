@@ -2,6 +2,7 @@ module LinearSolvers
 
 using Printf
 using LinearAlgebra
+using SparseArrays
 using BlockArrays
 using IterativeSolvers
 
@@ -23,7 +24,9 @@ export BlockDiagonalSmoother
 export ConjugateGradientSolver
 export GMRESSolver
 export MINRESSolver
+export SSORSolver
 
+include("Helpers.jl")
 include("JacobiLinearSolvers.jl")
 include("RichardsonSmoothers.jl")
 include("GMGLinearSolvers.jl")

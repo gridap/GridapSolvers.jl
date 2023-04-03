@@ -3,19 +3,26 @@ abstract type IterativeLinearSolverType end
 struct CGIterativeSolverType     <: IterativeLinearSolverType end
 struct GMRESIterativeSolverType  <: IterativeLinearSolverType end
 struct MINRESIterativeSolverType <: IterativeLinearSolverType end
+struct SSORIterativeSolverType   <: IterativeLinearSolverType end
 
-# Solvers
+# Constructors
 
 """
   Wrappers for [IterativeSolvers.jl](https://github.com/JuliaLinearAlgebra/IterativeSolvers.jl)
-  krylov-like iterative solvers.  
+  krylov-like iterative solvers.
+
+  Currently supported: 
+  - ConjugateGradientSolver
+  - GMRESSolver
+  - MINRESSolver
 """
 struct IterativeLinearSolver{A} <: Gridap.Algebra.LinearSolver
+  args
   kwargs
 
-  function IterativeLinearSolver(type::IterativeLinearSolverType,kwargs)
+  function IterativeLinearSolver(type::IterativeLinearSolverType,args,kwargs)
     A = typeof(type)
-    return new{A}(kwargs)
+    return new{A}(args,kwargs)
   end
 end
 
@@ -24,19 +31,26 @@ SolverType(::IterativeLinearSolver{T}) where T = T()
 function ConjugateGradientSolver(;kwargs...)
   options = [:statevars,:initially_zero,:Pl,:abstol,:reltol,:maxiter,:verbose,:log]
   @check all(map(opt -> opt ∈ options,keys(kwargs)))
-  return IterativeLinearSolver(CGIterativeSolverType(),kwargs)
+  return IterativeLinearSolver(CGIterativeSolverType(),nothing,kwargs)
 end
 
 function GMRESSolver(;kwargs...)
   options = [:initially_zero,:abstol,:reltol,:restart,:maxiter,:Pl,:Pr,:log,:verbose,:orth_meth]
   @check all(map(opt -> opt ∈ options,keys(kwargs)))
-  return IterativeLinearSolver(GMRESIterativeSolverType(),kwargs)
+  return IterativeLinearSolver(GMRESIterativeSolverType(),nothing,kwargs)
 end
 
 function MINRESSolver(;kwargs...)
   options = [:initially_zero,:skew_hermitian,:abstol,:reltol,:maxiter,:log,:verbose]
   @check all(map(opt -> opt ∈ options,keys(kwargs)))
-  return IterativeLinearSolver(MINRESIterativeSolverType(),kwargs)
+  return IterativeLinearSolver(MINRESIterativeSolverType(),nothing,kwargs)
+end
+
+function SSORSolver(ω::Real;kwargs...)
+  options = [:maxiter]
+  @check all(map(opt -> opt ∈ options,keys(kwargs)))
+  args = Dict(:ω => ω)
+  return IterativeLinearSolver(SSORIterativeSolverType(),args,kwargs)
 end
 
 # Symbolic setup
@@ -54,10 +68,49 @@ end
 struct IterativeLinearSolverNS <: Gridap.Algebra.NumericalSetup
   solver
   A
+  caches
 end
 
 function Gridap.Algebra.numerical_setup(ss::IterativeLinearSolverSS,A::AbstractMatrix)
-  IterativeLinearSolverNS(ss.solver,A)
+  solver_type = SolverType(ss.solver)
+  numerical_setup(solver_type,ss,A)
+end
+
+function Gridap.Algebra.numerical_setup(::IterativeLinearSolverType,
+                                        ss::IterativeLinearSolverSS,
+                                        A::AbstractMatrix)
+  IterativeLinearSolverNS(ss.solver,A,nothing)
+end
+
+function Gridap.Algebra.numerical_setup(::SSORIterativeSolverType,
+                                        ss::IterativeLinearSolverSS,
+                                        A::AbstractMatrix)
+  x = allocate_row_vector(A)
+  b = allocate_col_vector(A)
+  ω       = ss.solver.args[:ω]
+  maxiter = ss.solver.kwargs[:maxiter]
+  caches  = IterativeSolvers.ssor_iterable(x,A,b,ω;maxiter=maxiter)
+  return IterativeLinearSolverNS(ss.solver,A,caches)
+end
+
+function IterativeSolvers.ssor_iterable(x::PVector,
+                                        A::PSparseMatrix,
+                                        b::PVector,
+                                        ω::Real;
+                                        maxiter::Int = 10)
+  iterables = map_parts(x.owned_values,A.owned_owned_values,b.owned_values) do _xi,_Aii,_bi
+    xi  = Vector(_xi)
+    Aii = SparseMatrixCSC(_Aii)
+    bi  = Vector(_bi)
+    return IterativeSolvers.ssor_iterable(xi,Aii,bi,ω;maxiter=maxiter)
+  end
+  return iterables
+end
+
+# Solve
+
+function LinearAlgebra.ldiv!(x::AbstractVector,ns::IterativeLinearSolverNS,b::AbstractVector)
+  solve!(x,ns,b)
 end
 
 function Gridap.Algebra.solve!(x::AbstractVector,
@@ -67,7 +120,10 @@ function Gridap.Algebra.solve!(x::AbstractVector,
   solve!(solver_type,x,ns,y)
 end
 
-function(::IterativeLinearSolverType,::AbstractVector,::IterativeLinearSolverNS,::AbstractVector)
+function Gridap.Algebra.solve!(::IterativeLinearSolverType,
+                               ::AbstractVector,
+                               ::IterativeLinearSolverNS,
+                               ::AbstractVector)
   @abstractmethod
 end
 
@@ -93,4 +149,32 @@ function Gridap.Algebra.solve!(::MINRESIterativeSolverType,
                                y::AbstractVector)
   A, kwargs = ns.A, ns.solver.kwargs
   return minres!(x,A,y;kwargs...)
+end
+
+function Gridap.Algebra.solve!(::SSORIterativeSolverType,
+                               x::AbstractVector,
+                               ns::IterativeLinearSolverNS,
+                               y::AbstractVector)
+  iterable = ns.caches
+  iterable.x = x
+  iterable.b = y
+
+  for item = iterable end
+  return x
+end
+
+function Gridap.Algebra.solve!(::SSORIterativeSolverType,
+                               x::PVector,
+                               ns::IterativeLinearSolverNS,
+                               y::PVector)
+  iterables = ns.caches
+  map_parts(iterables,x.owned_values,y.owned_values) do iterable, xi, yi
+    iterable.x .= xi
+    iterable.b .= yi
+    for item = iterable end
+    xi .= iterable.x
+    yi .= iterable.b
+  end
+  #exchange!(x)
+  return x
 end
