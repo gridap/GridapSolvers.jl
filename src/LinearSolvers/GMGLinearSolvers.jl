@@ -120,7 +120,7 @@ function setup_coarsest_solver_cache(mh::ModelHierarchy,coarsest_solver::LinearS
         ss  = symbolic_setup(coarsest_solver, Ah)
         numerical_setup(ss, Ah)
       end
-      cache = cache.part
+      cache = get_part(cache)
     else # Parallel
       ss = symbolic_setup(coarsest_solver, mat)
       cache = numerical_setup(ss, mat)
@@ -143,7 +143,7 @@ function setup_coarsest_solver_cache(mh::ModelHierarchy,coarsest_solver::PETScLi
         ns  = numerical_setup(ss, Ah)
         return ns, xh, rh
       end
-      cache = cache.part
+      cache = get_part(cache)
     else # Parallel
       rh = convert(PETScVector,PVector(0.0,mat.cols))
       xh = convert(PETScVector,PVector(0.0,mat.cols))
