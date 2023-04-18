@@ -18,6 +18,7 @@ import LinearAlgebra: mul!, ldiv!
 
 export JacobiLinearSolver
 export RichardsonSmoother
+export SymGaussSeidelSmoother
 export GMGLinearSolver
 export BlockDiagonalSmoother
 
@@ -29,6 +30,7 @@ export SSORSolver
 include("Helpers.jl")
 include("JacobiLinearSolvers.jl")
 include("RichardsonSmoothers.jl")
+include("SymGaussSeidelSmoothers.jl")
 include("GMGLinearSolvers.jl")
 include("BlockDiagonalSmoothers.jl")
 include("IterativeLinearSolvers.jl")

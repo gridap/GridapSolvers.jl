@@ -175,6 +175,6 @@ function Gridap.Algebra.solve!(::SSORIterativeSolverType,
     xi .= iterable.x
     yi .= iterable.b
   end
-  #exchange!(x)
+  exchange!(x)
   return x
 end

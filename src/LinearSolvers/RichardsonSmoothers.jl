@@ -63,4 +63,3 @@ function LinearAlgebra.ldiv!(x::AbstractVector,ns::RichardsonSmootherNumericalSe
   solve!(x,ns,aux)
   return x
 end
-

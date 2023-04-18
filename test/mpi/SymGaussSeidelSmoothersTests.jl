@@ -32,7 +32,7 @@ function main(parts,partition)
   op = AffineFEOperator(a,l,Uh,Vh)
   A, b = get_matrix(op), get_vector(op)
 
-  P  = RichardsonSmoother(JacobiLinearSolver(),10,2.0/3.0)
+  P  = SymGaussSeidelSmoother(10)
   ss = symbolic_setup(P,A)
   ns = numerical_setup(ss,A)
 
@@ -56,6 +56,7 @@ end
 
 partition = (32,32)
 ranks = (2,2)
+
 with_backend(main,MPIBackend(),ranks,partition)
 MPI.Finalize()
 

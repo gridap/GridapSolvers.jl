@@ -26,6 +26,7 @@ module GridapSolvers
   # LinearSolvers
   export JacobiLinearSolver
   export RichardsonSmoother
+  export SymGaussSeidelSmoother
   export GMGLinearSolver
   export BlockDiagonalSmoother
 
