@@ -272,7 +272,7 @@ function Gridap.Algebra.solve!(x::AbstractVector,ns::GMGNumericalSetup,b::Abstra
   rel_res = nrm_r / nrm_r0
   parts = get_level_parts(mh,1)
 
-  if i_am_main(parts)
+  if i_am_main(parts) && verbose
     @printf "%6s  %12s" "Iter" "Rel res\n"
     @printf "%6i  %12.4e\n" current_iter rel_res
   end
@@ -283,7 +283,7 @@ function Gridap.Algebra.solve!(x::AbstractVector,ns::GMGNumericalSetup,b::Abstra
     nrm_r   = norm(rh)
     rel_res = nrm_r / nrm_r0
     current_iter += 1
-    if i_am_main(parts)
+    if i_am_main(parts) && verbose
       @printf "%6i  %12.4e\n" current_iter rel_res
     end
   end
