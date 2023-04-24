@@ -1,3 +1,5 @@
+module SymGaussSeidelSmoothersTests
+
 using Test
 using MPI
 using Gridap
@@ -8,43 +10,55 @@ using IterativeSolvers
 using GridapSolvers
 using GridapSolvers.LinearSolvers
 
-partition = (8,8)
-domain = (0,1,0,1)
-model  = CartesianDiscreteModel(domain,partition)
-
 sol(x) = x[1] + x[2]
 f(x)   = -Δ(sol)(x)
 
-order  = 1
-qorder = order*2 + 1
-reffe  = ReferenceFE(lagrangian,Float64,order)
-Vh     = TestFESpace(model,reffe;conformity=:H1,dirichlet_tags="boundary")
-Uh     = TrialFESpace(Vh,sol)
-u      = interpolate(sol,Uh)
+function main(model)
+  order  = 1
+  qorder = order*2 + 1
+  reffe  = ReferenceFE(lagrangian,Float64,order)
+  Vh     = TestFESpace(model,reffe;conformity=:H1,dirichlet_tags="boundary")
+  Uh     = TrialFESpace(Vh,sol)
+  u      = interpolate(sol,Uh)
 
-Ω      = Triangulation(model)
-dΩ     = Measure(Ω,qorder)
-a(u,v) = ∫(∇(v)⋅∇(u))*dΩ
-l(v)   = ∫(v⋅f)*dΩ
+  Ω      = Triangulation(model)
+  dΩ     = Measure(Ω,qorder)
+  a(u,v) = ∫(∇(v)⋅∇(u))*dΩ
+  l(v)   = ∫(v⋅f)*dΩ
 
-op = AffineFEOperator(a,l,Uh,Vh)
-A, b = get_matrix(op), get_vector(op)
+  op = AffineFEOperator(a,l,Uh,Vh)
+  A, b = get_matrix(op), get_vector(op);
 
-P  = SymGaussSeidelSmoother(10)
-ss = symbolic_setup(P,A)
-ns = numerical_setup(ss,A)
+  P  = SymGaussSeidelSmoother(10)
+  ss = symbolic_setup(P,A)
+  ns = numerical_setup(ss,A)
 
-x = LinearSolvers.allocate_row_vector(A)
-x, history = IterativeSolvers.cg!(x,A,b;
-                                  verbose=true,
-                                  reltol=1.0e-8,
-                                  Pl=ns,
-                                  log=true)
+  x = LinearSolvers.allocate_col_vector(A)
+  x, history = IterativeSolvers.cg!(x,A,b;
+                                    verbose=true,
+                                    reltol=1.0e-8,
+                                    Pl=ns,
+                                    log=true);
 
-u  = interpolate(sol,Uh)
-uh = FEFunction(Uh,x)
-eh = uh - u
-E  = sum(∫(eh*eh)*dΩ)
-println("L2 Error: ", E)
+  u  = interpolate(sol,Uh)
+  uh = FEFunction(Uh,x)
+  eh = uh - u
+  E  = sum(∫(eh*eh)*dΩ)
+  return E < 1.e-8
+end
 
-@test E < 1.e-8
+# Completely serial
+partition = (8,8)
+domain = (0,1,0,1)
+model  = CartesianDiscreteModel(domain,partition)
+@test main(model)
+
+# Sequential
+backend = SequentialBackend()
+ranks = (1,2)
+parts = get_part_ids(backend,ranks)
+
+model  = CartesianDiscreteModel(parts,domain,partition)
+@test main(model)
+
+end

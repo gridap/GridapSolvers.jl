@@ -3,6 +3,7 @@ module LinearSolvers
 using Printf
 using LinearAlgebra
 using SparseArrays
+using SparseMatricesCSR
 using BlockArrays
 using IterativeSolvers
 

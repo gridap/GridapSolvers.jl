@@ -38,8 +38,7 @@ function main(parts, coarse_grid_partition, num_parts_x_level, num_refs_coarse, 
     
     # Preconditioner
     #smoothers = Fill(RichardsonSmoother(JacobiLinearSolver(),10,9.0/8.0),num_levels-1)
-    smoothers = Fill(RichardsonSmoother(SSORSolver(1.0;maxiter=1),10,2.0/3.0),num_levels-1)
-    #smoothers = Fill(SSORSolver(1.0;maxiter=1),num_levels-1)
+    smoothers = Fill(SymGaussSeidelSmoother(5),num_levels-1)
     restrictions, prolongations = setup_transfer_operators(trials,qdegree;mode=:residual)
 
     gmg = GMGLinearSolver(mh,
