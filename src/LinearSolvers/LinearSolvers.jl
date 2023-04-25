@@ -23,10 +23,13 @@ export SymGaussSeidelSmoother
 export GMGLinearSolver
 export BlockDiagonalSmoother
 
-export ConjugateGradientSolver
+# Wrappers for IterativeSolvers.jl
+export IS_ConjugateGradientSolver
+export IS_GMRESSolver
+export IS_MINRESSolver
+export IS_SSORSolver
+
 export GMRESSolver
-export MINRESSolver
-export SSORSolver
 
 include("Helpers.jl")
 include("JacobiLinearSolvers.jl")
@@ -35,5 +38,6 @@ include("SymGaussSeidelSmoothers.jl")
 include("GMGLinearSolvers.jl")
 include("BlockDiagonalSmoothers.jl")
 include("IterativeLinearSolvers.jl")
+include("GMRESSolvers.jl")
 
 end

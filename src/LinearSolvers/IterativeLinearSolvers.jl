@@ -28,25 +28,25 @@ end
 
 SolverType(::IterativeLinearSolver{T}) where T = T()
 
-function ConjugateGradientSolver(;kwargs...)
+function IS_ConjugateGradientSolver(;kwargs...)
   options = [:statevars,:initially_zero,:Pl,:abstol,:reltol,:maxiter,:verbose,:log]
   @check all(map(opt -> opt ∈ options,keys(kwargs)))
   return IterativeLinearSolver(CGIterativeSolverType(),nothing,kwargs)
 end
 
-function GMRESSolver(;kwargs...)
+function IS_GMRESSolver(;kwargs...)
   options = [:initially_zero,:abstol,:reltol,:restart,:maxiter,:Pl,:Pr,:log,:verbose,:orth_meth]
   @check all(map(opt -> opt ∈ options,keys(kwargs)))
   return IterativeLinearSolver(GMRESIterativeSolverType(),nothing,kwargs)
 end
 
-function MINRESSolver(;kwargs...)
+function IS_MINRESSolver(;kwargs...)
   options = [:initially_zero,:skew_hermitian,:abstol,:reltol,:maxiter,:log,:verbose]
   @check all(map(opt -> opt ∈ options,keys(kwargs)))
   return IterativeLinearSolver(MINRESIterativeSolverType(),nothing,kwargs)
 end
 
-function SSORSolver(ω::Real;kwargs...)
+function IS_SSORSolver(ω::Real;kwargs...)
   options = [:maxiter]
   @check all(map(opt -> opt ∈ options,keys(kwargs)))
   args = Dict(:ω => ω)

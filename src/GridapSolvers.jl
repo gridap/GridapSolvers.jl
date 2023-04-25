@@ -31,9 +31,11 @@ module GridapSolvers
   export BlockDiagonalSmoother
 
   export ConjugateGradientSolver
+  export IS_GMRESSolver
+  export IS_MINRESSolver
+  export IS_SSORSolver
+
   export GMRESSolver
-  export MINRESSolver
-  export SSORSolver
 
   # PatchBasedSmoothers
   export PatchDecomposition
