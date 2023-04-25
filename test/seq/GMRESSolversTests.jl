@@ -1,3 +1,4 @@
+module GMRESSolversTests
 
 using Test
 using Gridap
@@ -54,3 +55,5 @@ parts = get_part_ids(backend,ranks)
 
 model  = CartesianDiscreteModel(parts,domain,partition)
 @test main(model)
+
+end
