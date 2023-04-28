@@ -73,3 +73,4 @@ run_tests(joinpath(@__DIR__, "mpi"))
 @time @testset "IterativeSolversTests" begin include("seq/IterativeSolversTests.jl") end
 @time @testset "PatchLinearSolverTests" begin include("seq/PatchLinearSolverTests.jl") end
 @time @testset "SymGaussSeidelSmoothersTests" begin include("seq/SymGaussSeidelSmoothersTests.jl") end
+@time @testset "SchurComplementSolversTests" begin include("seq/SchurComplementSolversTests.jl") end
