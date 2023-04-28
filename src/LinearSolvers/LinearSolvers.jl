@@ -10,8 +10,12 @@ using IterativeSolvers
 using Gridap
 using Gridap.Helpers
 using Gridap.Algebra
+using Gridap.FESpaces
+using Gridap.MultiField
 using PartitionedArrays
 using GridapPETSc
+
+using GridapDistributed
 
 using GridapSolvers.MultilevelTools
 
@@ -30,8 +34,10 @@ export IS_MINRESSolver
 export IS_SSORSolver
 
 export GMRESSolver
+export SchurComplementSolver
 
 include("Helpers.jl")
+include("IdentityLinearSolvers.jl")
 include("JacobiLinearSolvers.jl")
 include("RichardsonSmoothers.jl")
 include("SymGaussSeidelSmoothers.jl")
@@ -39,5 +45,6 @@ include("GMGLinearSolvers.jl")
 include("BlockDiagonalSmoothers.jl")
 include("IterativeLinearSolvers.jl")
 include("GMRESSolvers.jl")
+include("SchurComplementSolvers.jl")
 
 end

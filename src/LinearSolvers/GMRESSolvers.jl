@@ -49,13 +49,15 @@ function Gridap.Algebra.solve!(x::AbstractVector,ns::GMRESNumericalSetup,b::Abst
   solver, A, Pl, caches = ns.solver, ns.A, ns.Pl_ns, ns.caches
   m, tol = solver.m, solver.tol
   w, V, Z, H, g, c, s = caches
+  println(" > Starting GMRES solve: ")
 
   # Initial residual
   mul!(w,A,x); w .= b .- w
 
   β    = norm(w)
-  iter = 0; println("Iteration ", iter, " - Residual: ", β)
+  iter = 0
   while (β > tol)
+    println("   > Iteration ", iter," - Residual: ", β)
     fill!(H,0.0)
     
     # Arnoldi process
@@ -98,8 +100,9 @@ function Gridap.Algebra.solve!(x::AbstractVector,ns::GMRESNumericalSetup,b::Abst
     end
     mul!(w,A,x); w .= b .- w
 
-    iter += 1; println("Iteration ", iter, " - Residual: ", β)
+    iter += 1
   end
+  println("   > Iteration ", iter," - Residual: ", β)
 
   return x
 end
