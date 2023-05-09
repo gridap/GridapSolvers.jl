@@ -19,6 +19,7 @@ export PatchFESpace
 export PatchBasedLinearSolver
 
 include("seq/PatchDecompositions.jl")
+include("seq/PatchTriangulations.jl")
 include("seq/PatchFESpaces.jl")
 include("seq/PatchBasedLinearSolvers.jl")
 

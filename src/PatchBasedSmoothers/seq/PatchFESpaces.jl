@@ -77,12 +77,19 @@ end
 
 Gridap.FESpaces.get_dof_value_type(a::PatchFESpace) = Gridap.FESpaces.get_dof_value_type(a.Vh)
 Gridap.FESpaces.get_free_dof_ids(a::PatchFESpace)   = Base.OneTo(a.num_dofs)
-Gridap.FESpaces.get_cell_dof_ids(a::PatchFESpace)   = a.patch_cell_dofs_ids
-Gridap.FESpaces.get_cell_dof_ids(a::PatchFESpace,::Triangulation) = a.patch_cell_dofs_ids
 Gridap.FESpaces.get_fe_basis(a::PatchFESpace)       = get_fe_basis(a.Vh)
 Gridap.FESpaces.ConstraintStyle(::PatchFESpace)     = Gridap.FESpaces.UnConstrained()
 Gridap.FESpaces.get_vector_type(a::PatchFESpace)    = get_vector_type(a.Vh)
 Gridap.FESpaces.get_fe_dof_basis(a::PatchFESpace)   = get_fe_dof_basis(a.Vh)
+
+Gridap.FESpaces.get_cell_dof_ids(a::PatchFESpace)   = a.patch_cell_dofs_ids
+Gridap.FESpaces.get_cell_dof_ids(a::PatchFESpace,::Triangulation) = @notimplemented
+Gridap.FESpaces.get_cell_dof_ids(a::PatchFESpace,::PatchTriangulation) = a.patch_cell_dofs_ids
+
+function Gridap.FESpaces.get_cell_dof_ids(a::PatchFESpace,trian::Gridap.Geometry.TriangulationView)
+  cell_dof_ids = get_cell_dof_ids(a,trian.parent)
+  return lazy_map(Reindex(cell_dof_ids),trian.cell_to_parent_cell)
+end
 
 function Gridap.FESpaces.scatter_free_and_dirichlet_values(f::PatchFESpace,free_values,dirichlet_values)
   cell_vals = Gridap.Fields.PosNegReindex(free_values,dirichlet_values)

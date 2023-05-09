@@ -2,6 +2,8 @@ abstract type PatchBoundaryStyle end ;
 struct PatchBoundaryExclude  <: PatchBoundaryStyle end ;
 struct PatchBoundaryInclude  <: PatchBoundaryStyle end ;
 
+# TODO: Make patch_cells a Table
+
 # Question? Might a patch decomposition involve patches
 #           with roots of different topological dimension?
 #           This is not currently supported.
@@ -54,11 +56,6 @@ function PatchDecomposition(
                                    patch_cells,
                                    patch_cells_overlapped_mesh,
                                    patch_cells_faces_on_boundary)
-end
-
-function Gridap.Geometry.Triangulation(a::PatchDecomposition)
-   patch_cells = Gridap.Arrays.Table(a.patch_cells)
-   return view(Triangulation(a.model),patch_cells.data)
 end
 
 function setup_patch_cells_overlapped_mesh(patch_cells)
@@ -221,4 +218,195 @@ function generate_patch_boundary_faces!(patch_cells_faces_on_boundary,
       end
     end
   end
+end
+
+# Patch cell faces: 
+#   patch_faces[pcell] = [face1, face2, ...]
+#   where face1, face2, ... are the faces of the overlapped cell `pcell` such that 
+#        - they are NOT on the boundary of the patch
+#        - they are flagged `true` in faces_mask
+function get_patch_cell_faces(PD::PatchDecomposition,Df::Integer)
+  model    = PD.model
+  topo     = get_grid_topology(model)
+  faces_mask = Fill(true,num_faces(topo,Df))
+  return get_patch_cell_faces(PD,Df,faces_mask)
+end
+
+function get_patch_cell_faces(PD::PatchDecomposition{Dc},Df::Integer,faces_mask) where Dc
+  model    = PD.model
+  topo     = get_grid_topology(model)
+
+  c2e_map  = Gridap.Geometry.get_faces(topo,Dc,Df)
+  patch_cells = Gridap.Arrays.Table(PD.patch_cells)
+  patch_cell_faces  = map(Reindex(c2e_map),patch_cells.data)
+  faces_on_boundary = PD.patch_cells_faces_on_boundary[Df+1]
+
+  patch_faces = _allocate_patch_cell_faces(patch_cell_faces,faces_on_boundary,faces_mask)
+  _generate_patch_cell_faces!(patch_faces,patch_cell_faces,faces_on_boundary,faces_mask)
+
+  return patch_faces
+end
+
+function _allocate_patch_cell_faces(patch_cell_faces,faces_on_boundary,faces_mask)
+  num_patch_cells = length(patch_cell_faces)
+
+  num_patch_faces = 0
+  patch_cells_faces_cache = array_cache(patch_cell_faces)
+  faces_on_boundary_cache = array_cache(faces_on_boundary)
+  for iC in 1:num_patch_cells
+    cell_faces  = getindex!(patch_cells_faces_cache,patch_cell_faces,iC)
+    on_boundary = getindex!(faces_on_boundary_cache,faces_on_boundary,iC)
+    for (iF,face) in enumerate(cell_faces)
+      if (!on_boundary[iF] && faces_mask[face])
+        num_patch_faces += 1
+      end
+    end
+  end
+
+  patch_faces_data = zeros(Int64,num_patch_faces)
+  patch_faces_ptrs = zeros(Int64,num_patch_cells+1)
+  return Gridap.Arrays.Table(patch_faces_data,patch_faces_ptrs)
+end
+
+function _generate_patch_cell_faces!(patch_faces,patch_cell_faces,faces_on_boundary,faces_mask)
+  num_patch_cells = length(patch_cell_faces)
+  patch_faces_data, patch_faces_ptrs = patch_faces.data, patch_faces.ptrs
+
+  pface = 1
+  patch_faces_ptrs[1] = 1
+  patch_cells_faces_cache = array_cache(patch_cell_faces)
+  faces_on_boundary_cache = array_cache(faces_on_boundary)
+  for iC in 1:num_patch_cells
+    cell_faces  = getindex!(patch_cells_faces_cache,patch_cell_faces,iC)
+    on_boundary = getindex!(faces_on_boundary_cache,faces_on_boundary,iC)
+    patch_faces_ptrs[iC+1] = patch_faces_ptrs[iC]
+    for (iF,face) in enumerate(cell_faces)
+      if (!on_boundary[iF] && faces_mask[face])
+        patch_faces_data[pface] = face
+        patch_faces_ptrs[iC+1] += 1
+        pface += 1
+      end
+    end
+  end
+
+  return patch_faces
+end
+
+# Patch faces: 
+#   patch_faces[patch] = [face1, face2, ...]
+#   where face1, face2, ... are the faces of the patch such that 
+#        - they are NOT on the boundary of the patch
+#        - they are flagged `true` in faces_mask
+function get_patch_faces(PD::PatchDecomposition{Dc},Df::Integer,faces_mask) where Dc
+  model    = PD.model
+  topo     = get_grid_topology(model)
+
+  c2e_map  = Gridap.Geometry.get_faces(topo,Dc,Df)
+  patch_cells = Gridap.Arrays.Table(PD.patch_cells)
+  patch_cell_faces  = map(Reindex(c2e_map),patch_cells.data)
+  faces_on_boundary = PD.patch_cells_faces_on_boundary[Df+1]
+
+  patch_faces = _allocate_patch_faces(patch_cells,patch_cell_faces,faces_on_boundary,faces_mask)
+  _generate_patch_faces!(patch_faces,patch_cells,patch_cell_faces,faces_on_boundary,faces_mask)
+
+  return patch_faces
+end
+
+function _allocate_patch_faces(patch_cells,patch_cell_faces,faces_on_boundary,faces_mask)
+  num_patches = length(patch_cells)
+
+  touched = Dict{Int,Bool}()
+  pcell = 1
+  num_patch_faces = 0
+  patch_cells_cache       = array_cache(patch_cells)
+  patch_cells_faces_cache = array_cache(patch_cell_faces)
+  faces_on_boundary_cache = array_cache(faces_on_boundary)
+  for patch in 1:num_patches
+    current_patch_cells = getindex!(patch_cells_cache,patch_cells,patch)
+    for iC_local in 1:length(current_patch_cells)
+      cell_faces  = getindex!(patch_cells_faces_cache,patch_cell_faces,pcell)
+      on_boundary = getindex!(faces_on_boundary_cache,faces_on_boundary,pcell)
+      for (iF,face) in enumerate(cell_faces)
+        if (!on_boundary[iF] && faces_mask[face] && !haskey(touched,face))
+          num_patch_faces += 1
+          touched[face] = true
+        end
+      end
+      pcell += 1
+    end
+    empty!(touched)
+  end
+
+  patch_faces_data = zeros(Int64,num_patch_faces)
+  patch_faces_ptrs = zeros(Int64,num_patches+1)
+  return Gridap.Arrays.Table(patch_faces_data,patch_faces_ptrs)
+end
+
+function _generate_patch_faces!(patch_faces,patch_cells,patch_cell_faces,faces_on_boundary,faces_mask)
+  num_patches = length(patch_cells)
+  patch_faces_data, patch_faces_ptrs = patch_faces.data, patch_faces.ptrs
+
+  touched = Dict{Int,Bool}()
+  pcell = 1
+  pface = 1
+  patch_faces_ptrs[1] = 1
+  patch_cells_cache       = array_cache(patch_cells)
+  patch_cells_faces_cache = array_cache(patch_cell_faces)
+  faces_on_boundary_cache = array_cache(faces_on_boundary)
+  for patch in 1:num_patches
+    current_patch_cells = getindex!(patch_cells_cache,patch_cells,patch)
+    patch_faces_ptrs[patch+1] = patch_faces_ptrs[patch]
+    for _ in 1:length(current_patch_cells)
+      cell_faces  = getindex!(patch_cells_faces_cache,patch_cell_faces,pcell)
+      on_boundary = getindex!(faces_on_boundary_cache,faces_on_boundary,pcell)
+      for (iF,face) in enumerate(cell_faces)
+        if (!on_boundary[iF] && faces_mask[face] && !haskey(touched,face))
+          patch_faces_data[pface] = face
+          patch_faces_ptrs[patch+1] += 1
+          touched[face] = true
+          pface += 1
+        end
+      end
+      pcell += 1
+    end
+    empty!(touched)
+  end
+
+  return patch_faces
+end
+
+# Face connectivity for the patches
+#    pfaces_to_pcells[pface] = [pcell1, pcell2, ...]
+# This would be the Gridap equivalent to `get_faces(patch_topology,Df,Dc)`.
+# The argument `patch_faces` allows to select only some pfaces (i.e boundary/skeleton/etc...).
+function get_pfaces_to_pcells(PD::PatchDecomposition{Dc},Df::Integer,patch_faces) where Dc
+  model    = PD.model
+  topo     = get_grid_topology(model)
+
+  faces_to_cells  = Gridap.Geometry.get_faces(topo,Df,Dc)
+  pfaces_to_cells = lazy_map(Reindex(faces_to_cells),patch_faces.data)
+  patch_cells     = Gridap.Arrays.Table(PD.patch_cells)
+  patch_cells_overlapped = PD.patch_cells_overlapped_mesh
+
+  num_patches = length(patch_cells)
+  pf2pc_ptrs  = Gridap.Adaptivity.counts_to_ptrs(map(length,pfaces_to_cells))
+  pf2pc_data  = zeros(Int64,pf2pc_ptrs[end]-1)
+
+  patch_cells_cache = array_cache(patch_cells)
+  patch_cells_overlapped_cache = array_cache(patch_cells_overlapped)
+  pfaces_to_cells_cache = array_cache(pfaces_to_cells)
+  for patch in 1:num_patches
+    cells = getindex!(patch_cells_cache,patch_cells,patch)
+    cells_overlapped = getindex!(patch_cells_overlapped_cache,patch_cells_overlapped,patch)
+    for pface in patch_faces.ptrs[patch]:patch_faces.ptrs[patch+1]-1
+      pface_to_cells = getindex!(pfaces_to_cells_cache,pfaces_to_cells,pface)
+      for (lid,cell) in enumerate(pface_to_cells)
+        lid_patch = findfirst(c->c==cell,cells)
+        pf2pc_data[pf2pc_ptrs[pface]+lid-1] = cells_overlapped[lid_patch]
+      end
+    end
+  end
+
+  pfaces_to_pcells = Gridap.Arrays.Table(pf2pc_data,pf2pc_ptrs)
+  return pfaces_to_pcells
 end
