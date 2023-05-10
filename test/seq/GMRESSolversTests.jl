@@ -29,7 +29,7 @@ function main(model)
   A, b = get_matrix(op), get_vector(op);
 
   Pl = JacobiLinearSolver()
-  solver = LinearSolvers.GMRESSolver(20,Pl,1.e-8)
+  solver = LinearSolvers.GMRESSolver(40,Pl,1.e-8)
   ns = numerical_setup(symbolic_setup(solver,A),A)
 
   x = LinearSolvers.allocate_col_vector(A)

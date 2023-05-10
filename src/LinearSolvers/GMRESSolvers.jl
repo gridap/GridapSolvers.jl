@@ -1,9 +1,4 @@
 
-# Orthogonalization
-
-
-
-
 # GMRES Solver
 struct GMRESSolver <: Gridap.Algebra.LinearSolver
   m  ::Int
@@ -49,7 +44,7 @@ function Gridap.Algebra.solve!(x::AbstractVector,ns::GMRESNumericalSetup,b::Abst
   solver, A, Pl, caches = ns.solver, ns.A, ns.Pl_ns, ns.caches
   m, tol = solver.m, solver.tol
   w, V, Z, H, g, c, s = caches
-  println(" > Starting GMRES solve: ")
+  println(" > Starting GMRES solver: ")
 
   # Initial residual
   mul!(w,A,x); w .= b .- w
@@ -63,7 +58,9 @@ function Gridap.Algebra.solve!(x::AbstractVector,ns::GMRESNumericalSetup,b::Abst
     # Arnoldi process
     fill!(g,0.0); g[1] = β
     V[1] .= w ./ β
-    for j in 1:m
+    j = 1
+    while ( j < m+1 && β > tol )
+      println("      > Inner iteration ", j," - Residual: ", β)
       # Arnoldi orthogonalization by Modified Gram-Schmidt
       solve!(Z[j],Pl,V[j])
       mul!(w,A,Z[j])
@@ -86,23 +83,26 @@ function Gridap.Algebra.solve!(x::AbstractVector,ns::GMRESNumericalSetup,b::Abst
       H[j,j] = c[j]*H[j,j] + s[j]*H[j+1,j]; H[j+1,j] = 0.0
       g[j+1] = -s[j]*g[j]; g[j] = c[j]*g[j]
 
-      β = abs(g[j+1])
+      β  = abs(g[j+1])
+      j += 1
     end
+    j = j-1
 
     # Solve least squares problem Hy = g by backward substitution
-    for i in m:-1:1
-      g[i] = (g[i] - dot(H[i,i+1:m],g[i+1:m])) / H[i,i]
+    for i in j:-1:1
+      g[i] = (g[i] - dot(H[i,i+1:j],g[i+1:j])) / H[i,i]
     end
 
     # Update solution & residual
-    for i in 1:m
+    for i in 1:j
       x .+= g[i] .* Z[i]
     end
     mul!(w,A,x); w .= b .- w
 
     iter += 1
   end
-  println("   > Iteration ", iter," - Residual: ", β)
+  println("   Exiting GMRES solver.")
+  println("   > Num Iter: ", iter-1," - Final residual: ", β)
 
   return x
 end
