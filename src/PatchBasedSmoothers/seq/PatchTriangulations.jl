@@ -53,8 +53,8 @@ function Gridap.Geometry.BoundaryTriangulation(PD::PatchDecomposition{Dc}) where
   patch_faces = get_patch_faces(PD,Df,is_boundary)
   pfaces_to_pcells = get_pfaces_to_pcells(PD,Df,patch_faces)
 
-  Γ    = BoundaryTriangulation(model)
-  glue = get_glue(Γ,Val(Df))
+  trian = BoundaryTriangulation(model)
+  glue  = get_glue(trian,Val(Df))
   mface_to_tface = Gridap.Arrays.find_inverse_index_map(glue.tface_to_mface,num_faces(model,Df))
   
   return PatchTriangulation(trian,PD,patch_faces,pfaces_to_pcells,mface_to_tface)
@@ -66,12 +66,12 @@ function Gridap.Geometry.SkeletonTriangulation(PD::PatchDecomposition{Dc}) where
   labeling = get_face_labeling(model)
 
   is_interior = get_face_mask(labeling,["interior"],Df)
-  patch_faces = get_patch_cell_faces(PD,Df,is_interior)
+  patch_faces = get_patch_faces(PD,Df,is_interior)
   pfaces_to_pcells = get_pfaces_to_pcells(PD,Df,patch_faces)
 
-  Λ    = SkeletonTriangulation(model)
-  glue = get_glue(Λ,Val(Df))
-  mface_to_tface   = Gridap.Arrays.find_inverse_index_map(glue.tface_to_mface,num_faces(model,Df))
+  trian = SkeletonTriangulation(model)
+  glue  = get_glue(trian,Val(Df))
+  mface_to_tface = Gridap.Arrays.find_inverse_index_map(glue.tface_to_mface,num_faces(model,Df))
   
   return PatchTriangulation(trian,PD,patch_faces,pfaces_to_pcells,mface_to_tface)
 end
@@ -86,7 +86,7 @@ function Gridap.Geometry.move_contributions(::Triangulation,
                                             scell_to_val::AbstractArray,
                                             strian::PatchTriangulation)
   patch_cells = strian.patch_faces
-  return lazy_map(Reindex(scell_to_val),patch_cells.data)
+  return lazy_map(Reindex(scell_to_val),patch_cells.data), strian
 end
 
 function Gridap.Geometry.move_contributions(::Union{<:BoundaryTriangulation,<:SkeletonTriangulation},
@@ -95,5 +95,5 @@ function Gridap.Geometry.move_contributions(::Union{<:BoundaryTriangulation,<:Sk
   patch_faces      = strian.patch_faces
   mface_to_tface   = strian.mface_to_tface
   patch_faces_data = lazy_map(Reindex(mface_to_tface),patch_faces.data)
-  return lazy_map(Reindex(scell_to_val),patch_faces_data)
+  return lazy_map(Reindex(scell_to_val),patch_faces_data), strian
 end
