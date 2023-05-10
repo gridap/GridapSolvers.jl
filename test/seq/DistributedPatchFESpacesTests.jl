@@ -27,7 +27,7 @@ reffe = ReferenceFE(lagrangian,Float64,order)
 #reffe = ReferenceFE(raviart_thomas,Float64,order)
 Vh = TestFESpace(model,reffe)
 PD = PBS.PatchDecomposition(model)
-Ph = PBS.PatchFESpace(model,reffe,DivConformity(),PD,Vh)
+Ph = PBS.PatchFESpace(model,reffe,H1Conformity(),PD,Vh)
 
 # ---- Testing Prolongation and Injection ---- #
 
