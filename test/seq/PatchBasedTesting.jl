@@ -96,6 +96,21 @@ is_interior = get_face_mask(labeling,["interior"],Df)
 patch_faces = PBS.get_patch_faces(PD,Df,is_interior)
 pfaces_to_pcells = PBS.get_pfaces_to_pcells(PD,Df,patch_faces)
 
+glue = get_glue(Λ,Val(Df))
+mface_to_tface = Gridap.Arrays.find_inverse_index_map(glue.tface_to_mface,num_faces(model,Df))
+patch_faces_data = lazy_map(Reindex(mface_to_tface),patch_faces.data)
+
+contr = aΛ(u,v)
+vecdata = first(contr.dict)[2]
+patch_vecdata = lazy_map(Reindex(vecdata),patch_faces_data)
+
+cell_dof_ids = get_cell_dof_ids(Ph)
+plus         = lazy_map(Reindex(cell_dof_ids),lazy_map(x->x[1],pfaces_to_pcells))
+minus        = lazy_map(Reindex(cell_dof_ids),lazy_map(x->x[2],pfaces_to_pcells))
+face_dof_ids = lazy_map(Gridap.Fields.BlockMap(2,[1,2]),plus,minus)
+
+res = ([patch_vecdata],[face_dof_ids],[face_dof_ids])
+assemble_matrix(assembler_P,res)
 
 ############################################################################################
 
