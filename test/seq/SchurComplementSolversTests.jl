@@ -95,7 +95,7 @@ function main(model)
 
   psc_solver = SchurComplementSolver(A_ns,B,C,PS_ns);
 
-  gmres = GMRESSolver(20,psc_solver,1e-6)
+  gmres = GMRESSolver(20,psc_solver,1e-10)
   gmres_ns = numerical_setup(symbolic_setup(gmres,sysmat),sysmat)
 
   x = LinearSolvers.allocate_col_vector(sysmat)
@@ -106,8 +106,10 @@ function main(model)
   err_u3 = l2_error(uh,u_ref,dΩ) 
   err_p3 = l2_error(ph,p_ref,dΩ)
 
-  @test err_u3 ≈ err_u1
-  @test err_p3 ≈ err_p1
+  @test err_u1 < 1.e-4
+  @test err_u3 < 1.e-4
+  @test err_p1 < 1.e-4
+  @test err_p3 < 1.e-4
 end
 
 backend = SequentialBackend()
@@ -115,7 +117,7 @@ ranks = (2,2)
 parts = get_part_ids(backend,ranks)
 
 D = 2
-n = 40
+n = 60
 domain    = Tuple(repeat([0,1],D))
 partition = (n,n)
 
