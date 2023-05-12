@@ -1,5 +1,6 @@
 module BlockDiagonalSmoothersPETScTests
 
+using Test
 using Gridap
 using Gridap.MultiField
 using BlockArrays
