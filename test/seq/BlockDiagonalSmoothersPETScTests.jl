@@ -79,6 +79,7 @@ GridapPETSc.with() do
   x = cg!(x,A,b;verbose=true,Pl=BDSns,reltol=1.0e-12)
 
   println("Error: ",norm(x-x_star))
+  @test norm(x-x_star) < 1.0e-10
 end
 
 end

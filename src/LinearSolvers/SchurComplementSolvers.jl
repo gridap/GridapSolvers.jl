@@ -65,7 +65,7 @@ end
 function Gridap.Algebra.numerical_setup(ss::SchurComplementSymbolicSetup,mat::AbstractMatrix)
   s   = ss.solver
   B,C = s.B, s.C
-  ranges = get_block_ranges(B,C)
+  ranges = compute_block_ranges(C,B)
   caches = get_shur_complement_caches(B,C)
   return SchurComplementNumericalSetup(s,mat,ranges,caches)
 end
