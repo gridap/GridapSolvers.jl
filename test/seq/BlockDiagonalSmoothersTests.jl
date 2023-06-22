@@ -74,6 +74,23 @@ function main(model,single_proc::Bool)
   x = cg!(x,A,b;verbose=true,Pl=BDSns,reltol=1.0e-12)
 
   @test norm(x-x_star) < 1.e-8
+
+  # Build using BlockMatrixAssemblers
+  mfs = BlockMultiFieldStyle()
+  Yb = MultiFieldFESpace([V,Q];style=mfs)
+  Xb = MultiFieldFESpace([U,P];style=mfs)
+
+  op_blocks = AffineFEOperator(a,l,Xb,Yb)
+  Ab,bb = get_matrix(op_blocks), get_vector(op_blocks);
+
+  BDS   = BlockDiagonalSmoother(Ab,solvers)
+  BDSss = symbolic_setup(BDS,A)
+  BDSns = numerical_setup(BDSss,A)
+
+  xb = GridapSolvers.LinearSolvers.allocate_col_vector(Ab)
+  xb = cg!(xb,Ab,bb;verbose=true,Pl=BDSns,reltol=1.0e-12)
+
+  @test norm(x-x_star) < 1.e-8
 end
 
 backend = SequentialBackend()

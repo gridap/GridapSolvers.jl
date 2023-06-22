@@ -16,8 +16,15 @@ end
 
 # Constructors 
 
-function BlockDiagonalSmoother(blocks :: AbstractArray{<:AbstractMatrix},
-                               solvers:: AbstractArray{<:Gridap.Algebra.LinearSolver})
+function BlockDiagonalSmoother(blocks  :: AbstractArray{<:AbstractMatrix},
+                               solvers :: AbstractArray{<:Gridap.Algebra.LinearSolver})
+  ranges = compute_block_ranges(blocks...)
+  return BlockDiagonalSmoother(ranges,blocks,solvers)
+end
+
+function BlockDiagonalSmoother(block_mat :: BlockMatrix,
+                               solvers   :: AbstractArray{<:Gridap.Algebra.LinearSolver})
+  blocks = [block_mat[Block(i,i)] for i in 1:length(solvers)]
   ranges = compute_block_ranges(blocks...)
   return BlockDiagonalSmoother(ranges,blocks,solvers)
 end
@@ -105,18 +112,22 @@ end
 function Gridap.Algebra.numerical_setup(ss::BlockDiagonalSmootherSS,mat::AbstractMatrix)
   solver   = ss.solver
   block_ns = map(numerical_setup,ss.block_ss,solver.blocks)
-  caches   = _get_block_diagonal_smoothers_caches(solver.blocks)
+  caches   = _get_block_diagonal_smoothers_caches(solver.blocks,mat)
   return BlockDiagonalSmootherNS(solver,block_ns,caches)
 end
 
-function _get_block_diagonal_smoothers_caches(blocks)
+function _get_block_diagonal_smoothers_caches(blocks,mat)
   return nothing
 end
 
-function _get_block_diagonal_smoothers_caches(blocks::AbstractArray{<:PSparseMatrix})
+function _get_block_diagonal_smoothers_caches(blocks::AbstractArray{<:PSparseMatrix},mat::PSparseMatrix)
   x_blocks = map(bi->allocate_col_vector(bi),blocks)
   b_blocks = map(bi->allocate_col_vector(bi),blocks)
   return x_blocks,b_blocks
+end
+
+function _get_block_diagonal_smoothers_caches(blocks::AbstractArray{<:PSparseMatrix},mat::BlockMatrix)
+  return nothing
 end
 
 # Solve
@@ -154,6 +165,7 @@ function to_global!(x::PVector,x_blocks,ranges)
   return x
 end
 
+# Solve for serial vectors
 function Gridap.Algebra.solve!(x::AbstractVector,ns::BlockDiagonalSmootherNS,b::AbstractVector)
   solver, block_ns = ns.solver, ns.block_ns
   num_blocks, ranges = solver.num_blocks, solver.ranges
@@ -165,6 +177,7 @@ function Gridap.Algebra.solve!(x::AbstractVector,ns::BlockDiagonalSmootherNS,b::
   return x
 end
 
+# Solve for PVectors (parallel)
 function Gridap.Algebra.solve!(x::PVector,ns::BlockDiagonalSmootherNS,b::PVector)
   solver, block_ns, caches = ns.solver, ns.block_ns, ns.caches
   num_blocks, ranges = solver.num_blocks, solver.ranges
@@ -178,6 +191,21 @@ function Gridap.Algebra.solve!(x::PVector,ns::BlockDiagonalSmootherNS,b::PVector
     solve!(xi,block_ns[iB],bi)
   end
   to_global!(x,x_blocks,ranges)
+  return x
+end
+
+# Solve for BlockVectors (serial & parallel)
+function Gridap.Algebra.solve!(x::BlockVector,ns::BlockDiagonalSmootherNS,b::BlockVector)
+  solver, block_ns = ns.solver, ns.block_ns
+  num_blocks = solver.num_blocks
+
+  @check blocklength(x) == blocklength(b) == num_blocks
+  for iB in 1:num_blocks
+    xi = x[Block(iB)]
+    bi = b[Block(iB)]
+    solve!(xi,block_ns[iB],bi)
+  end
+
   return x
 end
 
