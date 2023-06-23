@@ -14,7 +14,7 @@ function Gridap.Algebra.symbolic_setup(solver::GMRESSolver, A::AbstractMatrix)
   return GMRESSymbolicSetup(solver)
 end
 
-struct GMRESNumericalSetup <: Gridap.Algebra.NumericalSetup
+mutable struct GMRESNumericalSetup <: Gridap.Algebra.NumericalSetup
   solver
   A
   Pl_ns
@@ -38,6 +38,11 @@ function Gridap.Algebra.numerical_setup(ss::GMRESSymbolicSetup, A::AbstractMatri
   Pl_ns  = numerical_setup(symbolic_setup(solver.Pl,A),A)
   caches = get_gmres_caches(solver.m,A)
   return GMRESNumericalSetup(solver,A,Pl_ns,caches)
+end
+
+function Gridap.Algebra.numerical_setup!(ns::GMRESNumericalSetup, A::AbstractMatrix)
+  numerical_setup!(ns.Pl_ns,A)
+  ns.A = A
 end
 
 function Gridap.Algebra.solve!(x::AbstractVector,ns::GMRESNumericalSetup,b::AbstractVector)
