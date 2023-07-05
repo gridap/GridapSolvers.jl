@@ -9,6 +9,7 @@ using FillArrays
 using IterativeSolvers
 using PartitionedArrays
 
+using GridapDistributed
 using GridapSolvers
 
 u(x) = VectorValue(x[1],x[2])
@@ -80,7 +81,12 @@ function main(model,single_proc::Bool)
   Yb = MultiFieldFESpace([V,Q];style=mfs)
   Xb = MultiFieldFESpace([U,P];style=mfs)
 
-  op_blocks = AffineFEOperator(a,l,Xb,Yb)
+  if single_proc
+    assem = SparseMatrixAssembler(Xb,Yb)
+  else
+    assem = SparseMatrixAssembler(Xb,Yb,FullyAssembledRows())
+  end
+  op_blocks = AffineFEOperator(a,l,Xb,Yb,assem)
   Ab,bb = get_matrix(op_blocks), get_vector(op_blocks);
 
   BDS   = BlockDiagonalSmoother(Ab,solvers)
