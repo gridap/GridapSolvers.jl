@@ -67,7 +67,7 @@ module PatchLinearSolverTests
   model  = CartesianDiscreteModel(domain,partition)
   _,Ph,xh,Vh    = returns_PD_Ph_xh_Vh(model)
 
-  parts  = get_part_ids(sequential,(1,2))
+  parts  = get_part_ids(SequentialBackend(),(1,2))
   dmodel = CartesianDiscreteModel(parts,domain,partition)
   _,dPh,dxh,dVh = returns_PD_Ph_xh_Vh(dmodel);
 
