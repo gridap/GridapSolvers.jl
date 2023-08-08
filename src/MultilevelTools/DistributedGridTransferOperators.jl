@@ -214,7 +214,7 @@ function LinearAlgebra.mul!(y::PVector,A::DistributedGridTransferOperator{Val{:r
   model_h, Uh, fv_h, dv_h, UH, fv_H, dv_H = cache_refine
 
   copy!(fv_h,x) # Matrix layout -> FE layout
-  exchange!(fv_h)
+  consistent!(fv_h)
   restrict_dofs!(fv_H,fv_h,dv_h,Uh,UH,get_adaptivity_glue(model_h))
   copy!(y,fv_H) # FE layout -> Matrix layout
 
@@ -249,7 +249,7 @@ function LinearAlgebra.mul!(y::Union{PVector,Nothing},A::DistributedGridTransfer
 
   # 1 - Redistribute from fine partition to coarse partition
   copy!(fv_h_red,x)
-  exchange!(fv_h_red)
+  consistent!(fv_h_red)
   redistribute_free_values!(cache_exchange,fv_h,Uh,fv_h_red,dv_h_red,Uh_red,model_h,glue;reverse=true)
 
   # 2 - Interpolate in coarse partition
@@ -270,7 +270,7 @@ function LinearAlgebra.mul!(y::Union{PVector,Nothing},A::DistributedGridTransfer
 
   # 1 - Redistribute from fine partition to coarse partition
   copy!(fv_h_red,x)
-  exchange!(fv_h_red)
+  consistent!(fv_h_red)
   redistribute_free_values!(cache_exchange,fv_h,Uh,fv_h_red,dv_h_red,Uh_red,model_h,glue;reverse=true)
 
   # 2 - Solve f2c projection coarse partition
@@ -295,7 +295,7 @@ function LinearAlgebra.mul!(y::Union{PVector,Nothing},A::DistributedGridTransfer
 
   # 1 - Redistribute from fine partition to coarse partition
   copy!(fv_h_red,x)
-  exchange!(fv_h_red)
+  consistent!(fv_h_red)
   redistribute_free_values!(cache_exchange,fv_h,Uh,fv_h_red,dv_h_red,Uh_red,model_h,glue;reverse=true)
 
   # 2 - Interpolate in coarse partition

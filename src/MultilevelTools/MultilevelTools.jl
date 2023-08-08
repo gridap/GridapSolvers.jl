@@ -11,7 +11,11 @@ using Gridap.Geometry
 using Gridap.FESpaces
 using Gridap.Adaptivity
 using PartitionedArrays
+
 using GridapDistributed
+using GridapDistributed: redistribute_cell_dofs, redistribute_cell_dofs!
+using GridapDistributed: redistribute_free_values, redistribute_free_values!
+using GridapDistributed: redistribute_fe_function
 
 import LinearAlgebra: mul!
 import GridapDistributed: local_views
@@ -20,9 +24,6 @@ import GridapDistributed: local_views
 export change_parts
 export generate_level_parts
 export generate_subparts
-
-export redistribute_fe_function
-export redistribute_free_values!
 
 export ModelHierarchy
 export num_levels, get_level, get_level_parts
@@ -38,10 +39,9 @@ export setup_transfer_operators
 export mul!
 
 include("SubpartitioningTools.jl")
-include("GridapDistributedExtensions.jl")
+#include("GridapDistributedExtensions.jl")
 include("GridapFixes.jl")
 include("RefinementTools.jl")
-include("RedistributeTools.jl")
 include("ModelHierarchies.jl")
 include("FESpaceHierarchies.jl")
 include("DistributedGridTransferOperators.jl")

@@ -6,7 +6,7 @@ function Gridap.CellData.Measure(tt::GridapDistributed.DistributedTriangulation{
                                  args...) where {Dc,Dp}
   itrians = change_parts(local_views(it),get_parts(tt);default=void(BodyFittedTriangulation{Dc,Dp}))
 
-  measures = map_parts(local_views(tt),itrians) do ttrian, itrian
+  measures = map(local_views(tt),itrians) do ttrian, itrian
     Measure(ttrian,itrian,args...)
   end
   return GridapDistributed.DistributedMeasure(measures)
@@ -18,9 +18,9 @@ end
 
 # change_parts
 
-function change_parts(x::Union{AbstractPData,Nothing}, new_parts; default=nothing)
-  x_new = map_parts(new_parts) do _p
-    if isa(x,AbstractPData)
+function change_parts(x::Union{AbstractArray,Nothing}, new_parts; default=nothing)
+  x_new = map(new_parts) do _p
+    if isa(x,AbstractArray)
       x.part
     else
       default
@@ -41,7 +41,7 @@ end
 # DistributedFESpaces
 
 function get_test_space(U::GridapDistributed.DistributedSingleFieldFESpace)
-  spaces = map_parts(local_views(U)) do U
+  spaces = map(local_views(U)) do U
     U.space
   end
   return GridapDistributed.DistributedSingleFieldFESpace(spaces,U.gids,U.vector_type)

@@ -76,7 +76,7 @@ function run(parts,num_parts_x_level,coarse_grid_partition,num_refs_coarse)
 
         if i_am_in(parts_H)
           y_ref = PVector(1.0,AH.cols)
-          tests = map_parts(y_ref.owned_values,yH1.owned_values,yH2.owned_values,yH3.owned_values) do y_ref,y1,y2,y3
+          tests = map(y_ref.owned_values,yH1.owned_values,yH2.owned_values,yH3.owned_values) do y_ref,y1,y2,y3
             map(y -> norm(y-y_ref) < 1.e-3 ,[y1,y2,y3])
           end
           @test all(tests.part)
@@ -94,7 +94,7 @@ function run(parts,num_parts_x_level,coarse_grid_partition,num_refs_coarse)
         mul!(yh3,P3,xH)
 
         y_ref = PVector(1.0,Ah.cols)
-        tests = map_parts(y_ref.owned_values,yh1.owned_values,yh2.owned_values,yh2.owned_values) do y_ref,y1,y2,y3
+        tests = map(y_ref.owned_values,yh1.owned_values,yh2.owned_values,yh2.owned_values) do y_ref,y1,y2,y3
           map(y -> norm(y-y_ref) < 1.e-3 ,[y1,y2,y3])
         end
         @test all(tests.part)

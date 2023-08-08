@@ -1,19 +1,19 @@
 
 # DistributedAdaptedTriangulations
 
-const DistributedAdaptedTriangulation{Dc,Dp} = GridapDistributed.DistributedTriangulation{Dc,Dp,<:AbstractPData{<:AdaptedTriangulation{Dc,Dp}}}
+const DistributedAdaptedTriangulation{Dc,Dp} = GridapDistributed.DistributedTriangulation{Dc,Dp,<:AbstractArray{<:AdaptedTriangulation{Dc,Dp}}}
 
 # Restriction of dofs
 
 function restrict_dofs!(fv_c::PVector,
                         fv_f::PVector,
-                        dv_f::AbstractPData,
+                        dv_f::AbstractArray,
                         U_f ::GridapDistributed.DistributedSingleFieldFESpace,
                         U_c ::GridapDistributed.DistributedSingleFieldFESpace,
-                        glue::AbstractPData{<:AdaptivityGlue})
+                        glue::AbstractArray{<:AdaptivityGlue})
 
-  map_parts(restrict_dofs!,local_views(fv_c),local_views(fv_f),dv_f,local_views(U_f),local_views(U_c),glue)
-  exchange!(fv_c)
+  map(restrict_dofs!,local_views(fv_c),local_views(fv_f),dv_f,local_views(U_f),local_views(U_c),glue)
+  consistent!(fv_c)
 
   return fv_c
 end

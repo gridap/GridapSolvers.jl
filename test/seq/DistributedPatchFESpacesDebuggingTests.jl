@@ -98,7 +98,7 @@ function run(parts)
 
   x1_mat = PVector(0.5,Ah.cols)
   r1_mat = fh-Ah*x1_mat
-  exchange!(r1_mat)
+  consistent!(r1_mat)
 
   r1 = PVector(0.0,Vh.gids)
   x1 = PVector(0.0,Vh.gids)
@@ -108,11 +108,11 @@ function run(parts)
   xp_mat = PVector(0.0,Ahp.cols)
 
   copy!(r1,r1_mat)
-  exchange!(r1)
+  consistent!(r1)
   PBS.prolongate!(rp,Ph,r1) # OK
 
   copy!(rp_mat,rp)
-  exchange!(rp_mat)
+  consistent!(rp_mat)
   solve!(xp_mat,LUns,rp_mat)
   copy!(xp,xp_mat) # Some big numbers appear here....
 
@@ -124,16 +124,16 @@ function run(parts)
 
   x2_mat = PVector(0.5,Ah.cols)
   r2_mat = fh-Ah*x2_mat
-  exchange!(r2_mat)
+  consistent!(r2_mat)
   solve!(x2_mat,Mns,r2_mat)
 
   # ---- Smoother inside Richardson
 
   x3_mat = PVector(0.5,Ah.cols)
   r3_mat = fh-Ah*x3_mat
-  exchange!(r3_mat)
+  consistent!(r3_mat)
   solve!(x3_mat,Rns,r3_mat)
-  exchange!(x3_mat)
+  consistent!(x3_mat)
 
   # Outputs 
   res = Dict{String,Any}()
@@ -165,7 +165,7 @@ Mm,PDm,Phm,Vhm,res_multi = run(parts);
 
 println(repeat('#',80))
 
-map_parts(local_views(Ms)) do model
+map(local_views(Ms)) do model
   cell_ids = get_cell_node_ids(model)
   cell_coords = get_cell_coordinates(model)
   display(reshape(cell_ids,length(cell_ids)))
@@ -178,29 +178,29 @@ vertex_gids = get_face_gids(Mm,0)
 edge_gids   = get_face_gids(Mm,1)
 
 println(">>> Cell gids")
-map_parts(cell_gids.partition) do p
+map(cell_gids.partition) do p
   println(transpose(p.lid_to_ohid))
 end;
 println(repeat('-',80))
 
 println(">>> Vertex gids")
-map_parts(vertex_gids.partition) do p
+map(vertex_gids.partition) do p
   println(transpose(p.lid_to_ohid))
 end;
 println(repeat('-',80))
 
 println(">>> Edge gids")
-map_parts(edge_gids.partition) do p
+map(edge_gids.partition) do p
   println(transpose(p.lid_to_ohid))
 end;
 
 println(repeat('#',80))
 
-map_parts(local_views(Phs)) do Ph
+map(local_views(Phs)) do Ph
   display(Ph.patch_cell_dofs_ids)
 end;
 
-map_parts(local_views(Phm)) do Ph
+map(local_views(Phm)) do Ph
   display(Ph.patch_cell_dofs_ids)
 end;
 
@@ -211,10 +211,10 @@ for key in keys(res_single)
   val_m = res_multi[key]
 
   println(">>> ", key)
-  map_parts(val_s.values) do v
+  map(val_s.values) do v
     println(transpose(v))
   end;
-  map_parts(val_m.owned_values) do v
+  map(val_m.owned_values) do v
     println(transpose(v))
   end;
   println(repeat('-',80))
