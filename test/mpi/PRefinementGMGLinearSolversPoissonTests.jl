@@ -93,8 +93,11 @@ coarse_grid_partition = (2,2)
 num_refs_coarse = 2
 
 num_parts_x_level = [4,4,1]
-ranks = num_parts_x_level[1]
-with_backend(main,MPIBackend(),ranks,coarse_grid_partition,num_parts_x_level,num_refs_coarse,max_order)
+num_ranks = num_parts_x_level[1]
+parts = with_mpi() do distribute
+  distribute(LinearIndices((prod(num_ranks),)))
+end
+main(parts,coarse_grid_partition,num_parts_x_level,num_refs_coarse,max_order)
 
 
 MPI.Finalize()

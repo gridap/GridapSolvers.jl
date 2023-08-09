@@ -58,8 +58,11 @@ function main(parts,partition)
 end
 
 partition = (32,32)
-ranks = (2,2)
-with_backend(main,MPIBackend(),ranks,partition)
+num_ranks = (2,2)
+parts = with_mpi() do distribute
+  distribute(LinearIndices((prod(num_ranks),)))
+end
+main(parts,partition)
 MPI.Finalize()
 
 end

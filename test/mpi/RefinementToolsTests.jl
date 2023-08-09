@@ -79,12 +79,14 @@ function run(parts,num_parts_x_level,coarse_grid_partition,num_refs_coarse)
   end
 end
 
-
 num_parts_x_level = [4,2,2]   # Procs in each refinement level
 num_trees         = (1,1)     # Number of initial P4est trees
 num_refs_coarse   = 2         # Number of initial refinements
 
-ranks = num_parts_x_level[1]
-with_backend(run,MPIBackend(),ranks,num_parts_x_level,num_trees,num_refs_coarse)
+num_ranks = num_parts_x_level[1]
+parts = with_mpi() do distribute
+  distribute(LinearIndices((prod(num_ranks),)))
+end
+run(parts,num_parts_x_level,num_trees,num_refs_coarse)
 MPI.Finalize()
 end
