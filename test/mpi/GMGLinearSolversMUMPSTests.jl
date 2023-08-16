@@ -76,7 +76,7 @@ function main(parts, coarse_grid_partition, num_parts_x_level, num_refs_coarse, 
       ns = numerical_setup(ss,A)
 
       # Solve 
-      x = PVector(0.0,A.cols)
+      x = pfill(0.0,partition(axes(A,2)))
       x, history = IterativeSolvers.cg!(x,A,b;
                             verbose=i_am_main(parts),
                             reltol=1.0e-12,

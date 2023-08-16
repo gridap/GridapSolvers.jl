@@ -53,7 +53,7 @@ function run(parts,num_parts_x_level,coarse_grid_partition,num_refs_coarse)
         Ah = assemble_matrix(ah,Uh,Vh)
         bh = assemble_vector(lh,Vh)
 
-        xh = PVector(0.0,Ah.cols)
+        xh = pfill(0.0,partition(axes(Ah,2)))
         IterativeSolvers.cg!(xh,Ah,bh;verbose=i_am_main(parts),reltol=1.0e-08)
         uH_projected = FEFunction(Uh,xh)
 
@@ -67,7 +67,7 @@ function run(parts,num_parts_x_level,coarse_grid_partition,num_refs_coarse)
         AH = assemble_matrix(aH,UH,VH)
         bH = assemble_vector(lH,VH)
 
-        xH = PVector(0.0,AH.cols)
+        xH = pfill(0.0,partition(axes(AH,2)))
         IterativeSolvers.cg!(xH,AH,bH;verbose=i_am_main(parts),reltol=1.0e-08)
         uh_projected = FEFunction(UH,xH)
 

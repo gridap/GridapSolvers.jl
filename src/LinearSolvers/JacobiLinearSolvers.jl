@@ -22,14 +22,14 @@ function Gridap.Algebra.numerical_setup!(ns::JacobiNumericalSetup, A::AbstractMa
 end
 
 function Gridap.Algebra.numerical_setup(ss::JacobiSymbolicSetup,A::PSparseMatrix)
-  inv_diag=map(A.owned_owned_values) do a
+  inv_diag=map(own_values(A)) do a
     1.0 ./ diag(a)
   end
   return JacobiNumericalSetup(inv_diag)
 end
 
 function Gridap.Algebra.numerical_setup!(ns::JacobiNumericalSetup, A::PSparseMatrix)
-  map(ns.inv_diag,A.owned_owned_values) do inv_diag, a
+  map(ns.inv_diag,own_values(A)) do inv_diag, a
     inv_diag .= 1.0 ./ diag(a)
   end
   return ns
@@ -43,7 +43,7 @@ end
 
 function Gridap.Algebra.solve!(x::PVector, ns::JacobiNumericalSetup, b::PVector)
   inv_diag = ns.inv_diag
-  map(inv_diag,x.owned_values,b.owned_values) do inv_diag, x, b
+  map(inv_diag,own_values(x),own_values(b)) do inv_diag, x, b
     x .= inv_diag .* b
   end
   return x

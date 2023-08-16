@@ -54,11 +54,11 @@ function _get_interpolation_cache(lev::Int,sh::FESpaceHierarchy,qdegree::Int,mod
   if i_am_in(cparts)
     model_h = get_model_before_redist(mh,lev)
     Uh = get_fe_space_before_redist(sh,lev)
-    fv_h = PVector(0.0,Uh.gids)
+    fv_h = pfill(0.0,partition(Uh.gids))
     dv_h = (mode == :solution) ? get_dirichlet_dof_values(Uh) : zero_dirichlet_values(Uh)
 
     UH = get_fe_space(sh,lev+1)
-    fv_H = PVector(0.0,UH.gids)
+    fv_H = pfill(0.0,partition(UH.gids))
     dv_H = (mode == :solution) ? get_dirichlet_dof_values(UH) : zero_dirichlet_values(UH)
 
     cache_refine = model_h, Uh, fv_h, dv_h, UH, fv_H, dv_H
@@ -102,7 +102,7 @@ function _get_projection_cache(lev::Int,sh::FESpaceHierarchy,qdegree::Int,mode::
     u,v    = get_trial_fe_basis(UH), get_fe_basis(VH)
     data   = collect_cell_matrix_and_vector(UH,VH,aH(u,v),lH(v,u00),u_dir)
     AH,bH0 = assemble_matrix_and_vector(assem,data)
-    xH     = PVector(0.0,AH.cols)
+    xH     = pfill(0.0,partition(axes(AH,2)))
     bH     = copy(bH0)
 
     cache_refine = model_h, Uh, fv_h, dv_h, VH, AH, lH, xH, bH, bH0, assem
@@ -125,7 +125,7 @@ function _get_redistribution_cache(lev::Int,sh::FESpaceHierarchy,mode::Symbol,op
 
   Uh_red      = get_fe_space(sh,lev)
   model_h_red = get_model(mh,lev)
-  fv_h_red    = PVector(0.0,Uh_red.gids)
+  fv_h_red    = pfill(0.0,partition(Uh_red.gids))
   dv_h_red    = (mode == :solution) ? get_dirichlet_dof_values(Uh_red) : zero_dirichlet_values(Uh_red)
   glue        = mh.levels[lev].red_glue
 

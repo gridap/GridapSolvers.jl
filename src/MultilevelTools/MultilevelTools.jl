@@ -13,17 +13,18 @@ using Gridap.Adaptivity
 using PartitionedArrays
 
 using GridapDistributed
-using GridapDistributed: redistribute_cell_dofs, redistribute_cell_dofs!
-using GridapDistributed: redistribute_free_values, redistribute_free_values!
+using GridapDistributed: redistribute_cell_dofs, redistribute_cell_dofs!, get_redistribute_cell_dofs_cache
+using GridapDistributed: redistribute_free_values, redistribute_free_values!, get_redistribute_free_values_cache
 using GridapDistributed: redistribute_fe_function
+using GridapDistributed: get_old_and_new_parts
+import GridapDistributed: generate_subparts
 
 import LinearAlgebra: mul!
 import GridapDistributed: local_views
 
 
-export change_parts
-export generate_level_parts
-export generate_subparts
+export change_parts, num_parts, i_am_in
+export generate_level_parts, generate_subparts
 
 export ModelHierarchy
 export num_levels, get_level, get_level_parts

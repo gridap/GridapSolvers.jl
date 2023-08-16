@@ -16,7 +16,7 @@ include("../../src/GridapFixes.jl")
 function cg_solve(op)
   A = get_matrix(op)
   b = get_vector(op)
-  x = PVector(0.0,A.cols)
+  x = pfill(0.0,partition(axes(A,2)))
   IterativeSolvers.cg!(x,A,b;verbose=true,reltol=1.0e-06)
   return x
 end

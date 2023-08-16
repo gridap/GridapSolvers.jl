@@ -57,7 +57,7 @@ function main(parts,partition)
     ss = symbolic_setup(P,A)
     ns = numerical_setup(ss,A)
 
-    x = PVector(1.0,A.cols)
+    x = pfill(0.0,partition(axes(A,2)))
     solve!(x,ns,b)
 
     u  = interpolate(sol,Uh)

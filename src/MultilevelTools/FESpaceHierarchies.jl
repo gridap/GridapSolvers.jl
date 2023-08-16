@@ -42,29 +42,28 @@ function get_fe_space_before_redist(fh::FESpaceHierarchy,lev::Int)
   get_fe_space_before_redist(fh[lev])
 end
 
+# Test/Trial FESpaces for ModelHierarchyLevels
+
 function Gridap.FESpaces.TestFESpace(
       mh::ModelHierarchyLevel{A,B,C,Nothing},args...;kwargs...) where {A,B,C}
   Vh = TestFESpace(get_model(mh),args...;kwargs...)
   FESpaceHierarchyLevel(mh.level,Vh,nothing)
 end
 
-function Gridap.FESpaces.TestFESpace(
-      mh::ModelHierarchyLevel{A,B,C,D},args...;kwargs...) where {A,B,C,D}
-  Vh     = TestFESpace(get_model_before_redist(mh),args...;kwargs...)
+function Gridap.FESpaces.TestFESpace(mh::ModelHierarchyLevel{A,B,C,D},args...;kwargs...) where {A,B,C,D}
+  cparts, _ = get_old_and_new_parts(mh.red_glue,Val(false))
+  Vh     = i_am_in(cparts) ? TestFESpace(get_model_before_redist(mh),args...;kwargs...) : nothing
   Vh_red = TestFESpace(get_model(mh),args...;kwargs...)
   FESpaceHierarchyLevel(mh.level,Vh,Vh_red)
 end
 
-function Gridap.FESpaces.TrialFESpace(a::FESpaceHierarchyLevel{A,Nothing},u) where {A}
-  Uh = TrialFESpace(a.fe_space,u)
-  FESpaceHierarchyLevel(a.level,Uh,nothing)
-end
-
-function Gridap.FESpaces.TrialFESpace(a::FESpaceHierarchyLevel{A,B},u) where {A,B}
-  Uh     = TrialFESpace(a.fe_space,u)
-  Uh_red = TrialFESpace(a.fe_space_red,u)
+function Gridap.FESpaces.TrialFESpace(a::FESpaceHierarchyLevel,u)
+  Uh     = !isa(a.fe_space,Nothing) ? TrialFESpace(a.fe_space,u) : nothing
+  Uh_red = !isa(a.fe_space_red,Nothing) ? TrialFESpace(a.fe_space_red,u) : nothing
   FESpaceHierarchyLevel(a.level,Uh,Uh_red)
 end
+
+# Test/Trial FESpaces for ModelHierarchies/FESpaceHierarchy
 
 function Gridap.FESpaces.TestFESpace(mh::ModelHierarchy,args...;kwargs...)
   test_spaces = Vector{FESpaceHierarchyLevel}(undef,num_levels(mh))
@@ -119,6 +118,8 @@ function Gridap.FESpaces.TrialFESpace(a::FESpaceHierarchy)
   FESpaceHierarchy(a.mh,trial_spaces)
 end
 
+# Computing system matrices
+
 function compute_hierarchy_matrices(trials::FESpaceHierarchy,a::Function,l::Function,qdegree::Integer)
   return compute_hierarchy_matrices(trials,a,l,Fill(qdegree,num_levels(trials)))
 end
@@ -152,4 +153,11 @@ function compute_hierarchy_matrices(trials::FESpaceHierarchy,a::Function,l::Func
     end
   end
   return mats, A, b
+end
+
+function get_test_space(U::GridapDistributed.DistributedSingleFieldFESpace)
+  spaces = map(local_views(U)) do U
+    U.space
+  end
+  return GridapDistributed.DistributedSingleFieldFESpace(spaces,U.gids,U.vector_type)
 end

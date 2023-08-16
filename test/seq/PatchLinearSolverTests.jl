@@ -61,19 +61,22 @@ module PatchLinearSolverTests
 
   ##################################################
 
+  parts  = with_debug() do distribute
+    distribute(LinearIndices((2,)))
+  end
+
   domain    = (0.0,1.0,0.0,1.0)
   partition = (2,3)
   
   model  = CartesianDiscreteModel(domain,partition)
   _,Ph,xh,Vh    = returns_PD_Ph_xh_Vh(model)
 
-  parts  = get_part_ids(SequentialBackend(),(1,2))
   dmodel = CartesianDiscreteModel(parts,domain,partition)
   _,dPh,dxh,dVh = returns_PD_Ph_xh_Vh(dmodel);
 
   @test num_free_dofs(Ph) == num_free_dofs(dPh)
-  @test all(dxh.owned_values.parts[1] .≈ xh[1:3])
-  @test all(dxh.owned_values.parts[2] .≈ xh[4:end])
+  @test all(own_values(dxh).items[1] .≈ xh[1:3])
+  @test all(own_values(dxh).items[2] .≈ xh[4:end])
 
   #################################################
   
@@ -88,5 +91,5 @@ module PatchLinearSolverTests
   dA,db = compute_matrix_vector(dmodel,dVh);
   dx    = test_smoother(dPD,dPh,dVh,dA,db)
 
-  @test all(dx.owned_values.parts[1] .≈ x)
+  @test all(own_values(dx).items[1] .≈ x)
 end

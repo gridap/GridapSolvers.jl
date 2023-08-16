@@ -38,7 +38,7 @@ function main(parts,partition)
     ss = symbolic_setup(P,A)
     ns = numerical_setup(ss,A)
 
-    x = PVector(1.0,A.cols)
+    x = pfill(1.0,partition(axes(A,2)))
     x, history = IterativeSolvers.cg!(x,A,b;
                                       verbose=i_am_main(parts),
                                       reltol=1.0e-8,

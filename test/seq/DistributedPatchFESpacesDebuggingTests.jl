@@ -96,16 +96,16 @@ function run(parts)
 
   # ---- Manual solve using LU ---- # 
 
-  x1_mat = PVector(0.5,Ah.cols)
+  x1_mat = pfill(0.5,partition(axes(Ah,2)))
   r1_mat = fh-Ah*x1_mat
   consistent!(r1_mat)
 
-  r1 = PVector(0.0,Vh.gids)
-  x1 = PVector(0.0,Vh.gids)
-  rp = PVector(0.0,Ph.gids)
-  xp = PVector(0.0,Ph.gids)
-  rp_mat = PVector(0.0,Ahp.cols)
-  xp_mat = PVector(0.0,Ahp.cols)
+  r1 = pfill(0.0,partition(Vh.gids))
+  x1 = pfill(0.0,partition(Vh.gids))
+  rp = pfill(0.0,partition(Ph.gids))
+  xp = pfill(0.0,partition(Ph.gids))
+  rp_mat = pfill(0.0,partition(axes(Ahp,2)))
+  xp_mat = pfill(0.0,partition(axes(Ahp,2)))
 
   copy!(r1,r1_mat)
   consistent!(r1)
@@ -122,14 +122,14 @@ function run(parts)
 
   # ---- Same using the PatchBasedSmoother ---- #
 
-  x2_mat = PVector(0.5,Ah.cols)
+  x2_mat = pfill(0.5,partition(axes(Ah,2)))
   r2_mat = fh-Ah*x2_mat
   consistent!(r2_mat)
   solve!(x2_mat,Mns,r2_mat)
 
   # ---- Smoother inside Richardson
 
-  x3_mat = PVector(0.5,Ah.cols)
+  x3_mat = pfill(0.5,partition(axes(Ah,2)))
   r3_mat = fh-Ah*x3_mat
   consistent!(r3_mat)
   solve!(x3_mat,Rns,r3_mat)
@@ -214,7 +214,7 @@ for key in keys(res_single)
   map(val_s.values) do v
     println(transpose(v))
   end;
-  map(val_m.owned_values) do v
+  map(own_values(val_m)) do v
     println(transpose(v))
   end;
   println(repeat('-',80))

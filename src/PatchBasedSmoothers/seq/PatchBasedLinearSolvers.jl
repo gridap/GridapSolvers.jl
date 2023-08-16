@@ -79,11 +79,11 @@ function _allocate_row_vector(A::AbstractMatrix)
 end
 
 function _allocate_col_vector(A::PSparseMatrix)
-  PVector(0.0,A.cols)
+  pfill(0.0,partition(axes(A,2)))
 end
 
 function _allocate_row_vector(A::PSparseMatrix)
-  PVector(0.0,A.rows)
+  pfill(0.0,partition(axes(A,1)))
 end
 
 function Gridap.Algebra.numerical_setup!(ns::PatchBasedSmootherNumericalSetup, A::AbstractMatrix)
