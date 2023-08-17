@@ -60,7 +60,7 @@ function prolongate!(x::PVector,
    map(x.values,Ph.spaces,y.values) do x,Ph,y
      prolongate!(x,Ph,y)
    end
-   consistent!(x)
+   consistent!(x) |> fetch
 end
 
 # x \in  SingleFESpace
@@ -78,7 +78,7 @@ function inject!(x::PVector,
 
   # Exchange local contributions 
   assemble!(x)
-  consistent!(x) # TO CONSIDER: Is this necessary? Do we need ghosts for later?
+  consistent!(x) |> fetch # TO CONSIDER: Is this necessary? Do we need ghosts for later?
   return x
 end
 
@@ -92,7 +92,7 @@ function compute_weight_operators(Ph::GridapDistributed.DistributedSingleFieldFE
   
   # partial sums -> global sums
   assemble!(w_sums) # ghost -> owners
-  consistent!(w_sums) # repopulate ghosts with owner info
+  consistent!(w_sums) |> fetch # repopulate ghosts with owner info
 
   return w, w_sums
 end

@@ -8,6 +8,7 @@ using Test
 
 using GridapSolvers
 using GridapSolvers.MultilevelTools
+using GridapDistributed: redistribute_fe_function
 
 function run(parts,num_parts_x_level,coarse_grid_partition,num_refs_coarse)
   GridapP4est.with(parts) do
@@ -23,14 +24,19 @@ function run(parts,num_parts_x_level,coarse_grid_partition,num_refs_coarse)
     new_parts = level_parts[1]
 
     # FE Spaces
-    order = 1
-    u(x)  = x[1] + x[2]
+    order = 2
+    u(x)  = x[1]^2 + x[2]^2 - 3.0*x[1]*x[2]
     reffe = ReferenceFE(lagrangian,Float64,order)
     glue  = mh.levels[1].red_glue
 
     model_old = get_model_before_redist(mh.levels[1])
-    VOLD  = TestFESpace(model_old,reffe,dirichlet_tags="boundary")
-    UOLD  = TrialFESpace(VOLD,u)
+    if i_am_in(old_parts)
+      VOLD  = TestFESpace(model_old,reffe,dirichlet_tags="boundary")
+      UOLD  = TrialFESpace(VOLD,u)
+    else
+      VOLD  = nothing
+      UOLD  = nothing
+    end
 
     model_new = get_model(mh.levels[1])
     VNEW  = TestFESpace(model_new,reffe,dirichlet_tags="boundary")
@@ -53,10 +59,7 @@ function run(parts,num_parts_x_level,coarse_grid_partition,num_refs_coarse)
     end
 
     # Old -> New
-    uh_old_red = redistribute_fe_function(uh_old,
-                                          UNEW,
-                                          model_new,
-                                          glue)
+    uh_old_red = redistribute_fe_function(uh_old,UNEW,model_new,glue)
     n = sum(∫(uh_old_red)*dΩ_new)
     if i_am_in(old_parts)
       o = sum(∫(uh_old)*dΩ_old)
@@ -64,11 +67,7 @@ function run(parts,num_parts_x_level,coarse_grid_partition,num_refs_coarse)
     end
 
     # New -> Old
-    uh_new_red = redistribute_fe_function(uh_new,
-                                          UOLD,
-                                          model_old,
-                                          glue;
-                                          reverse=true)
+    uh_new_red = redistribute_fe_function(uh_new,UOLD,model_old,glue;reverse=true)
     n = sum(∫(uh_new)*dΩ_new)
     if i_am_in(old_parts)
       o = sum(∫(uh_new_red)*dΩ_old)
@@ -78,9 +77,9 @@ function run(parts,num_parts_x_level,coarse_grid_partition,num_refs_coarse)
 end
 
 
-num_parts_x_level = [4,2,2]   # Procs in each refinement level
+num_parts_x_level = [4,2]   # Procs in each refinement level
 num_trees         = (1,1)     # Number of initial P4est trees
-num_refs_coarse   = 2         # Number of initial refinements
+num_refs_coarse   = 3         # Number of initial refinements
 
 num_ranks = num_parts_x_level[1]
 parts = with_mpi() do distribute

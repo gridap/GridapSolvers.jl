@@ -34,7 +34,7 @@ function run(parts,num_parts_x_level,coarse_grid_partition,num_refs_coarse)
     ops3 = setup_transfer_operators(trials, qdegree; restriction_method=:dof_mask, mode=:solution)
     restrictions3, prolongations3 = ops3
 
-    a(u,v,dΩ) = ∫(∇(v)⋅∇(u))*dΩ
+    a(u,v,dΩ) = ∫(v⋅u)*dΩ
     l(v,dΩ)   = ∫(v⋅u)*dΩ
     mats, A, b = compute_hierarchy_matrices(trials,a,l,qdegree)
 
@@ -93,7 +93,7 @@ function run(parts,num_parts_x_level,coarse_grid_partition,num_refs_coarse)
         P3 = prolongations3[lev]
         mul!(yh3,P3,xH)
 
-        y_ref = pfill(1.0,partition(axes(Ah)))
+        y_ref = pfill(1.0,partition(axes(Ah,2)))
         tests = map(own_values(y_ref),own_values(yh1),own_values(yh2),own_values(yh3)) do y_ref,y1,y2,y3
           map(y -> norm(y-y_ref) < 1.e-3 ,[y1,y2,y3])
         end

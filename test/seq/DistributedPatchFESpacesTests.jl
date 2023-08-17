@@ -89,7 +89,7 @@ Rns = numerical_setup(Rss,Ah)
 
 x1_mat = pfill(0.5,partition(axes(Ah,2)))
 r1_mat = fh-Ah*x1_mat
-consistent!(r1_mat)
+consistent!(r1_mat) |> fetch
 
 r1 = PVector(0.0,Vh.gids)
 x1 = PVector(0.0,Vh.gids)
@@ -99,7 +99,7 @@ rp_mat = pfill(0.0,partition(axes(Ahp,2)))
 xp_mat = pfill(0.0,partition(axes(Ahp,2)))
 
 copy!(r1,r1_mat)
-consistent!(r1)
+consistent!(r1) |> fetch
 PBS.prolongate!(rp,Ph,r1)
 
 copy!(rp_mat,rp)
@@ -115,7 +115,7 @@ copy!(x1_mat,x1)
 
 x2_mat = pfill(0.5,partition(axes(Ah,2)))
 r2_mat = fh-Ah*x2_mat
-consistent!(r2_mat)
+consistent!(r2_mat) |> fetch
 solve!(x2_mat,Mns,r2_mat)
 
 
@@ -123,8 +123,8 @@ solve!(x2_mat,Mns,r2_mat)
 
 x3_mat = pfill(0.5,partition(axes(Ah,2)))
 r3_mat = fh-Ah*x3_mat
-consistent!(r3_mat)
+consistent!(r3_mat) |> fetch
 solve!(x3_mat,Rns,r3_mat)
-consistent!(x3_mat)
+consistent!(x3_mat) |> fetch
 
 end

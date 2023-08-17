@@ -40,3 +40,15 @@ function generate_level_parts(root_parts::AbstractArray,num_procs_x_level::Vecto
   end
   return level_parts
 end
+
+my_print(x::PVector,s) = my_print(partition(x),s)
+
+function my_print(x::MPIArray,s)
+  parts = linear_indices(x)
+  i_am_main(parts) && println(s)
+  map(parts,x) do p,xi
+    sleep(p*0.2)
+    println("   > $p: ", xi)
+  end
+  sleep(2)
+end

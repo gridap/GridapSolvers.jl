@@ -40,7 +40,6 @@ export setup_transfer_operators
 export mul!
 
 include("SubpartitioningTools.jl")
-#include("GridapDistributedExtensions.jl")
 include("GridapFixes.jl")
 include("RefinementTools.jl")
 include("ModelHierarchies.jl")

@@ -98,7 +98,7 @@ function run(parts)
 
   x1_mat = pfill(0.5,partition(axes(Ah,2)))
   r1_mat = fh-Ah*x1_mat
-  consistent!(r1_mat)
+  consistent!(r1_mat) |> fetch
 
   r1 = pfill(0.0,partition(Vh.gids))
   x1 = pfill(0.0,partition(Vh.gids))
@@ -108,11 +108,11 @@ function run(parts)
   xp_mat = pfill(0.0,partition(axes(Ahp,2)))
 
   copy!(r1,r1_mat)
-  consistent!(r1)
+  consistent!(r1) |> fetch
   PBS.prolongate!(rp,Ph,r1) # OK
 
   copy!(rp_mat,rp)
-  consistent!(rp_mat)
+  consistent!(rp_mat) |> fetch
   solve!(xp_mat,LUns,rp_mat)
   copy!(xp,xp_mat) # Some big numbers appear here....
 
@@ -124,7 +124,7 @@ function run(parts)
 
   x2_mat = pfill(0.5,partition(axes(Ah,2)))
   r2_mat = fh-Ah*x2_mat
-  consistent!(r2_mat)
+  consistent!(r2_mat) |> fetch
   solve!(x2_mat,Mns,r2_mat)
 
   # ---- Smoother inside Richardson
@@ -133,7 +133,7 @@ function run(parts)
   r3_mat = fh-Ah*x3_mat
   consistent!(r3_mat)
   solve!(x3_mat,Rns,r3_mat)
-  consistent!(x3_mat)
+  consistent!(x3_mat) |> fetch
 
   # Outputs 
   res = Dict{String,Any}()

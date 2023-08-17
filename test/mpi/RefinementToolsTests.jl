@@ -20,13 +20,13 @@ function run(parts,num_parts_x_level,coarse_grid_partition,num_refs_coarse)
     mh = ModelHierarchy(parts,coarse_model,num_parts_x_level)
 
     # FE Spaces
-    order  = 1
-    sol(x) = x[1] + x[2]
+    order  = 2
+    sol(x) = x[1]^2 + x[2]^2 - 3.0*x[1]*x[2]
     reffe  = ReferenceFE(lagrangian,Float64,order)
     tests  = TestFESpace(mh,reffe;conformity=:H1,dirichlet_tags="boundary")
     trials = TrialFESpace(tests,sol)
 
-    quad_order = 3*order+1
+    quad_order = 2*order+1
     for lev in 1:num_levels-1
       fparts = get_level_parts(mh,lev)
       cparts = get_level_parts(mh,lev+1)
@@ -50,8 +50,9 @@ function run(parts,num_parts_x_level,coarse_grid_partition,num_refs_coarse)
         # Coarse FEFunction -> Fine FEFunction, by projection
         ah(u,v) = ∫(v⋅u)*dΩh
         lh(v)   = ∫(v⋅uH)*dΩh
-        Ah = assemble_matrix(ah,Uh,Vh)
-        bh = assemble_vector(lh,Vh)
+        oph = AffineFEOperator(ah,lh,Uh,Vh)
+        Ah  = get_matrix(oph)
+        bh  = get_vector(oph)
 
         xh = pfill(0.0,partition(axes(Ah,2)))
         IterativeSolvers.cg!(xh,Ah,bh;verbose=i_am_main(parts),reltol=1.0e-08)
@@ -60,12 +61,14 @@ function run(parts,num_parts_x_level,coarse_grid_partition,num_refs_coarse)
         _eh = uh-uH_projected
         eh  = sum(∫(_eh⋅_eh)*dΩh)
         i_am_main(parts) && println("Error H2h: ", eh)
+        @test eh < 1.0e-10
 
         # Fine FEFunction -> Coarse FEFunction, by projection
         aH(u,v) = ∫(v⋅u)*dΩH
         lH(v)   = ∫(v⋅uH_projected)*dΩhH
-        AH = assemble_matrix(aH,UH,VH)
-        bH = assemble_vector(lH,VH)
+        opH = AffineFEOperator(aH,lH,UH,VH)
+        AH  = get_matrix(opH)
+        bH  = get_vector(opH)
 
         xH = pfill(0.0,partition(axes(AH,2)))
         IterativeSolvers.cg!(xH,AH,bH;verbose=i_am_main(parts),reltol=1.0e-08)
@@ -74,6 +77,15 @@ function run(parts,num_parts_x_level,coarse_grid_partition,num_refs_coarse)
         _eH = uH-uh_projected
         eH  = sum(∫(_eH⋅_eH)*dΩH)
         i_am_main(parts) && println("Error h2H: ", eH)
+        @test eh < 1.0e-10
+
+        # Coarse FEFunction -> Fine FEFunction, by interpolation
+        uH_i = interpolate(uH,Uh)
+
+        _eh = uH_i-uh
+        eh  = sum(∫(_eh⋅_eh)*dΩh)
+        i_am_main(parts) && println("Error h2H: ", eh)
+        @test eh < 1.0e-10
       end
     end
   end

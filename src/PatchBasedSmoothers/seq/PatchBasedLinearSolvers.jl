@@ -112,7 +112,7 @@ function Gridap.Algebra.solve!(x_mat::PVector,ns::PatchBasedSmootherNumericalSet
   rp, dxp, r, x = caches
 
   copy!(r,r_mat)
-  consistent!(r)
+  consistent!(r) |> fetch
   prolongate!(rp,Ph,r)
   solve!(dxp,Ap_ns,rp)
   inject!(x,Ph,dxp,w,w_sums)

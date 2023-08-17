@@ -57,9 +57,9 @@ function Gridap.FESpaces.TestFESpace(mh::ModelHierarchyLevel{A,B,C,D},args...;kw
   FESpaceHierarchyLevel(mh.level,Vh,Vh_red)
 end
 
-function Gridap.FESpaces.TrialFESpace(a::FESpaceHierarchyLevel,u)
-  Uh     = !isa(a.fe_space,Nothing) ? TrialFESpace(a.fe_space,u) : nothing
-  Uh_red = !isa(a.fe_space_red,Nothing) ? TrialFESpace(a.fe_space_red,u) : nothing
+function Gridap.FESpaces.TrialFESpace(a::FESpaceHierarchyLevel,args...;kwargs...)
+  Uh     = !isa(a.fe_space,Nothing) ? TrialFESpace(a.fe_space,args...;kwargs...) : nothing
+  Uh_red = !isa(a.fe_space_red,Nothing) ? TrialFESpace(a.fe_space_red,args...;kwargs...) : nothing
   FESpaceHierarchyLevel(a.level,Uh,Uh_red)
 end
 
@@ -157,7 +157,11 @@ end
 
 function get_test_space(U::GridapDistributed.DistributedSingleFieldFESpace)
   spaces = map(local_views(U)) do U
-    U.space
+    if isa(U,Gridap.FESpaces.UnconstrainedFESpace)
+      U
+    else
+      U.space
+    end
   end
   return GridapDistributed.DistributedSingleFieldFESpace(spaces,U.gids,U.vector_type)
 end
