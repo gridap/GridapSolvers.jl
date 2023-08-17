@@ -13,9 +13,9 @@ function Gridap.Adaptivity.change_domain_n2o(f_fine,ftrian::Gridap.Adaptivity.Ad
 
     ### New Model -> Old Model
     # f_c2f[i_coarse] = [f_fine[i_fine_1], ..., f_fine[i_fine_nChildren]]
-    f_c2f = Gridap.Adaptivity.f2c_reindex(fine_mface_to_field,glue)
+    f_c2f = Gridap.Adaptivity.n2o_reindex(fine_mface_to_field,glue)
 
-    child_ids = Gridap.Adaptivity.f2c_reindex(glue.n2o_cell_to_child_id,glue)
+    child_ids = Gridap.Adaptivity.n2o_reindex(glue.n2o_cell_to_child_id,glue)
     rrules    = Gridap.Adaptivity.get_old_cell_refinement_rules(glue)
     coarse_mface_to_field = lazy_map(Gridap.Adaptivity.FineToCoarseField,f_c2f,rrules,child_ids)
 

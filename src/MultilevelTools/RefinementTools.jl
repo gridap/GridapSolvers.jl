@@ -28,8 +28,8 @@ function restrict_dofs!(fv_c::AbstractVector,
   fine_cell_ids    = get_cell_dof_ids(U_f)
   fine_cell_values = Gridap.Arrays.Table(lazy_map(Gridap.Arrays.PosNegReindex(fv_f,dv_f),fine_cell_ids.data),fine_cell_ids.ptrs)
   coarse_rrules    = Gridap.Adaptivity.get_old_cell_refinement_rules(glue)
-  f2c_cell_values  = Gridap.Adaptivity.f2c_reindex(fine_cell_values,glue)
-  child_ids        = Gridap.Adaptivity.f2c_reindex(glue.n2o_cell_to_child_id,glue)
+  f2c_cell_values  = Gridap.Adaptivity.n2o_reindex(fine_cell_values,glue)
+  child_ids        = Gridap.Adaptivity.n2o_reindex(glue.n2o_cell_to_child_id,glue)
 
   f2c_maps = lazy_map(FineToCoarseDofMap,coarse_rrules)
   caches   = lazy_map(Gridap.Arrays.return_cache,f2c_maps,f2c_cell_values,child_ids)

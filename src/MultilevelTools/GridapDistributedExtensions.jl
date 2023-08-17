@@ -65,7 +65,7 @@ function GridapDistributed.get_parts(x::VoidDistributedDiscreteModel)
   return x.parts
 end
 
-struct VoidDistributedTriangulation{Dc,Dp,A} <: GridapDistributed.DistributedGridapType
+struct VoidDistributedTriangulation{Dc,Dp,A} <: GridapDistributed.GridapType
   parts::A
   function VoidDistributedTriangulation(Dc::Int,Dp::Int,parts)
     A = typeof(parts)
@@ -85,7 +85,7 @@ function Gridap.Geometry.Triangulation(model::VoidDistributedDiscreteModel{Dc,Dp
   return VoidDistributedTriangulation(Dc,Dp,get_parts(model))
 end
 
-struct VoidDistributedFESpace{A} <: GridapDistributed.DistributedGridapType
+struct VoidDistributedFESpace{A} <: GridapDistributed.GridapType
   parts::A
 end
 
