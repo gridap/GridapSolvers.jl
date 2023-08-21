@@ -75,8 +75,8 @@ module PatchLinearSolverTests
   _,dPh,dxh,dVh = returns_PD_Ph_xh_Vh(dmodel);
 
   @test num_free_dofs(Ph) == num_free_dofs(dPh)
-  @test all(partition(dxh).items[1] .≈ xh[1:3])
-  @test all(partition(dxh).items[2] .≈ xh[4:end])
+  @test all(own_values(dxh).items[1] .≈ xh[1:4])
+  @test all(own_values(dxh).items[2] .≈ xh[5:end])
 
   #################################################
   
