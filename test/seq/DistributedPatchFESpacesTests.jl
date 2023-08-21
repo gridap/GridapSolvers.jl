@@ -19,16 +19,17 @@ parts = with_debug() do distribute
 end
 
 domain = (0.0,1.0,0.0,1.0)
-partition = (2,4)
-model = CartesianDiscreteModel(parts,ranks,domain,partition)
+domain_partition = (2,4)
+model = CartesianDiscreteModel(parts,ranks,domain,domain_partition)
 
-# order = 1
-# reffe = ReferenceFE(lagrangian,Float64,order)
-order = 0
-reffe = ReferenceFE(raviart_thomas,Float64,order)
+order = 1
+reffe = ReferenceFE(lagrangian,Float64,order)
+#order = 0
+#reffe = ReferenceFE(raviart_thomas,Float64,order)
 Vh = TestFESpace(model,reffe)
 PD = PBS.PatchDecomposition(model)
-Ph = PBS.PatchFESpace(model,reffe,DivConformity(),PD,Vh)
+Ph = PBS.PatchFESpace(model,reffe,H1Conformity(),PD,Vh)
+# Ph = PBS.PatchFESpace(model,reffe,DivConformity(),PD,Vh)
 
 # ---- Testing Prolongation and Injection ---- #
 
