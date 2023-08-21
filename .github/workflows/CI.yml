@@ -15,7 +15,6 @@ jobs:
     name: Julia ${{ matrix.version }} - ${{ matrix.os }} - ${{ matrix.arch }} - ${{ github.event_name }}
     runs-on: ${{ matrix.os }}
     env:
-      JULIA_MPI_BINARY: "system"
       P4EST_ROOT_DIR: "/opt/p4est/2.2/"
       JULIA_PETSC_LIBRARY: "/opt/petsc/3.18/lib/libpetsc"
     strategy:
@@ -93,6 +92,16 @@ jobs:
              --with-mpi=1 --with-64-bit-indices
           make
           make install
+      - name: add MPIPreferences
+        shell: julia --color=yes --project=. {0}
+        run: |
+          using Pkg
+          Pkg.add("MPIPreferences")
+      - name: use MPI system binary 
+        shell: julia --color=yes --project=. {0}
+        run: |
+          using MPIPreferences
+          MPIPreferences.use_system_binary()
       - uses: julia-actions/julia-buildpkg@latest
       - run: echo $PWD
       - run: julia --project=. -e 'using Pkg; Pkg.instantiate(); Pkg.build(); Pkg.precompile()'
