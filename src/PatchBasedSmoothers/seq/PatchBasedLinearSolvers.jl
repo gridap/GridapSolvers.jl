@@ -63,10 +63,10 @@ end
 function _patch_based_solver_caches(Ph::GridapDistributed.DistributedSingleFieldFESpace,
                                     Vh::GridapDistributed.DistributedSingleFieldFESpace,
                                     Ap::PSparseMatrix)
-  rp      = PVector(0.0,Ph.gids)
-  dxp     = PVector(0.0,Ph.gids)
-  r       = PVector(0.0,Vh.gids)
-  x       = PVector(0.0,Vh.gids)
+  rp      = pfill(0.0,partition(Ph.gids))
+  dxp     = pfill(0.0,partition(Ph.gids))
+  r       = pfill(0.0,partition(Vh.gids))
+  x       = pfill(0.0,partition(Vh.gids))
   return rp, dxp, r, x
 end
 

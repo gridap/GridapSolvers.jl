@@ -58,8 +58,8 @@ function mark_interface_facets!(model::GridapDistributed.DistributedDiscreteMode
     tag_to_entities = face_labeling.tag_to_entities
     d_to_dface_to_entity = face_labeling.d_to_dface_to_entity
   
-    # Create new tag & entity 
-    interface_entity = maximum(map(maximum,tag_to_entities)) + 1
+    # Create new tag & entity
+    interface_entity = maximum(map(x -> maximum(x;init=0),tag_to_entities)) + 1
     push!(tag_to_entities,[interface_entity])
     push!(tag_to_name,"interface")
 

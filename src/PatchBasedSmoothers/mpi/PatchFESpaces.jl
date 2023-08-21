@@ -15,20 +15,19 @@ function PatchFESpace(model::GridapDistributed.DistributedDiscreteModel,
   root_gids = get_face_gids(model,get_patch_root_dim(patch_decomposition))
 
   spaces = map(local_views(model),
-                     local_views(patch_decomposition),
-                     local_views(Vh),
-                     root_gids.partition) do model, patch_decomposition, Vh, partition
-    patches_mask = fill(false,length(partition.lid_to_gid))
-    patches_mask[partition.hid_to_lid] .= true # Mask ghost patch roots
+               local_views(patch_decomposition),
+               local_views(Vh),
+               partition(root_gids)) do model, patch_decomposition, Vh, partition
+    patches_mask = fill(false,local_length(partition))
+    patches_mask[ghost_to_local(partition)] .= true # Mask ghost patch roots
     PatchFESpace(model,reffe,conformity,patch_decomposition,Vh;patches_mask=patches_mask)
   end
   
-  parts  = get_parts(model)
+  # This PRange has no ghost dofs
   local_ndofs  = map(num_free_dofs,spaces)
   global_ndofs = sum(local_ndofs)
-  first_gdof, _ = xscan(+,reduce,local_ndofs,init=1)
-  # This PRange has no ghost dofs
-  gids = PRange(parts,global_ndofs,local_ndofs,first_gdof)
+  patch_partition = variable_partition(local_ndofs,global_ndofs,false)
+  gids = PRange(patch_partition)
   return GridapDistributed.DistributedSingleFieldFESpace(spaces,gids,get_vector_type(Vh))
 end
 
@@ -57,7 +56,7 @@ end
 function prolongate!(x::PVector,
                      Ph::GridapDistributed.DistributedSingleFieldFESpace,
                      y::PVector)
-   map(x.values,Ph.spaces,y.values) do x,Ph,y
+   map(partition(x),local_views(Ph),partition(y)) do x,Ph,y
      prolongate!(x,Ph,y)
    end
    consistent!(x) |> fetch
@@ -72,26 +71,26 @@ function inject!(x::PVector,
                  w_sums::PVector)
 
   #consistent!(y)
-  map(x.values,Ph.spaces,y.values,w.values,w_sums.values) do x,Ph,y,w,w_sums
+  map(partition(x),local_views(Ph),partition(y),partition(w),partition(w_sums)) do x,Ph,y,w,w_sums
     inject!(x,Ph,y,w,w_sums)
   end
 
   # Exchange local contributions 
-  assemble!(x)
+  assemble!(x) |> fetch
   consistent!(x) |> fetch # TO CONSIDER: Is this necessary? Do we need ghosts for later?
   return x
 end
 
 function compute_weight_operators(Ph::GridapDistributed.DistributedSingleFieldFESpace,Vh)
   # Local weights and partial sums
-  w = PVector(0.0,Ph.gids)
-  w_sums = PVector(0.0,Vh.gids)
-  map(w.values,w_sums.values,Ph.spaces) do w, w_sums, Ph
+  w = pfill(0.0,partition(Ph.gids))
+  w_sums = pfill(0.0,partition(Vh.gids))
+  map(partition(w),partition(w_sums),local_views(Ph)) do w, w_sums, Ph
     compute_weight_operators!(Ph,Ph.Vh,w,w_sums)
   end
   
   # partial sums -> global sums
-  assemble!(w_sums) # ghost -> owners
+  assemble!(w_sums) |> fetch# ghost -> owners
   consistent!(w_sums) |> fetch # repopulate ghosts with owner info
 
   return w, w_sums
