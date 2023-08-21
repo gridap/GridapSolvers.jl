@@ -44,16 +44,16 @@ end
 
 # Test/Trial FESpaces for ModelHierarchyLevels
 
-function Gridap.FESpaces.TestFESpace(
+function Gridap.FESpaces.FESpace(
       mh::ModelHierarchyLevel{A,B,C,Nothing},args...;kwargs...) where {A,B,C}
-  Vh = TestFESpace(get_model(mh),args...;kwargs...)
+  Vh = FESpace(get_model(mh),args...;kwargs...)
   FESpaceHierarchyLevel(mh.level,Vh,nothing)
 end
 
-function Gridap.FESpaces.TestFESpace(mh::ModelHierarchyLevel{A,B,C,D},args...;kwargs...) where {A,B,C,D}
+function Gridap.FESpaces.FESpace(mh::ModelHierarchyLevel{A,B,C,D},args...;kwargs...) where {A,B,C,D}
   cparts, _ = get_old_and_new_parts(mh.red_glue,Val(false))
-  Vh     = i_am_in(cparts) ? TestFESpace(get_model_before_redist(mh),args...;kwargs...) : nothing
-  Vh_red = TestFESpace(get_model(mh),args...;kwargs...)
+  Vh     = i_am_in(cparts) ? FESpace(get_model_before_redist(mh),args...;kwargs...) : nothing
+  Vh_red = FESpace(get_model(mh),args...;kwargs...)
   FESpaceHierarchyLevel(mh.level,Vh,Vh_red)
 end
 
@@ -65,7 +65,7 @@ end
 
 # Test/Trial FESpaces for ModelHierarchies/FESpaceHierarchy
 
-function Gridap.FESpaces.TestFESpace(mh::ModelHierarchy,args...;kwargs...)
+function Gridap.FESpaces.FESpace(mh::ModelHierarchy,args...;kwargs...)
   test_spaces = Vector{FESpaceHierarchyLevel}(undef,num_levels(mh))
   for i = 1:num_levels(mh)
     parts = get_level_parts(mh,i)
@@ -77,7 +77,7 @@ function Gridap.FESpaces.TestFESpace(mh::ModelHierarchy,args...;kwargs...)
   FESpaceHierarchy(mh,test_spaces)
 end
 
-function Gridap.FESpaces.TestFESpace(
+function Gridap.FESpaces.FESpace(
                       mh::ModelHierarchy,
                       arg_vector::AbstractVector{<:Union{ReferenceFE,Tuple{<:Gridap.ReferenceFEs.ReferenceFEName,Any,Any}}};
                       kwargs...)
