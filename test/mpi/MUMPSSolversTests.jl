@@ -1,4 +1,4 @@
-module RichardsonSmoothersTests
+module MUMPSSolversTests
 
 using Test
 using MPI
@@ -30,10 +30,10 @@ function set_ksp_options(ksp)
   @check_error_code GridapPETSc.PETSC.MatMumpsSetCntl(mumpsmat[], 3, 1.0e-6)
 end
 
-function main(parts,partition)
+function main(parts,nranks,domain_partition)
   GridapPETSc.with() do
     domain = (0,1,0,1)
-    model  = CartesianDiscreteModel(parts,domain,partition)
+    model  = CartesianDiscreteModel(parts,nranks,domain,domain_partition)
 
     sol(x) = x[1] + x[2]
     f(x)   = -Δ(sol)(x)
@@ -72,12 +72,12 @@ function main(parts,partition)
   end
 end
 
-partition = (32,32)
+domain_partition = (32,32)
 num_ranks = (2,2)
 parts = with_mpi() do distribute
   distribute(LinearIndices((prod(num_ranks),)))
 end
-main(parts,partition)
+main(parts,num_ranks,domain_partition)
 MPI.Finalize()
 
 end

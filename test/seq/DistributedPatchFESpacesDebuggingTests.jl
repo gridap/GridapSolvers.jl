@@ -14,16 +14,14 @@ using FillArrays
 using GridapSolvers
 import GridapSolvers.PatchBasedSmoothers as PBS
 
-#= 
-backend = SequentialBackend()
-ranks = (1,2)
-parts = get_part_ids(backend,ranks)
-=#
+function run(ranks)
+  parts = with_debug() do distribute
+    distribute(LinearIndices((prod(ranks),)))
+  end
 
-function run(parts)
   domain = (0.0,1.0,0.0,1.0)
   partition = (2,4)
-  model = CartesianDiscreteModel(parts,domain,partition)
+  model = CartesianDiscreteModel(parts,ranks,domain,partition)
 
   order = 0
   reffe = ReferenceFE(raviart_thomas,Float64,order)
@@ -36,10 +34,10 @@ function run(parts)
 
   w, w_sums = PBS.compute_weight_operators(Ph,Vh);
 
-  xP = PVector(1.0,Ph.gids)
-  yP = PVector(0.0,Ph.gids)
-  x = PVector(1.0,Vh.gids)
-  y = PVector(0.0,Vh.gids)
+  xP = pfill(1.0,partition(Ph.gids))
+  yP = pfill(0.0,partition(Ph.gids))
+  x  = pfill(1.0,partition(Vh.gids))
+  y  = pfill(0.0,partition(Vh.gids))
 
   PBS.prolongate!(yP,Ph,x)
   PBS.inject!(y,Ph,yP,w,w_sums)
@@ -155,13 +153,11 @@ function run(parts)
   return model,PD,Ph,Vh,res
 end
 
-backend = SequentialBackend()
+ranks = (1,1)
+Ms,PDs,Phs,Vhs,res_single = run(ranks);
 
-parts = get_part_ids(backend,(1,1))
-Ms,PDs,Phs,Vhs,res_single = run(parts);
-
-parts = get_part_ids(backend,(1,2))
-Mm,PDm,Phm,Vhm,res_multi = run(parts);
+ranks = (1,2)
+Mm,PDm,Phm,Vhm,res_multi = run(ranks);
 
 println(repeat('#',80))
 

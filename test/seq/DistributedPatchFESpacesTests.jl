@@ -13,13 +13,14 @@ using FillArrays
 using GridapSolvers
 import GridapSolvers.PatchBasedSmoothers as PBS
 
-backend = SequentialBackend()
 ranks = (1,2)
-parts = get_part_ids(backend,ranks)
+parts = with_debug() do distribute
+  distribute(LinearIndices((prod(ranks),)))
+end
 
 domain = (0.0,1.0,0.0,1.0)
 partition = (2,4)
-model = CartesianDiscreteModel(parts,domain,partition)
+model = CartesianDiscreteModel(parts,ranks,domain,partition)
 
 # order = 1
 # reffe = ReferenceFE(lagrangian,Float64,order)
@@ -33,10 +34,10 @@ Ph = PBS.PatchFESpace(model,reffe,DivConformity(),PD,Vh)
 
 w, w_sums = PBS.compute_weight_operators(Ph,Vh);
 
-xP = PVector(1.0,Ph.gids)
-yP = PVector(0.0,Ph.gids)
-x = PVector(1.0,Vh.gids)
-y = PVector(0.0,Vh.gids)
+xP = pfill(1.0,partition(Ph.gids))
+yP = pfill(0.0,partition(Ph.gids))
+x  = pfill(1.0,partition(Vh.gids))
+y  = pfill(0.0,partition(Vh.gids))
 
 PBS.prolongate!(yP,Ph,x)
 PBS.inject!(y,Ph,yP,w,w_sums)
@@ -91,10 +92,10 @@ x1_mat = pfill(0.5,partition(axes(Ah,2)))
 r1_mat = fh-Ah*x1_mat
 consistent!(r1_mat) |> fetch
 
-r1 = PVector(0.0,Vh.gids)
-x1 = PVector(0.0,Vh.gids)
-rp = PVector(0.0,Ph.gids)
-xp = PVector(0.0,Ph.gids)
+r1 = pfill(0.0,partition(Vh.gids))
+x1 = pfill(0.0,partition(Vh.gids))
+rp = pfill(0.0,partition(Ph.gids))
+xp = pfill(0.0,partition(Ph.gids))
 rp_mat = pfill(0.0,partition(axes(Ahp,2)))
 xp_mat = pfill(0.0,partition(axes(Ahp,2)))
 
