@@ -56,7 +56,7 @@ function get_block_ranges(B::AbstractMatrix,C::AbstractMatrix)
 end
 
 function get_block_ranges(B::PSparseMatrix,C::PSparseMatrix)
-  ranges = map_parts(B.owned_owned_values,C.owned_owned_values) do B,C
+  ranges = map(own_values(B),own_values(C)) do B,C
     get_block_ranges(B,C)
   end
   return ranges
@@ -78,7 +78,7 @@ function to_blocks!(x::AbstractVector,u,p,ranges)
 end
 
 function to_blocks!(x::PVector,u,p,ranges)
-  map_parts(own_values(x),own_values(u),own_values(p),ranges) do x,u,p,ranges
+  map(own_values(x),own_values(u),own_values(p),ranges) do x,u,p,ranges
     to_blocks!(x,u,p,ranges)
   end
   consistent!(u) |> fetch
@@ -94,7 +94,7 @@ function to_global!(x::AbstractVector,u,p,ranges)
 end
 
 function to_global!(x::PVector,u,p,ranges)
-  map_parts(x.owned_values,u.owned_values,p.owned_values,ranges) do x,u,p,ranges
+  map(owned_values(x),owned_values(u),owned_values(p),ranges) do x,u,p,ranges
     to_global!(x,u,p,ranges)
   end
   consistent!(x) |> fetch

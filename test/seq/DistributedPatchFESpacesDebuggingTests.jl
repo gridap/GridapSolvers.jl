@@ -207,7 +207,7 @@ for key in keys(res_single)
   val_m = res_multi[key]
 
   println(">>> ", key)
-  map(val_s.values) do v
+  map(partition(val_s)) do v
     println(transpose(v))
   end;
   map(own_values(val_m)) do v

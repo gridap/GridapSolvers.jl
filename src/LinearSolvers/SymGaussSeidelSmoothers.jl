@@ -69,7 +69,7 @@ function forward_sub!(L::LowerTriangular{Tv,Ti,<:SparseMatrixCSC},x::AbstractVec
 end
 
 function forward_sub!(L::AbstractArray{<:LowerTriangular},x::PVector)
-  map_parts(L,x.owned_values) do L, x
+  map(L,own_values(x)) do L, x
     forward_sub!(L, x)
   end
 end
@@ -91,7 +91,7 @@ function backward_sub!(U::UpperTriangular{Tv,Ti,<:SparseMatrixCSC}, x::AbstractV
 end
 
 function backward_sub!(U::AbstractArray{<:UpperTriangular},x::PVector)
-  map_parts(U,x.owned_values) do U, x
+  map(U,own_values(x)) do U, x
     backward_sub!(U, x)
   end
 end
@@ -136,12 +136,12 @@ end
 function _gs_decompose_matrix(A::PSparseMatrix{T,<:AbstractArray{MatType}}) where {T, MatType}
   values  = partition(A)
   indices = isa(PartitionedArrays.getany(values),SparseMatrixCSC) ? partition(axes(A,2)) : partition(axes(A,1))
-  L,U = map_parts(values,indices) do A, indices
+  L,U = map(values,indices) do A, indices
     D = DiagonalIndices(A,own_to_local(indices))
     L = LowerTriangular(A,D)
     U = UpperTriangular(A,D)
     return L,U
-  end
+  end |> tuple_of_arrays
   return L,U
 end
 

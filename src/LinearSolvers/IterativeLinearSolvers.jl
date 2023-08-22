@@ -98,7 +98,7 @@ function IterativeSolvers.ssor_iterable(x::PVector,
                                         b::PVector,
                                         ω::Real;
                                         maxiter::Int = 10)
-  iterables = map_parts(x.owned_values,A.owned_owned_values,b.owned_values) do _xi,_Aii,_bi
+  iterables = map(own_values(x),own_values(A),own_values(b)) do _xi,_Aii,_bi
     xi  = Vector(_xi)
     Aii = SparseMatrixCSC(_Aii)
     bi  = Vector(_bi)
@@ -168,13 +168,13 @@ function Gridap.Algebra.solve!(::SSORIterativeSolverType,
                                ns::IterativeLinearSolverNS,
                                y::PVector)
   iterables = ns.caches
-  map_parts(iterables,x.owned_values,y.owned_values) do iterable, xi, yi
+  map(iterables,own_values(x),own_values(y)) do iterable, xi, yi
     iterable.x .= xi
     iterable.b .= yi
     for item = iterable end
     xi .= iterable.x
     yi .= iterable.b
   end
-  exchange!(x)
+  consistent!(x) |> fetch
   return x
 end
