@@ -11,38 +11,27 @@ end
 # Row/Col vector allocations for parallel
 function allocate_row_vector(A::PSparseMatrix)
   T = eltype(A)
-  return PVector(zero(T),A.rows)
+  return pfill(zero(T),partition(axes(A,1)))
 end
 
 function allocate_col_vector(A::PSparseMatrix)
   T = eltype(A)
-  return PVector(zero(T),A.cols)
+  return pfill(zero(T),partition(axes(A,2)))
 end
 
-# Block Row/Col vector allocations for serial
-function allocate_row_vector(A::BlockMatrix{T}) where T
-  bsizes = blocksizes(A)
-  return mortar(map(s->zeros(T,s),bsizes[1]))
+# Row/Col vector allocations for blocks
+function allocate_row_vector(A::BlockMatrix)
+  return mortar(map(Aii->allocate_row_vector(Aii),blocks(A)[:,1]))
 end
 
-function allocate_col_vector(A::BlockMatrix{T}) where T
-  bsizes = blocksizes(A)
-  return mortar(map(s->zeros(T,s),bsizes[2]))
+function allocate_col_vector(A::BlockMatrix)
+  return mortar(map(Aii->allocate_col_vector(Aii),blocks(A)[1,:]))
 end
 
 # BlockArrays of PVectors/PSparseMatrices
 
 const BlockPVector{T} = BlockVector{T,<:Vector{<:PVector{T}}}
 const BlockPSparseMatrix{T,V} = BlockMatrix{T,<:Matrix{<:PSparseMatrix{V}}}
-
-# Block Row/Col vector allocations for parallel
-function allocate_row_vector(A::BlockPSparseMatrix)
-  return mortar(map(Aii->PVector(0.0,Aii.rows),A.blocks[:,1]))
-end
-
-function allocate_col_vector(A::BlockPSparseMatrix)
-  return mortar(map(Aii->PVector(1.0,Aii.cols),A.blocks[1,:]))
-end
 
 # BlockVector algebra 
 function LinearAlgebra.mul!(y::BlockVector,A::BlockMatrix,x::BlockVector)

@@ -14,16 +14,14 @@ using FillArrays
 using GridapSolvers
 import GridapSolvers.PatchBasedSmoothers as PBS
 
-#= 
-backend = SequentialBackend()
-ranks = (1,2)
-parts = get_part_ids(backend,ranks)
-=#
+function run(ranks)
+  parts = with_debug() do distribute
+    distribute(LinearIndices((prod(ranks),)))
+  end
 
-function run(parts)
   domain = (0.0,1.0,0.0,1.0)
   partition = (2,4)
-  model = CartesianDiscreteModel(parts,domain,partition)
+  model = CartesianDiscreteModel(parts,ranks,domain,partition)
 
   order = 0
   reffe = ReferenceFE(raviart_thomas,Float64,order)
@@ -36,10 +34,10 @@ function run(parts)
 
   w, w_sums = PBS.compute_weight_operators(Ph,Vh);
 
-  xP = PVector(1.0,Ph.gids)
-  yP = PVector(0.0,Ph.gids)
-  x = PVector(1.0,Vh.gids)
-  y = PVector(0.0,Vh.gids)
+  xP = pfill(1.0,partition(Ph.gids))
+  yP = pfill(0.0,partition(Ph.gids))
+  x  = pfill(1.0,partition(Vh.gids))
+  y  = pfill(0.0,partition(Vh.gids))
 
   PBS.prolongate!(yP,Ph,x)
   PBS.inject!(y,Ph,yP,w,w_sums)
@@ -96,23 +94,23 @@ function run(parts)
 
   # ---- Manual solve using LU ---- # 
 
-  x1_mat = PVector(0.5,Ah.cols)
+  x1_mat = pfill(0.5,partition(axes(Ah,2)))
   r1_mat = fh-Ah*x1_mat
-  exchange!(r1_mat)
+  consistent!(r1_mat) |> fetch
 
-  r1 = PVector(0.0,Vh.gids)
-  x1 = PVector(0.0,Vh.gids)
-  rp = PVector(0.0,Ph.gids)
-  xp = PVector(0.0,Ph.gids)
-  rp_mat = PVector(0.0,Ahp.cols)
-  xp_mat = PVector(0.0,Ahp.cols)
+  r1 = pfill(0.0,partition(Vh.gids))
+  x1 = pfill(0.0,partition(Vh.gids))
+  rp = pfill(0.0,partition(Ph.gids))
+  xp = pfill(0.0,partition(Ph.gids))
+  rp_mat = pfill(0.0,partition(axes(Ahp,2)))
+  xp_mat = pfill(0.0,partition(axes(Ahp,2)))
 
   copy!(r1,r1_mat)
-  exchange!(r1)
+  consistent!(r1) |> fetch
   PBS.prolongate!(rp,Ph,r1) # OK
 
   copy!(rp_mat,rp)
-  exchange!(rp_mat)
+  consistent!(rp_mat) |> fetch
   solve!(xp_mat,LUns,rp_mat)
   copy!(xp,xp_mat) # Some big numbers appear here....
 
@@ -122,18 +120,18 @@ function run(parts)
 
   # ---- Same using the PatchBasedSmoother ---- #
 
-  x2_mat = PVector(0.5,Ah.cols)
+  x2_mat = pfill(0.5,partition(axes(Ah,2)))
   r2_mat = fh-Ah*x2_mat
-  exchange!(r2_mat)
+  consistent!(r2_mat) |> fetch
   solve!(x2_mat,Mns,r2_mat)
 
   # ---- Smoother inside Richardson
 
-  x3_mat = PVector(0.5,Ah.cols)
+  x3_mat = pfill(0.5,partition(axes(Ah,2)))
   r3_mat = fh-Ah*x3_mat
-  exchange!(r3_mat)
+  consistent!(r3_mat)
   solve!(x3_mat,Rns,r3_mat)
-  exchange!(x3_mat)
+  consistent!(x3_mat) |> fetch
 
   # Outputs 
   res = Dict{String,Any}()
@@ -155,17 +153,15 @@ function run(parts)
   return model,PD,Ph,Vh,res
 end
 
-backend = SequentialBackend()
+ranks = (1,1)
+Ms,PDs,Phs,Vhs,res_single = run(ranks);
 
-parts = get_part_ids(backend,(1,1))
-Ms,PDs,Phs,Vhs,res_single = run(parts);
-
-parts = get_part_ids(backend,(1,2))
-Mm,PDm,Phm,Vhm,res_multi = run(parts);
+ranks = (1,2)
+Mm,PDm,Phm,Vhm,res_multi = run(ranks);
 
 println(repeat('#',80))
 
-map_parts(local_views(Ms)) do model
+map(local_views(Ms)) do model
   cell_ids = get_cell_node_ids(model)
   cell_coords = get_cell_coordinates(model)
   display(reshape(cell_ids,length(cell_ids)))
@@ -178,29 +174,29 @@ vertex_gids = get_face_gids(Mm,0)
 edge_gids   = get_face_gids(Mm,1)
 
 println(">>> Cell gids")
-map_parts(cell_gids.partition) do p
+map(cell_gids.partition) do p
   println(transpose(p.lid_to_ohid))
 end;
 println(repeat('-',80))
 
 println(">>> Vertex gids")
-map_parts(vertex_gids.partition) do p
+map(vertex_gids.partition) do p
   println(transpose(p.lid_to_ohid))
 end;
 println(repeat('-',80))
 
 println(">>> Edge gids")
-map_parts(edge_gids.partition) do p
+map(edge_gids.partition) do p
   println(transpose(p.lid_to_ohid))
 end;
 
 println(repeat('#',80))
 
-map_parts(local_views(Phs)) do Ph
+map(local_views(Phs)) do Ph
   display(Ph.patch_cell_dofs_ids)
 end;
 
-map_parts(local_views(Phm)) do Ph
+map(local_views(Phm)) do Ph
   display(Ph.patch_cell_dofs_ids)
 end;
 
@@ -211,10 +207,10 @@ for key in keys(res_single)
   val_m = res_multi[key]
 
   println(">>> ", key)
-  map_parts(val_s.values) do v
+  map(val_s.values) do v
     println(transpose(v))
   end;
-  map_parts(val_m.owned_values) do v
+  map(own_values(val_m)) do v
     println(transpose(v))
   end;
   println(repeat('-',80))

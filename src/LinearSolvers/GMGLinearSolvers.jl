@@ -116,11 +116,11 @@ function setup_coarsest_solver_cache(mh::ModelHierarchy,coarsest_solver::LinearS
   if i_am_in(parts)
     mat = smatrices[nlevs]
     if (num_parts(parts) == 1) # Serial
-      cache = map_parts(mat.owned_owned_values) do Ah
+      cache = map(own_values(mat)) do Ah
         ss  = symbolic_setup(coarsest_solver, Ah)
         numerical_setup(ss, Ah)
       end
-      cache = get_part(cache)
+      cache = PartitionedArrays.getany(cache)
     else # Parallel
       ss = symbolic_setup(coarsest_solver, mat)
       cache = numerical_setup(ss, mat)
@@ -136,17 +136,17 @@ function setup_coarsest_solver_cache(mh::ModelHierarchy,coarsest_solver::PETScLi
   if i_am_in(parts)
     mat   = smatrices[nlevs]
     if (num_parts(parts) == 1) # Serial
-      cache = map_parts(mat.owned_owned_values) do Ah
+      cache = map(own_values(mat)) do Ah
         rh  = convert(PETScVector,fill(0.0,size(A,2)))
         xh  = convert(PETScVector,fill(0.0,size(A,2)))
         ss  = symbolic_setup(coarsest_solver, Ah)
         ns  = numerical_setup(ss, Ah)
         return ns, xh, rh
       end
-      cache = get_part(cache)
+      cache = PartitionedArrays.getany(cache)
     else # Parallel
-      rh = convert(PETScVector,PVector(0.0,mat.cols))
-      xh = convert(PETScVector,PVector(0.0,mat.cols))
+      rh = convert(PETScVector,pfill(0.0,partition(axes(mat,2))))
+      xh = convert(PETScVector,pfill(0.0,partition(axes(mat,2))))
       ss = symbolic_setup(coarsest_solver, mat)
       ns = numerical_setup(ss, mat)
       cache = ns, xh, rh
@@ -183,9 +183,9 @@ function allocate_work_vectors(mh::ModelHierarchy,smatrices::Vector{<:AbstractMa
   return work_vectors
 end
 
-function solve_coarsest_level!(parts::AbstractPData,::LinearSolver,xh::PVector,rh::PVector,caches)
+function solve_coarsest_level!(parts::AbstractArray,::LinearSolver,xh::PVector,rh::PVector,caches)
   if (num_parts(parts) == 1)
-    map_parts(xh.owned_values,rh.owned_values) do xh, rh
+    map(own_values(xh),own_values(rh)) do xh, rh
        solve!(xh,caches,rh)
     end
   else
@@ -193,10 +193,10 @@ function solve_coarsest_level!(parts::AbstractPData,::LinearSolver,xh::PVector,r
   end
 end
 
-function solve_coarsest_level!(parts::AbstractPData,::PETScLinearSolver,xh::PVector,rh::PVector,caches)
+function solve_coarsest_level!(parts::AbstractArray,::PETScLinearSolver,xh::PVector,rh::PVector,caches)
   solver_ns, xh_petsc, rh_petsc = caches
   if (num_parts(parts) == 1)
-    map_parts(xh.owned_values,rh.owned_values) do xh, rh
+    map(own_values(xh),own_values(rh)) do xh, rh
       copy!(rh_petsc,rh)
       solve!(xh_petsc,solver_ns,rh_petsc)
       copy!(xh,xh_petsc)

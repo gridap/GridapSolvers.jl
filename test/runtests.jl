@@ -32,6 +32,7 @@ function run_tests(testdir)
                  "RedistributeToolsTests.jl",
                  "RefinementToolsTests.jl",
                  "RichardsonSmoothersTests.jl",
+                 "ModelHierarchiesTests.jl",
                  "GMGLinearSolversPoissonTests.jl",
                  "GMGLinearSolversLaplacianTests.jl",
                  "GMGLinearSolversVectorLaplacianTests.jl",
@@ -41,17 +42,13 @@ function run_tests(testdir)
                  "RestrictDofsTests.jl",
                  "PRefinementGMGLinearSolversPoissonTests.jl"]
           np = 4
-          #extra_args = "-s 2 2 -r 2"
-          extra_args = ""
-        elseif f in ["ModelHierarchiesTests.jl"]
-          np = 6
           extra_args = ""
         else
           np = 4 # nprocs
           extra_args = ""
         end
         if ! image_file_exists
-          cmd = `$cmd -n $(np) --allow-run-as-root --oversubscribe $(Base.julia_cmd()) --project=. $(joinpath(testdir, f)) $(split(extra_args))`
+          cmd = `$cmd -n $(np) --allow-run-as-root --oversubscribe $(Base.julia_cmd()) --project=. $(joinpath(testdir, f))`
         else
           cmd = `$cmd -n $(np) --allow-run-as-root --oversubscribe $(Base.julia_cmd()) -J$(image_file_path) --project=. $(joinpath(testdir, f)) $(split(extra_args))`
         end

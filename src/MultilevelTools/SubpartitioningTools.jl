@@ -1,27 +1,37 @@
 
-function generate_subparts(root_parts::AbstractPData,subpart_size::Integer)
-  root_comm = root_parts.comm
-  rank = MPI.Comm_rank(root_comm)
-  size = MPI.Comm_size(root_comm)
-  Gridap.Helpers.@check all(subpart_size .<= size)
-  Gridap.Helpers.@check all(subpart_size .>= 1)
-
-  if rank < subpart_size
-    comm = MPI.Comm_split(root_comm, 0, 0)
+function num_parts(comm::MPI.Comm)
+  if comm != MPI.COMM_NULL
+    nparts = MPI.Comm_size(comm)
   else
-    comm = MPI.Comm_split(root_comm, MPI.MPI_UNDEFINED, MPI.MPI_UNDEFINED)
+    nparts = -1
   end
-  return get_part_ids(comm)
+  nparts
 end
 
-function generate_level_parts(root_parts::AbstractPData,last_level_parts::AbstractPData,level_parts_size::Integer)
+num_parts(comm::MPIArray) = num_parts(comm.comm)
+num_parts(comm::GridapDistributed.MPIVoidVector) = num_parts(comm.comm)
+
+function get_part_id(comm::MPI.Comm)
+  if comm != MPI.COMM_NULL
+    id = MPI.Comm_rank(comm)+1
+  else
+    id = -1
+  end
+  id
+end
+
+i_am_in(comm::MPI.Comm) = get_part_id(comm) >=0
+i_am_in(comm::MPIArray) = i_am_in(comm.comm)
+i_am_in(comm::GridapDistributed.MPIVoidVector) = i_am_in(comm.comm)
+
+function generate_level_parts(root_parts::AbstractArray,last_level_parts::AbstractArray,level_parts_size::Integer)
   if level_parts_size == num_parts(last_level_parts)
     return last_level_parts
   end
   return generate_subparts(root_parts,level_parts_size)
 end
 
-function generate_level_parts(root_parts::AbstractPData,num_procs_x_level::Vector{<:Integer})
+function generate_level_parts(root_parts::AbstractArray,num_procs_x_level::Vector{<:Integer})
   num_levels  = length(num_procs_x_level)
   level_parts = Vector{typeof(parts)}(undef,num_levels)
   level_parts[1] = generate_subparts(root_parts,num_procs_x_level[1])
@@ -29,4 +39,16 @@ function generate_level_parts(root_parts::AbstractPData,num_procs_x_level::Vecto
     level_parts[l] = generate_level_parts(root_parts,level_parts[l-1],num_procs_x_level[l])
   end
   return level_parts
+end
+
+my_print(x::PVector,s) = my_print(partition(x),s)
+
+function my_print(x::MPIArray,s)
+  parts = linear_indices(x)
+  i_am_main(parts) && println(s)
+  map(parts,x) do p,xi
+    sleep(p*0.2)
+    println("   > $p: ", xi)
+  end
+  sleep(2)
 end

@@ -18,7 +18,7 @@ end
 """
 """
 struct ModelHierarchy
-  level_parts :: Vector{PartitionedArrays.AbstractPData}
+  level_parts :: Vector{PartitionedArrays.AbstractArray}
   levels      :: Vector{ModelHierarchyLevel}
 end
 
@@ -50,7 +50,7 @@ has_refinement(a::ModelHierarchyLevel{A,Nothing}) where A = false
                          each level into. We need `num_procs_x_level[end]` to be equal to 
                          the number of parts of `model`.
 """
-function ModelHierarchy(root_parts        ::AbstractPData,
+function ModelHierarchy(root_parts        ::AbstractArray,
                         model             ::GridapDistributed.DistributedDiscreteModel,
                         num_procs_x_level ::Vector{<:Integer};
                         mesh_refinement = true,
@@ -58,10 +58,10 @@ function ModelHierarchy(root_parts        ::AbstractPData,
 
   # Request correct number of parts from MAIN
   model_parts  = get_parts(model)
-  my_num_parts = map_parts(root_parts) do _p
+  my_num_parts = map(root_parts) do _p
     num_parts(model_parts) # == -1 if !i_am_in(my_parts)
   end
-  main_num_parts = get_main_part(my_num_parts)
+  main_num_parts = PartitionedArrays.getany(emit(my_num_parts))
 
   if main_num_parts == num_procs_x_level[end] # Coarsest model
     if mesh_refinement
@@ -80,12 +80,12 @@ function ModelHierarchy(root_parts        ::AbstractPData,
   @error "Model parts do not correspond to coarsest or finest parts!"
 end
 
-function _model_hierarchy_without_refinement_bottom_up(root_parts::AbstractPData,
+function _model_hierarchy_without_refinement_bottom_up(root_parts::AbstractArray{T},
                                                        bottom_model::GridapDistributed.DistributedDiscreteModel,
-                                                       num_procs_x_level::Vector{<:Integer})
-  num_levels         = length(num_procs_x_level)
-  level_parts        = Vector{typeof(root_parts)}(undef,num_levels)
-  meshes             = Vector{ModelHierarchyLevel}(undef,num_levels)
+                                                       num_procs_x_level::Vector{<:Integer}) where T
+  num_levels  = length(num_procs_x_level)
+  level_parts = Vector{Union{typeof(root_parts),GridapDistributed.MPIVoidVector{T}}}(undef,num_levels)
+  meshes      = Vector{ModelHierarchyLevel}(undef,num_levels)
 
   level_parts[num_levels] = get_parts(bottom_model)
   meshes[num_levels] = ModelHierarchyLevel(num_levels,bottom_model,nothing,nothing,nothing)
@@ -103,15 +103,15 @@ function _model_hierarchy_without_refinement_bottom_up(root_parts::AbstractPData
   end
 
   mh = ModelHierarchy(level_parts,meshes)
-  return convert_to_void_models(mh)
+  return mh
 end
 
-function _model_hierarchy_without_refinement_top_down(root_parts::AbstractPData,
+function _model_hierarchy_without_refinement_top_down(root_parts::AbstractArray{T},
                                                       top_model::GridapDistributed.DistributedDiscreteModel,
-                                                      num_procs_x_level::Vector{<:Integer})
-  num_levels         = length(num_procs_x_level)
-  level_parts        = Vector{typeof(root_parts)}(undef,num_levels)
-  meshes             = Vector{ModelHierarchyLevel}(undef,num_levels)
+                                                      num_procs_x_level::Vector{<:Integer}) where T
+  num_levels  = length(num_procs_x_level)
+  level_parts = Vector{Union{typeof(root_parts),GridapDistributed.MPIVoidVector{T}}}(undef,num_levels)
+  meshes      = Vector{ModelHierarchyLevel}(undef,num_levels)
 
   level_parts[1] = get_parts(top_model)
   model = top_model
@@ -129,17 +129,17 @@ function _model_hierarchy_without_refinement_top_down(root_parts::AbstractPData,
   meshes[num_levels] = ModelHierarchyLevel(num_levels,model,nothing,nothing,nothing)
 
   mh = ModelHierarchy(level_parts,meshes)
-  return convert_to_void_models(mh)
+  return mh
 end
 
-function _model_hierarchy_by_refinement(root_parts::AbstractPData,
+function _model_hierarchy_by_refinement(root_parts::AbstractArray{T},
                                         coarsest_model::GridapDistributed.DistributedDiscreteModel,
                                         num_procs_x_level::Vector{<:Integer}; 
-                                        num_refs_x_level=nothing)
+                                        num_refs_x_level=nothing) where T
   # TODO: Implement support for num_refs_x_level? (future work)
-  num_levels         = length(num_procs_x_level)
-  level_parts        = Vector{typeof(root_parts)}(undef,num_levels)
-  meshes             = Vector{ModelHierarchyLevel}(undef,num_levels)
+  num_levels  = length(num_procs_x_level)
+  level_parts = Vector{Union{typeof(root_parts),GridapDistributed.MPIVoidVector{T}}}(undef,num_levels)
+  meshes      = Vector{ModelHierarchyLevel}(undef,num_levels)
 
   level_parts[num_levels] = get_parts(coarsest_model)
   meshes[num_levels] = ModelHierarchyLevel(num_levels,coarsest_model,nothing,nothing,nothing)
@@ -164,14 +164,14 @@ function _model_hierarchy_by_refinement(root_parts::AbstractPData,
   return convert_to_adapted_models(mh)
 end
 
-function _model_hierarchy_by_coarsening(root_parts::AbstractPData,
+function _model_hierarchy_by_coarsening(root_parts::AbstractArray{T},
                                         finest_model::GridapDistributed.DistributedDiscreteModel,
                                         num_procs_x_level::Vector{<:Integer}; 
-                                        num_refs_x_level=nothing)
+                                        num_refs_x_level=nothing) where T
   # TODO: Implement support for num_refs_x_level? (future work)
-  num_levels         = length(num_procs_x_level)
-  level_parts        = Vector{typeof(root_parts)}(undef,num_levels)
-  meshes             = Vector{ModelHierarchyLevel}(undef,num_levels)
+  num_levels  = length(num_procs_x_level)
+  level_parts = Vector{Union{typeof(root_parts),GridapDistributed.MPIVoidVector{T}}}(undef,num_levels)
+  meshes      = Vector{ModelHierarchyLevel}(undef,num_levels)
   
   level_parts[1] = get_parts(finest_model)
   model = finest_model
@@ -202,34 +202,16 @@ function convert_to_adapted_models(mh::ModelHierarchy)
   levels = Vector{ModelHierarchyLevel}(undef,nlevs)
   for lev in 1:nlevs-1
     cparts = get_level_parts(mh,lev+1)
+    mhlev  = get_level(mh,lev)
     if i_am_in(cparts)
-      model       = get_model_before_redist(mh,lev)
-      parent      = get_model(mh,lev+1)
-      ref_glue    = mh.levels[lev].ref_glue
-      model_ref   = GridapDistributed.DistributedAdaptedDiscreteModel(model,parent,ref_glue)
-    else
       model     = get_model_before_redist(mh,lev)
-      model_ref = VoidDistributedDiscreteModel(model)
-    end
-    levels[lev] = ModelHierarchyLevel(lev,model_ref,mh.levels[lev].ref_glue,mh.levels[lev].model_red,mh.levels[lev].red_glue)
-  end
-  levels[nlevs] = mh.levels[nlevs]
-
-  return ModelHierarchy(mh.level_parts,levels)
-end
-
-function convert_to_void_models(mh::ModelHierarchy)
-  nlevs  = num_levels(mh)
-  levels = Vector{ModelHierarchyLevel}(undef,nlevs)
-  for lev in 1:nlevs-1
-    cparts = get_level_parts(mh,lev+1)
-    if i_am_in(cparts)
-      model_ref = get_model_before_redist(mh,lev)
+      parent    = get_model(mh,lev+1)
+      ref_glue  = mhlev.ref_glue
+      model_ref = GridapDistributed.DistributedAdaptedDiscreteModel(model,parent,ref_glue)
     else
-      model     = get_model_before_redist(mh,lev)
-      model_ref = VoidDistributedDiscreteModel(model)
+      model_ref = nothing
     end
-    levels[lev] = ModelHierarchyLevel(lev,model_ref,mh.levels[lev].ref_glue,mh.levels[lev].model_red,mh.levels[lev].red_glue)
+    levels[lev] = ModelHierarchyLevel(lev,model_ref,mhlev.ref_glue,mhlev.model_red,mhlev.red_glue)
   end
   levels[nlevs] = mh.levels[nlevs]
 

@@ -79,7 +79,7 @@ function main(parts, coarse_grid_partition, num_parts_x_level, num_refs_coarse, 
     ns = numerical_setup(ss,A)
 
     # Solve 
-    x = PVector(0.0,A.cols)
+    x = pfill(0.0,partition(axes(A,2)))
     x, history = IterativeSolvers.cg!(x,A,b;
                           verbose=i_am_main(parts),
                           reltol=1.0e-8,
@@ -118,8 +118,12 @@ num_refs_coarse = 2
 
 α = 1.0
 num_parts_x_level = [4,2,1]
-ranks = num_parts_x_level[1]
-num_iters, num_free_dofs2 = with_backend(main,MPIBackend(),ranks,coarse_grid_partition,num_parts_x_level,num_refs_coarse,order,α)
+num_ranks = num_parts_x_level[1]
+parts = with_mpi() do distribute
+  distribute(LinearIndices((prod(num_ranks),)))
+end
+
+num_iters, num_free_dofs2 = main(parts,coarse_grid_partition,num_parts_x_level,num_refs_coarse,order,α)
 
 """
 

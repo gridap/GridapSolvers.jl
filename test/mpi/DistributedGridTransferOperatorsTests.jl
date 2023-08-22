@@ -34,7 +34,7 @@ function run(parts,num_parts_x_level,coarse_grid_partition,num_refs_coarse)
     ops3 = setup_transfer_operators(trials, qdegree; restriction_method=:dof_mask, mode=:solution)
     restrictions3, prolongations3 = ops3
 
-    a(u,v,dΩ) = ∫(∇(v)⋅∇(u))*dΩ
+    a(u,v,dΩ) = ∫(v⋅u)*dΩ
     l(v,dΩ)   = ∫(v⋅u)*dΩ
     mats, A, b = compute_hierarchy_matrices(trials,a,l,qdegree)
 
@@ -45,17 +45,17 @@ function run(parts,num_parts_x_level,coarse_grid_partition,num_refs_coarse)
       if i_am_in(parts_h)
         i_am_main(parts_h) && println("Lev : ", lev)
         Ah  = mats[lev]
-        xh  = PVector(1.0,Ah.cols)
-        yh1 = PVector(0.0,Ah.cols)
-        yh2 = PVector(0.0,Ah.cols)
-        yh3 = PVector(0.0,Ah.cols)
+        xh  = pfill(1.0,partition(axes(Ah,2)))
+        yh1 = pfill(0.0,partition(axes(Ah,2)))
+        yh2 = pfill(0.0,partition(axes(Ah,2)))
+        yh3 = pfill(0.0,partition(axes(Ah,2)))
 
         if i_am_in(parts_H)
           AH  = mats[lev+1]
-          xH  = PVector(1.0,AH.cols)
-          yH1 = PVector(0.0,AH.cols)
-          yH2 = PVector(0.0,AH.cols)
-          yH3 = PVector(0.0,AH.cols)
+          xH  = pfill(1.0,partition(axes(AH,2)))
+          yH1 = pfill(0.0,partition(axes(AH,2)))
+          yH2 = pfill(0.0,partition(axes(AH,2)))
+          yH3 = pfill(0.0,partition(axes(AH,2)))
         else
           xH  = nothing
           yH1 = nothing
@@ -75,11 +75,11 @@ function run(parts,num_parts_x_level,coarse_grid_partition,num_refs_coarse)
         mul!(yH3,R3,xh)
 
         if i_am_in(parts_H)
-          y_ref = PVector(1.0,AH.cols)
-          tests = map_parts(y_ref.owned_values,yH1.owned_values,yH2.owned_values,yH3.owned_values) do y_ref,y1,y2,y3
+          y_ref = pfill(1.0,partition(axes(AH,2)))
+          tests = map(own_values(y_ref),own_values(yH1),own_values(yH2),own_values(yH3)) do y_ref,y1,y2,y3
             map(y -> norm(y-y_ref) < 1.e-3 ,[y1,y2,y3])
           end
-          @test all(tests.part)
+          @test all(PartitionedArrays.getany(tests))
         end
 
         # ----    Prolongation    ----
@@ -93,11 +93,11 @@ function run(parts,num_parts_x_level,coarse_grid_partition,num_refs_coarse)
         P3 = prolongations3[lev]
         mul!(yh3,P3,xH)
 
-        y_ref = PVector(1.0,Ah.cols)
-        tests = map_parts(y_ref.owned_values,yh1.owned_values,yh2.owned_values,yh2.owned_values) do y_ref,y1,y2,y3
+        y_ref = pfill(1.0,partition(axes(Ah,2)))
+        tests = map(own_values(y_ref),own_values(yh1),own_values(yh2),own_values(yh3)) do y_ref,y1,y2,y3
           map(y -> norm(y-y_ref) < 1.e-3 ,[y1,y2,y3])
         end
-        @test all(tests.part)
+        @test all(PartitionedArrays.getany(tests))
 
       end
     end
@@ -109,7 +109,12 @@ num_trees         = (1,1)     # Number of initial P4est trees
 num_refs_coarse   = 2         # Number of initial refinements
 
 num_ranks = num_parts_x_level[1]
-with_backend(run,MPIBackend(),num_ranks,num_parts_x_level,num_trees,num_refs_coarse)
+
+parts = with_mpi() do distribute
+  distribute(LinearIndices((prod(num_ranks),)))
+end
+run(parts,num_parts_x_level,num_trees,num_refs_coarse)
+
 println("AT THE END")
 MPI.Finalize()
 end

@@ -42,31 +42,30 @@ function get_fe_space_before_redist(fh::FESpaceHierarchy,lev::Int)
   get_fe_space_before_redist(fh[lev])
 end
 
-function Gridap.FESpaces.TestFESpace(
+# Test/Trial FESpaces for ModelHierarchyLevels
+
+function Gridap.FESpaces.FESpace(
       mh::ModelHierarchyLevel{A,B,C,Nothing},args...;kwargs...) where {A,B,C}
-  Vh = TestFESpace(get_model(mh),args...;kwargs...)
+  Vh = FESpace(get_model(mh),args...;kwargs...)
   FESpaceHierarchyLevel(mh.level,Vh,nothing)
 end
 
-function Gridap.FESpaces.TestFESpace(
-      mh::ModelHierarchyLevel{A,B,C,D},args...;kwargs...) where {A,B,C,D}
-  Vh     = TestFESpace(get_model_before_redist(mh),args...;kwargs...)
-  Vh_red = TestFESpace(get_model(mh),args...;kwargs...)
+function Gridap.FESpaces.FESpace(mh::ModelHierarchyLevel{A,B,C,D},args...;kwargs...) where {A,B,C,D}
+  cparts, _ = get_old_and_new_parts(mh.red_glue,Val(false))
+  Vh     = i_am_in(cparts) ? FESpace(get_model_before_redist(mh),args...;kwargs...) : nothing
+  Vh_red = FESpace(get_model(mh),args...;kwargs...)
   FESpaceHierarchyLevel(mh.level,Vh,Vh_red)
 end
 
-function Gridap.FESpaces.TrialFESpace(a::FESpaceHierarchyLevel{A,Nothing},u) where {A}
-  Uh = TrialFESpace(a.fe_space,u)
-  FESpaceHierarchyLevel(a.level,Uh,nothing)
-end
-
-function Gridap.FESpaces.TrialFESpace(a::FESpaceHierarchyLevel{A,B},u) where {A,B}
-  Uh     = TrialFESpace(a.fe_space,u)
-  Uh_red = TrialFESpace(a.fe_space_red,u)
+function Gridap.FESpaces.TrialFESpace(a::FESpaceHierarchyLevel,args...;kwargs...)
+  Uh     = !isa(a.fe_space,Nothing) ? TrialFESpace(a.fe_space,args...;kwargs...) : nothing
+  Uh_red = !isa(a.fe_space_red,Nothing) ? TrialFESpace(a.fe_space_red,args...;kwargs...) : nothing
   FESpaceHierarchyLevel(a.level,Uh,Uh_red)
 end
 
-function Gridap.FESpaces.TestFESpace(mh::ModelHierarchy,args...;kwargs...)
+# Test/Trial FESpaces for ModelHierarchies/FESpaceHierarchy
+
+function Gridap.FESpaces.FESpace(mh::ModelHierarchy,args...;kwargs...)
   test_spaces = Vector{FESpaceHierarchyLevel}(undef,num_levels(mh))
   for i = 1:num_levels(mh)
     parts = get_level_parts(mh,i)
@@ -78,7 +77,7 @@ function Gridap.FESpaces.TestFESpace(mh::ModelHierarchy,args...;kwargs...)
   FESpaceHierarchy(mh,test_spaces)
 end
 
-function Gridap.FESpaces.TestFESpace(
+function Gridap.FESpaces.FESpace(
                       mh::ModelHierarchy,
                       arg_vector::AbstractVector{<:Union{ReferenceFE,Tuple{<:Gridap.ReferenceFEs.ReferenceFEName,Any,Any}}};
                       kwargs...)
@@ -119,6 +118,8 @@ function Gridap.FESpaces.TrialFESpace(a::FESpaceHierarchy)
   FESpaceHierarchy(a.mh,trial_spaces)
 end
 
+# Computing system matrices
+
 function compute_hierarchy_matrices(trials::FESpaceHierarchy,a::Function,l::Function,qdegree::Integer)
   return compute_hierarchy_matrices(trials,a,l,Fill(qdegree,num_levels(trials)))
 end
@@ -152,4 +153,15 @@ function compute_hierarchy_matrices(trials::FESpaceHierarchy,a::Function,l::Func
     end
   end
   return mats, A, b
+end
+
+function get_test_space(U::GridapDistributed.DistributedSingleFieldFESpace)
+  spaces = map(local_views(U)) do U
+    if isa(U,Gridap.FESpaces.UnconstrainedFESpace)
+      U
+    else
+      U.space
+    end
+  end
+  return GridapDistributed.DistributedSingleFieldFESpace(spaces,U.gids,U.vector_type)
 end

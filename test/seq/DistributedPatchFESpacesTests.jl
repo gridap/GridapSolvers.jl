@@ -13,13 +13,14 @@ using FillArrays
 using GridapSolvers
 import GridapSolvers.PatchBasedSmoothers as PBS
 
-backend = SequentialBackend()
 ranks = (1,2)
-parts = get_part_ids(backend,ranks)
+parts = with_debug() do distribute
+  distribute(LinearIndices((prod(ranks),)))
+end
 
 domain = (0.0,1.0,0.0,1.0)
-partition = (2,4)
-model = CartesianDiscreteModel(parts,domain,partition)
+domain_partition = (2,4)
+model = CartesianDiscreteModel(parts,ranks,domain,domain_partition)
 
 order = 1
 reffe = ReferenceFE(lagrangian,Float64,order)
@@ -28,15 +29,16 @@ reffe = ReferenceFE(lagrangian,Float64,order)
 Vh = TestFESpace(model,reffe)
 PD = PBS.PatchDecomposition(model)
 Ph = PBS.PatchFESpace(model,reffe,H1Conformity(),PD,Vh)
+# Ph = PBS.PatchFESpace(model,reffe,DivConformity(),PD,Vh)
 
 # ---- Testing Prolongation and Injection ---- #
 
 w, w_sums = PBS.compute_weight_operators(Ph,Vh);
 
-xP = PVector(1.0,Ph.gids)
-yP = PVector(0.0,Ph.gids)
-x = PVector(1.0,Vh.gids)
-y = PVector(0.0,Vh.gids)
+xP = pfill(1.0,partition(Ph.gids))
+yP = pfill(0.0,partition(Ph.gids))
+x  = pfill(1.0,partition(Vh.gids))
+y  = pfill(0.0,partition(Vh.gids))
 
 PBS.prolongate!(yP,Ph,x)
 PBS.inject!(y,Ph,yP,w,w_sums)
@@ -87,19 +89,19 @@ Rns = numerical_setup(Rss,Ah)
 
 # ---- Manual solve using LU ---- # 
 
-x1_mat = PVector(0.5,Ah.cols)
+x1_mat = pfill(0.5,partition(axes(Ah,2)))
 r1_mat = fh-Ah*x1_mat
-exchange!(r1_mat)
+consistent!(r1_mat) |> fetch
 
-r1 = PVector(0.0,Vh.gids)
-x1 = PVector(0.0,Vh.gids)
-rp = PVector(0.0,Ph.gids)
-xp = PVector(0.0,Ph.gids)
-rp_mat = PVector(0.0,Ahp.cols)
-xp_mat = PVector(0.0,Ahp.cols)
+r1 = pfill(0.0,partition(Vh.gids))
+x1 = pfill(0.0,partition(Vh.gids))
+rp = pfill(0.0,partition(Ph.gids))
+xp = pfill(0.0,partition(Ph.gids))
+rp_mat = pfill(0.0,partition(axes(Ahp,2)))
+xp_mat = pfill(0.0,partition(axes(Ahp,2)))
 
 copy!(r1,r1_mat)
-exchange!(r1)
+consistent!(r1) |> fetch
 PBS.prolongate!(rp,Ph,r1)
 
 copy!(rp_mat,rp)
@@ -113,18 +115,18 @@ copy!(x1_mat,x1)
 
 # ---- Same using the PatchBasedSmoother ---- #
 
-x2_mat = PVector(0.5,Ah.cols)
+x2_mat = pfill(0.5,partition(axes(Ah,2)))
 r2_mat = fh-Ah*x2_mat
-exchange!(r2_mat)
+consistent!(r2_mat) |> fetch
 solve!(x2_mat,Mns,r2_mat)
 
 
 # ---- Smoother inside Richardson
 
-x3_mat = PVector(0.5,Ah.cols)
+x3_mat = pfill(0.5,partition(axes(Ah,2)))
 r3_mat = fh-Ah*x3_mat
-exchange!(r3_mat)
+consistent!(r3_mat) |> fetch
 solve!(x3_mat,Rns,r3_mat)
-exchange!(x3_mat)
+consistent!(x3_mat) |> fetch
 
 end
