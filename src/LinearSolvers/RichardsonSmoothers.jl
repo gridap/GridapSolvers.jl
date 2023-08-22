@@ -40,8 +40,8 @@ function Gridap.Algebra.numerical_setup(ss::RichardsonSmootherSymbolicSetup, A::
 end
 
 function Gridap.Algebra.numerical_setup(ss::RichardsonSmootherSymbolicSetup, A::PSparseMatrix)
-  Adx = PVector(0.0,A.rows)
-  dx  = PVector(0.0,A.cols)
+  Adx = pfill(0.0,partition(axes(A,1)))
+  dx  = pfill(0.0,partition(axes(A,2)))
   Mns = numerical_setup(ss.Mss,A)
   return RichardsonSmootherNumericalSetup(ss.smoother,A,Adx,dx,Mns)
 end

@@ -1,7 +1,7 @@
 name = "GridapSolvers"
 uuid = "6d3209ee-5e3c-4db7-a716-942eb12ed534"
 authors = ["Santiago Badia <santiago.badia@monash.edu>", "Jordi Manyer <jordi.manyer@monash.edu>", "Alberto F. Martin <alberto.f.martin@anu.edu.au>", "Javier Principe <principe@cimne.upc.edu>"]
-version = "0.1.1"
+version = "0.2.0"
 
 [deps]
 ArgParse = "c7e460c6-2fb9-53a9-8c5b-16f535851c63"
@@ -18,14 +18,14 @@ Printf = "de0858da-6303-5e67-8744-51eddeeeb8d7"
 
 [compat]
 ArgParse = "1"
-FillArrays = "0.9, 0.10, 0.11, 0.12"
-Gridap = "0.17.17"
-GridapDistributed = "0.2.7"
-GridapP4est = "0.2"
-GridapPETSc = "0.4"
+FillArrays = "0.9, 0.10, 0.11, 0.12, 0.13, 1.0"
+Gridap = "0.17.18"
+GridapDistributed = "0.3"
+GridapP4est = "0.3"
+GridapPETSc = "0.5"
 IterativeSolvers = "0.9"
-MPI = "0.19"
-PartitionedArrays = "0.2.15"
+MPI = "0.20"
+PartitionedArrays = "0.3"
 julia = "1.7"
 
 [extras]

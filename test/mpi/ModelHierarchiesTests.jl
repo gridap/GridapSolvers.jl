@@ -41,8 +41,11 @@ end
 
 num_parts_x_level = [4,4,2,2] # Procs in each refinement level
 
-ranks = num_parts_x_level[1]
-with_backend(main,MPIBackend(),ranks,num_parts_x_level)
+num_ranks = num_parts_x_level[1]
+parts = with_mpi() do distribute
+  distribute(LinearIndices((prod(num_ranks),)))
+end
+main(parts,num_parts_x_level)
 MPI.Finalize()
 
 end

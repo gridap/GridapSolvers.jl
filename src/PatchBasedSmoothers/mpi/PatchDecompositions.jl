@@ -10,7 +10,7 @@ function PatchDecomposition(model::GridapDistributed.DistributedDiscreteModel{Dc
                             Dr=0,
                             patch_boundary_style::PatchBoundaryStyle=PatchBoundaryExclude()) where {Dc,Dp}
   mark_interface_facets!(model)
-  patch_decompositions = map_parts(local_views(model)) do lmodel
+  patch_decompositions = map(local_views(model)) do lmodel
     PatchDecomposition(lmodel;
                        Dr=Dr,
                        patch_boundary_style=patch_boundary_style,
@@ -35,7 +35,7 @@ function PatchDecomposition(mh::ModelHierarchy;kwargs...)
 end
 
 function Gridap.Geometry.Triangulation(a::DistributedPatchDecomposition)
-  trians = map_parts(a.patch_decompositions) do a
+  trians = map(a.patch_decompositions) do a
     Triangulation(a)
   end
   return GridapDistributed.DistributedTriangulation(trians,a.model)
@@ -43,7 +43,7 @@ end
 
 function get_patch_root_dim(a::DistributedPatchDecomposition)
   patch_root_dim = -1
-  map_parts(a.patch_decompositions) do patch_decomposition
+  map(a.patch_decompositions) do patch_decomposition
     patch_root_dim = patch_decomposition.Dr
   end
   return patch_root_dim
@@ -53,13 +53,13 @@ function mark_interface_facets!(model::GridapDistributed.DistributedDiscreteMode
   face_labeling = get_face_labeling(model)
   topo = get_grid_topology(model)
 
-  map_parts(local_views(face_labeling),local_views(topo)) do face_labeling, topo
+  map(local_views(face_labeling),local_views(topo)) do face_labeling, topo
     tag_to_name = face_labeling.tag_to_name
     tag_to_entities = face_labeling.tag_to_entities
     d_to_dface_to_entity = face_labeling.d_to_dface_to_entity
   
-    # Create new tag & entity 
-    interface_entity = maximum(map(maximum,tag_to_entities)) + 1
+    # Create new tag & entity
+    interface_entity = maximum(map(x -> maximum(x;init=0),tag_to_entities)) + 1
     push!(tag_to_entities,[interface_entity])
     push!(tag_to_name,"interface")
 

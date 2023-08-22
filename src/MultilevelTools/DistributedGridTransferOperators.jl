@@ -53,12 +53,12 @@ function _get_interpolation_cache(lev::Int,sh::FESpaceHierarchy,qdegree::Int,mod
 
   if i_am_in(cparts)
     model_h = get_model_before_redist(mh,lev)
-    Uh = get_fe_space_before_redist(sh,lev)
-    fv_h = PVector(0.0,Uh.gids)
+    Uh   = get_fe_space_before_redist(sh,lev)
+    fv_h = pfill(0.0,partition(Uh.gids))
     dv_h = (mode == :solution) ? get_dirichlet_dof_values(Uh) : zero_dirichlet_values(Uh)
 
-    UH = get_fe_space(sh,lev+1)
-    fv_H = PVector(0.0,UH.gids)
+    UH   = get_fe_space(sh,lev+1)
+    fv_H = pfill(0.0,partition(UH.gids))
     dv_H = (mode == :solution) ? get_dirichlet_dof_values(UH) : zero_dirichlet_values(UH)
 
     cache_refine = model_h, Uh, fv_h, dv_h, UH, fv_H, dv_H
@@ -102,7 +102,7 @@ function _get_projection_cache(lev::Int,sh::FESpaceHierarchy,qdegree::Int,mode::
     u,v    = get_trial_fe_basis(UH), get_fe_basis(VH)
     data   = collect_cell_matrix_and_vector(UH,VH,aH(u,v),lH(v,u00),u_dir)
     AH,bH0 = assemble_matrix_and_vector(assem,data)
-    xH     = PVector(0.0,AH.cols)
+    xH     = pfill(0.0,partition(axes(AH,2)))
     bH     = copy(bH0)
 
     cache_refine = model_h, Uh, fv_h, dv_h, VH, AH, lH, xH, bH, bH0, assem
@@ -125,7 +125,7 @@ function _get_redistribution_cache(lev::Int,sh::FESpaceHierarchy,mode::Symbol,op
 
   Uh_red      = get_fe_space(sh,lev)
   model_h_red = get_model(mh,lev)
-  fv_h_red    = PVector(0.0,Uh_red.gids)
+  fv_h_red    = pfill(0.0,partition(Uh_red.gids))
   dv_h_red    = (mode == :solution) ? get_dirichlet_dof_values(Uh_red) : zero_dirichlet_values(Uh_red)
   glue        = mh.levels[lev].red_glue
 
@@ -214,7 +214,7 @@ function LinearAlgebra.mul!(y::PVector,A::DistributedGridTransferOperator{Val{:r
   model_h, Uh, fv_h, dv_h, UH, fv_H, dv_H = cache_refine
 
   copy!(fv_h,x) # Matrix layout -> FE layout
-  exchange!(fv_h)
+  consistent!(fv_h) |> fetch
   restrict_dofs!(fv_H,fv_h,dv_h,Uh,UH,get_adaptivity_glue(model_h))
   copy!(y,fv_H) # FE layout -> Matrix layout
 
@@ -249,7 +249,7 @@ function LinearAlgebra.mul!(y::Union{PVector,Nothing},A::DistributedGridTransfer
 
   # 1 - Redistribute from fine partition to coarse partition
   copy!(fv_h_red,x)
-  exchange!(fv_h_red)
+  consistent!(fv_h_red) |> fetch
   redistribute_free_values!(cache_exchange,fv_h,Uh,fv_h_red,dv_h_red,Uh_red,model_h,glue;reverse=true)
 
   # 2 - Interpolate in coarse partition
@@ -259,7 +259,7 @@ function LinearAlgebra.mul!(y::Union{PVector,Nothing},A::DistributedGridTransfer
     copy!(y,fv_H) # FE layout -> Matrix layout
   end
 
-  return y 
+  return y
 end
 
 # D.2) Restriction, with redistribution, by projection
@@ -270,11 +270,12 @@ function LinearAlgebra.mul!(y::Union{PVector,Nothing},A::DistributedGridTransfer
 
   # 1 - Redistribute from fine partition to coarse partition
   copy!(fv_h_red,x)
-  exchange!(fv_h_red)
+  consistent!(fv_h_red) |> fetch
   redistribute_free_values!(cache_exchange,fv_h,Uh,fv_h_red,dv_h_red,Uh_red,model_h,glue;reverse=true)
 
   # 2 - Solve f2c projection coarse partition
   if !isa(y,Nothing)
+    consistent!(fv_h) |> fetch
     uh = FEFunction(Uh,fv_h,dv_h)
     v  = get_fe_basis(VH)
     vec_data = collect_cell_vector(VH,lH(v,uh))
@@ -284,7 +285,7 @@ function LinearAlgebra.mul!(y::Union{PVector,Nothing},A::DistributedGridTransfer
     copy!(y,xH)
   end
 
-  return y 
+  return y
 end
 
 # D.3) Restriction, with redistribution, by dof selection (only nodal dofs)
@@ -295,11 +296,12 @@ function LinearAlgebra.mul!(y::Union{PVector,Nothing},A::DistributedGridTransfer
 
   # 1 - Redistribute from fine partition to coarse partition
   copy!(fv_h_red,x)
-  exchange!(fv_h_red)
+  consistent!(fv_h_red) |> fetch
   redistribute_free_values!(cache_exchange,fv_h,Uh,fv_h_red,dv_h_red,Uh_red,model_h,glue;reverse=true)
 
   # 2 - Interpolate in coarse partition
   if !isa(y,Nothing)
+    consistent!(fv_h) |> fetch
     restrict_dofs!(fv_H,fv_h,dv_h,Uh,UH,get_adaptivity_glue(model_h))
     copy!(y,fv_H) # FE layout -> Matrix layout
   end

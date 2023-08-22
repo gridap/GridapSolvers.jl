@@ -32,6 +32,7 @@ function run_tests(testdir)
                  "RedistributeToolsTests.jl",
                  "RefinementToolsTests.jl",
                  "RichardsonSmoothersTests.jl",
+                 "ModelHierarchiesTests.jl",
                  "GMGLinearSolversPoissonTests.jl",
                  "GMGLinearSolversLaplacianTests.jl",
                  "GMGLinearSolversVectorLaplacianTests.jl",
@@ -41,13 +42,6 @@ function run_tests(testdir)
                  "RestrictDofsTests.jl",
                  "PRefinementGMGLinearSolversPoissonTests.jl"]
           np = 4
-          #extra_args = "-s 2 2 -r 2"
-          extra_args = ""
-        elseif f in ["ModelHierarchiesTests.jl"]
-          np = 6
-          extra_args = ""
-        elseif f in [""]
-          np = 1
           extra_args = ""
         else
           np = nprocs

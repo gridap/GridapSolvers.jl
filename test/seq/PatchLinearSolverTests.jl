@@ -10,8 +10,6 @@ module PatchLinearSolverTests
   using GridapSolvers
   using GridapSolvers.PatchBasedSmoothers
 
-  order=1
-
   function returns_PD_Ph_xh_Vh(model;style=GridapSolvers.PatchBasedSmoothers.PatchBoundaryExclude())
     reffe = ReferenceFE(lagrangian,Float64,order)
     # reffe=ReferenceFE(lagrangian,VectorValue{2,Float64},order) @santiagobadia: For Vector Laplacian
@@ -60,33 +58,42 @@ module PatchLinearSolverTests
   end
 
   ##################################################
+  order = 1
+
+  rank_partition = (2,1)
+  parts  = with_debug() do distribute
+    distribute(LinearIndices((prod(rank_partition),)))
+  end
 
   domain    = (0.0,1.0,0.0,1.0)
-  partition = (2,3)
+  mesh_partition = (2,3)
   
-  model  = CartesianDiscreteModel(domain,partition)
+  model  = CartesianDiscreteModel(domain,mesh_partition)
   _,Ph,xh,Vh    = returns_PD_Ph_xh_Vh(model)
 
-  parts  = get_part_ids(sequential,(1,2))
-  dmodel = CartesianDiscreteModel(parts,domain,partition)
+  dmodel = CartesianDiscreteModel(parts,rank_partition,domain,mesh_partition)
   _,dPh,dxh,dVh = returns_PD_Ph_xh_Vh(dmodel);
 
   @test num_free_dofs(Ph) == num_free_dofs(dPh)
-  @test all(dxh.owned_values.parts[1] .≈ xh[1:3])
-  @test all(dxh.owned_values.parts[2] .≈ xh[4:end])
+  @test all(own_values(dxh).items[1] .≈ xh[1:4])
+  @test all(own_values(dxh).items[2] .≈ xh[5:end])
 
   #################################################
   
-  model  = CartesianDiscreteModel(domain,partition)
+  model  = CartesianDiscreteModel(domain,mesh_partition)
   PD,Ph,xh,Vh = returns_PD_Ph_xh_Vh(model)
   A,b = compute_matrix_vector(model,Vh)
   x   = test_smoother(PD,Ph,Vh,A,b)
 
-  parts  = get_part_ids(SequentialBackend(),(1,1))
-  dmodel = CartesianDiscreteModel(parts,domain,partition)
+  rank_partition = (1,1)
+  parts  = with_debug() do distribute
+    distribute(LinearIndices((prod(rank_partition),)))
+  end
+
+  dmodel = CartesianDiscreteModel(parts,rank_partition,domain,mesh_partition)
   dPD,dPh,dxh,dVh = returns_PD_Ph_xh_Vh(dmodel);
   dA,db = compute_matrix_vector(dmodel,dVh);
   dx    = test_smoother(dPD,dPh,dVh,dA,db)
 
-  @test all(dx.owned_values.parts[1] .≈ x)
+  @test all(own_values(dx).items[1] .≈ x)
 end
