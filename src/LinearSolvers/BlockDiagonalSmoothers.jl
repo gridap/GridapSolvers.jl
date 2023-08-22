@@ -65,7 +65,7 @@ function compute_block_ranges(blocks::AbstractMatrix...)
 end
 
 function compute_block_ranges(blocks::PSparseMatrix...)
-  _blocks = map(b -> b.owned_owned_values,blocks)
+  _blocks = map(b -> own_values(b),blocks)
   ranges = map_parts(_blocks...) do blocks...
     compute_block_ranges(blocks...)
   end
@@ -141,11 +141,13 @@ end
 
 # TODO: The exchange could be optimized for sure by swapping the loop order...
 function to_blocks!(x::PVector,x_blocks,ranges)
-  x_blocks_owned = map(xi->xi.owned_values,x_blocks)
-  map_parts(x.owned_values,ranges,x_blocks_owned...) do x,ranges,x_blocks...
+  x_blocks_owned = map(xi->own_values(xi),x_blocks)
+  map_parts(own_values(x),ranges,x_blocks_owned...) do x,ranges,x_blocks...
     to_blocks!(x,x_blocks,ranges)
   end
-  map(exchange!,x_blocks)
+  map(x_blocks) do 
+    consistent!(x) |> fetch
+  end
   return x_blocks
 end
 
@@ -157,11 +159,11 @@ function to_global!(x::AbstractVector,x_blocks,ranges)
 end
 
 function to_global!(x::PVector,x_blocks,ranges)
-  x_blocks_owned = map(xi->xi.owned_values,x_blocks)
-  map_parts(x.owned_values,ranges,x_blocks_owned...) do x,ranges,x_blocks...
+  x_blocks_owned = map(xi->own_values(xi),x_blocks)
+  map_parts(own_values(x),ranges,x_blocks_owned...) do x,ranges,x_blocks...
     to_global!(x,x_blocks,ranges)
   end
-  exchange!(x)
+  consistent!(x) |> fetch
   return x
 end
 

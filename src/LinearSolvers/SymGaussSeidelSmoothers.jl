@@ -68,7 +68,7 @@ function forward_sub!(L::LowerTriangular{Tv,Ti,<:SparseMatrixCSC},x::AbstractVec
   return x
 end
 
-function forward_sub!(L::AbstractPData{<:LowerTriangular},x::PVector)
+function forward_sub!(L::AbstractArray{<:LowerTriangular},x::PVector)
   map_parts(L,x.owned_values) do L, x
     forward_sub!(L, x)
   end
@@ -90,7 +90,7 @@ function backward_sub!(U::UpperTriangular{Tv,Ti,<:SparseMatrixCSC}, x::AbstractV
   return x
 end
 
-function backward_sub!(U::AbstractPData{<:UpperTriangular},x::PVector)
+function backward_sub!(U::AbstractArray{<:UpperTriangular},x::PVector)
   map_parts(U,x.owned_values) do U, x
     backward_sub!(U, x)
   end
@@ -125,9 +125,6 @@ function _gs_get_caches(A::AbstractMatrix)
   return dx, Adx
 end
 
-_get_partition(A::PSparseMatrix,::Type{<:SparseMatrixCSC}) = A.cols.partition
-_get_partition(A::PSparseMatrix,::Type{<:SparseMatrixCSR}) = A.rows.partition
-
 function _gs_decompose_matrix(A::AbstractMatrix)
   idx_range = 1:minimum(size(A))
   D  = DiagonalIndices(A,idx_range)
@@ -136,10 +133,11 @@ function _gs_decompose_matrix(A::AbstractMatrix)
   return L,U
 end
 
-function _gs_decompose_matrix(A::PSparseMatrix{T,<:AbstractPData{MatType}}) where {T, MatType}
-  partition = _get_partition(A,MatType)
-  L,U = map_parts(A.values,partition) do A, partition
-    D = DiagonalIndices(A,partition.oid_to_lid)
+function _gs_decompose_matrix(A::PSparseMatrix{T,<:AbstractArray{MatType}}) where {T, MatType}
+  values  = partition(A)
+  indices = isa(PartitionedArrays.getany(values),SparseMatrixCSC) ? partition(axes(A,2)) : partition(axes(A,1))
+  L,U = map_parts(values,indices) do A, indices
+    D = DiagonalIndices(A,own_to_local(indices))
     L = LowerTriangular(A,D)
     U = UpperTriangular(A,D)
     return L,U

@@ -78,7 +78,7 @@ function to_blocks!(x::AbstractVector,u,p,ranges)
 end
 
 function to_blocks!(x::PVector,u,p,ranges)
-  map_parts(x.owned_values,u.owned_values,p.owned_values,ranges) do x,u,p,ranges
+  map_parts(own_values(x),own_values(u),own_values(p),ranges) do x,u,p,ranges
     to_blocks!(x,u,p,ranges)
   end
   consistent!(u) |> fetch
