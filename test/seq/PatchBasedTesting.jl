@@ -14,13 +14,14 @@ using FillArrays
 using GridapSolvers
 import GridapSolvers.PatchBasedSmoothers as PBS
 
-backend = SequentialBackend()
-ranks = (1,2)
-parts = get_part_ids(backend,ranks)
+num_ranks = (1,2)
+parts = with_debug() do distribute
+  distribute(LinearIndices((prod(num_ranks),)))
+end
 
 domain = (0.0,1.0,0.0,1.0)
-partition = (2,4)
-model = CartesianDiscreteModel(domain,partition)
+mesh_partition = (2,4)
+model = CartesianDiscreteModel(domain,mesh_partition)
 
 order = 1; reffe = ReferenceFE(lagrangian,Float64,order;space=:P); conformity = L2Conformity();
 #order = 1; reffe = ReferenceFE(lagrangian,Float64,order); conformity = H1Conformity();

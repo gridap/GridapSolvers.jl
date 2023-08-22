@@ -50,7 +50,7 @@ model  = CartesianDiscreteModel(domain,mesh_partition)
 
 # Sequential
 num_ranks = (1,2)
-parts = with_mpi() do distribute
+parts = with_debug() do distribute
   distribute(LinearIndices((prod(num_ranks),)))
 end
 

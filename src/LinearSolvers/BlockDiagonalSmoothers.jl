@@ -145,7 +145,7 @@ function to_blocks!(x::PVector,x_blocks,ranges)
   map(own_values(x),ranges,x_blocks_owned...) do x,ranges,x_blocks...
     to_blocks!(x,x_blocks,ranges)
   end
-  map(x_blocks) do 
+  map(x_blocks) do x
     consistent!(x) |> fetch
   end
   return x_blocks
