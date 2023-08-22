@@ -43,17 +43,18 @@ function main(model)
 end
 
 # Completely serial
-partition = (10,10)
+mesh_partition = (10,10)
 domain = (0,1,0,1)
-model  = CartesianDiscreteModel(domain,partition)
+model  = CartesianDiscreteModel(domain,mesh_partition)
 @test main(model)
 
 # Sequential
-backend = SequentialBackend()
-ranks = (1,2)
-parts = get_part_ids(backend,ranks)
+num_ranks = (1,2)
+parts = with_mpi() do distribute
+  distribute(LinearIndices((prod(num_ranks),)))
+end
 
-model  = CartesianDiscreteModel(parts,domain,partition)
+model  = CartesianDiscreteModel(parts,num_ranks,domain,mesh_partition)
 @test main(model)
 
 end

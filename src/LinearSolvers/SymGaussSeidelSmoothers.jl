@@ -62,7 +62,7 @@ function forward_sub!(L::LowerTriangular{Tv,Ti,<:SparseMatrixCSC},x::AbstractVec
 
     # Substitute next values involving x[col]
     for i = idx + 1 : last[col]
-        x[A.rowval[i]] -= A.nzval[i] * x[col]
+      x[A.rowval[i]] -= A.nzval[i] * x[col]
     end
   end
   return x
@@ -78,14 +78,14 @@ function backward_sub!(U::UpperTriangular{Tv,Ti,<:SparseMatrixCSC}, x::AbstractV
   A, diag = U.mat, U.diag.diag
   n = length(diag)
   for col = n : -1 : 1
-      # Solve for diagonal element
-      idx = diag[col]
-      x[col] = x[col] / A.nzval[idx]
+    # Solve for diagonal element
+    idx = diag[col]
+    x[col] = x[col] / A.nzval[idx]
 
-      # Substitute next values involving x[col]
-      for i = A.colptr[col] : idx - 1
-          x[A.rowval[i]] -= A.nzval[i] * x[col]
-      end
+    # Substitute next values involving x[col]
+    for i = A.colptr[col] : idx - 1
+      x[A.rowval[i]] -= A.nzval[i] * x[col]
+    end
   end
   return x
 end

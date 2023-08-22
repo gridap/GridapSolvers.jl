@@ -40,12 +40,12 @@ struct SchurComplementNumericalSetup <: Gridap.Algebra.NumericalSetup
 end 
 
 function get_shur_complement_caches(B::AbstractMatrix,C::AbstractMatrix)
-  du1   = LinearSolvers.allocate_col_vector(C)
-  du2   = LinearSolvers.allocate_col_vector(C)
-  dp    = LinearSolvers.allocate_col_vector(B)
+  du1   = allocate_col_vector(C)
+  du2   = allocate_col_vector(C)
+  dp    = allocate_col_vector(B)
 
-  rv_u  = LinearSolvers.allocate_row_vector(B)
-  rv_p  = LinearSolvers.allocate_row_vector(C)
+  rv_u  = allocate_row_vector(B)
+  rv_p  = allocate_row_vector(C)
   return (du1,du2,dp,rv_u,rv_p)
 end
 
@@ -81,8 +81,8 @@ function to_blocks!(x::PVector,u,p,ranges)
   map_parts(x.owned_values,u.owned_values,p.owned_values,ranges) do x,u,p,ranges
     to_blocks!(x,u,p,ranges)
   end
-  exchange!(u)
-  exchange!(p)
+  consistent!(u) |> fetch
+  consistent!(p) |> fetch
   return u,p
 end
 
@@ -97,7 +97,7 @@ function to_global!(x::PVector,u,p,ranges)
   map_parts(x.owned_values,u.owned_values,p.owned_values,ranges) do x,u,p,ranges
     to_global!(x,u,p,ranges)
   end
-  exchange!(x)
+  consistent!(x) |> fetch
   return x
 end
 

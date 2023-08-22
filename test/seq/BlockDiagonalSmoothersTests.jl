@@ -99,21 +99,22 @@ function main(model,single_proc::Bool)
   @test norm(x-x_star) < 1.e-8
 end
 
-backend = SequentialBackend()
-ranks = (2,2)
-parts = get_part_ids(backend,ranks)
+num_ranks = (2,2)
+parts = with_mpi() do distribute
+  distribute(LinearIndices((prod(num_ranks),)))
+end
 
 D = 2
 n = 10
 domain = Tuple(repeat([0,1],D))
-partition = (n,n)
+mesh_partition = (n,n)
 
 # Serial
-model     = CartesianDiscreteModel(domain,partition)
+model = CartesianDiscreteModel(domain,mesh_partition)
 main(model,true)
 
 # Distributed, sequential
-model     = CartesianDiscreteModel(parts,domain,partition)
+model = CartesianDiscreteModel(parts,num_ranks,domain,mesh_partition)
 main(model,false)
 
 end

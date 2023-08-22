@@ -112,21 +112,22 @@ function main(model)
   @test err_p3 < 1.e-4
 end
 
-backend = SequentialBackend()
-ranks = (2,2)
-parts = get_part_ids(backend,ranks)
+num_ranks = (2,2)
+parts = with_debug() do distribute
+  distribute(LinearIndices((prod(num_ranks),)))
+end
 
 D = 2
 n = 60
 domain    = Tuple(repeat([0,1],D))
-partition = (n,n)
+mesh_partition = (n,n)
 
 # Serial
-model     = CartesianDiscreteModel(domain,partition)
+model     = CartesianDiscreteModel(domain,mesh_partition)
 main(model)
 
 # Distributed, sequential
-model     = CartesianDiscreteModel(parts,domain,partition)
+model     = CartesianDiscreteModel(parts,num_ranks,domain,mesh_partition)
 main(model)
 
 end

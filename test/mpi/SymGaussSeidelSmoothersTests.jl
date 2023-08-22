@@ -10,9 +10,9 @@ using IterativeSolvers
 using GridapSolvers
 using GridapSolvers.LinearSolvers
 
-function main(parts,partition)
+function main(parts,num_ranks,mesh_partition)
   domain = (0,1,0,1)
-  model  = CartesianDiscreteModel(parts,domain,partition)
+  model  = CartesianDiscreteModel(parts,num_ranks,domain,mesh_partition)
 
   sol(x) = x[1] + x[2]
   f(x)   = -Δ(sol)(x)
@@ -36,7 +36,7 @@ function main(parts,partition)
   ss = symbolic_setup(P,A)
   ns = numerical_setup(ss,A)
 
-  x = PVector(1.0,A.cols)
+  x = pfill(1.0,partition(axes(A,2)))
   x, history = IterativeSolvers.cg!(x,A,b;
                                     verbose=i_am_main(parts),
                                     reltol=1.0e-8,
@@ -54,10 +54,13 @@ function main(parts,partition)
   @test E < 1.e-8
 end
 
-partition = (32,32)
-ranks = (2,2)
+mesh_partition = (32,32)
+num_ranks = (2,2)
+parts = with_mpi() do distribute
+  distribute(LinearIndices((prod(num_ranks),)))
+end
 
-with_backend(main,MPIBackend(),ranks,partition)
+main(parts,num_ranks,mesh_partition)
 MPI.Finalize()
 
 end
