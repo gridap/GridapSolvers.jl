@@ -10,16 +10,10 @@ using IterativeSolvers
 using GridapSolvers
 using GridapSolvers.LinearSolvers
 
-<<<<<<< HEAD
-function main(parts,partition)
-  domain = (0,1,0,1)
-  model  = CartesianDiscreteModel(parts,domain,partition)
-=======
 function main(parts,nranks,domain_partition)
   GridapP4est.with(parts) do
     domain = (0,1,0,1)
     model  = CartesianDiscreteModel(parts,nranks,domain,domain_partition)
->>>>>>> acea3e200d6892357ac46b28c59e6f63ecc572da
 
   sol(x) = x[1] + x[2]
   f(x)   = -Δ(sol)(x)
