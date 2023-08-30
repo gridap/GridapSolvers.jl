@@ -32,93 +32,42 @@ function Gridap.Algebra.symbolic_setup(s::SchurComplementSolver,A::AbstractMatri
   SchurComplementSymbolicSetup(s)
 end
 
-struct SchurComplementNumericalSetup <: Gridap.Algebra.NumericalSetup
-  solver
-  mat
-  ranges
-  caches
+struct SchurComplementNumericalSetup{A,B,C} <: Gridap.Algebra.NumericalSetup
+  solver::A
+  mat   ::B
+  caches::C
 end 
 
 function get_shur_complement_caches(B::AbstractMatrix,C::AbstractMatrix)
-  du1   = allocate_col_vector(C)
-  du2   = allocate_col_vector(C)
-  dp    = allocate_col_vector(B)
-
-  rv_u  = allocate_row_vector(B)
-  rv_p  = allocate_row_vector(C)
-  return (du1,du2,dp,rv_u,rv_p)
-end
-
-function get_block_ranges(B::AbstractMatrix,C::AbstractMatrix)
-  u_range = 1:size(C,2)
-  p_range = size(C,2) .+ (1:size(B,2))
-  return u_range, p_range
-end
-
-function get_block_ranges(B::PSparseMatrix,C::PSparseMatrix)
-  ranges = map(own_values(B),own_values(C)) do B,C
-    get_block_ranges(B,C)
-  end
-  return ranges
+  du = allocate_col_vector(C)
+  bu = allocate_col_vector(C)
+  bp = allocate_col_vector(B)
+  return du,bu,bp
 end
 
 function Gridap.Algebra.numerical_setup(ss::SchurComplementSymbolicSetup,mat::AbstractMatrix)
   s   = ss.solver
-  B,C = s.B, s.C
-  ranges = compute_block_ranges(C,B)
-  caches = get_shur_complement_caches(B,C)
-  return SchurComplementNumericalSetup(s,mat,ranges,caches)
+  caches = get_shur_complement_caches(s.B,s.C)
+  return SchurComplementNumericalSetup(s,mat,caches)
 end
 
-function to_blocks!(x::AbstractVector,u,p,ranges)
-  u_range, p_range = ranges
-  u .= x[u_range]
-  p .= x[p_range]
-  return u,p
-end
-
-function to_blocks!(x::PVector,u,p,ranges)
-  map(own_values(x),own_values(u),own_values(p),ranges) do x,u,p,ranges
-    to_blocks!(x,u,p,ranges)
-  end
-  consistent!(u) |> fetch
-  consistent!(p) |> fetch
-  return u,p
-end
-
-function to_global!(x::AbstractVector,u,p,ranges)
-  u_range, p_range = ranges
-  x[u_range] .= u
-  x[p_range] .= p
-  return x
-end
-
-function to_global!(x::PVector,u,p,ranges)
-  map(own_values(x),own_values(u),own_values(p),ranges) do x,u,p,ranges
-    to_global!(x,u,p,ranges)
-  end
-  consistent!(x) |> fetch
-  return x
-end
-
-function Gridap.Algebra.solve!(x::AbstractVector,ns::SchurComplementNumericalSetup,y::AbstractVector)
+function Gridap.Algebra.solve!(x::AbstractBlockVector,ns::SchurComplementNumericalSetup,y::AbstractBlockVector)
   s = ns.solver
   A,B,C,S = s.A,s.B,s.C,s.S
-  du1,du2,dp,rv_u,rv_p = ns.caches
+  du,bu,bp = ns.caches
 
-  # Split y into blocks
-  to_blocks!(y,rv_u,rv_p,ns.ranges)
+  @check blocklength(x) == blocklength(y) == 2
+  y_u = y[Block(1)]; y_p = y[Block(2)]
+  x_u = x[Block(1)]; x_p = x[Block(2)]
 
   # Solve Schur complement
-  solve!(du1,A,rv_u)        # du1 = A^-1 y_u
-  mul!(rv_p,C,du1,1.0,-1.0) # b1  = C*du1 - y_p
-  solve!(dp,S,rv_p)         # dp  = S^-1 b1
-  mul!(rv_u,B,dp)           # b2  = B*dp
-  solve!(du2,A,rv_u)        # du2 = A^-1 b2
-  du1 .-= du2               # du  = du1 - du2
+  solve!(x_u,A,y_u)                      # x_u = A^-1 y_u
+  copy!(bp,y_p); mul!(bp,C,du,1.0,-1.0)  # bp  = C*(A^-1 y_u) - y_p
+  solve!(x_p,S,bp)                       # x_p = S^-1 bp
 
-  # Assemble into global
-  to_global!(x,du1,dp,ns.ranges)
+  mul!(bu,B,x_p)         # bu  = B*x_p
+  solve!(du,A,bu)        # du = A^-1 bu
+  x_u .-= du             # x_u  = x_u - du
 
   return x
 end

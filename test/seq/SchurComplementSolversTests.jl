@@ -1,6 +1,7 @@
 module SchurComplementSolversTests
 
 using Test
+using BlockArrays
 using Gridap
 using Gridap.MultiField
 using Gridap.Algebra
@@ -49,8 +50,9 @@ function main(model)
   Q = TestFESpace(model,reffeₚ,conformity=:L2)
   P = TrialFESpace(Q,p_ref)
 
-  Y = MultiFieldFESpace([V, Q])
-  X = MultiFieldFESpace([U, P])
+  mfs = BlockMultiFieldStyle()
+  Y = MultiFieldFESpace([V, Q];style=mfs)
+  X = MultiFieldFESpace([U, P];style=mfs)
 
   qdegree = 4
   Ω   = Triangulation(model)
@@ -70,18 +72,6 @@ function main(model)
   op = AffineFEOperator(biform,liform,X,Y)
   sysmat, sysvec = get_matrix(op), get_vector(op);
 
-  A = assemble_matrix(a,U,V)
-  B = assemble_matrix(b,P,V)
-  C = assemble_matrix(c,U,Q)
-
-  ############################################################################################
-  # Solve by global matrix factorization
-
-  xh = solve(op)
-  uh, ph = xh
-  err_u1 = l2_error(uh,u_ref,dΩ) 
-  err_p1 = l2_error(ph,p_ref,dΩ)
-
   ############################################################################################
   # Solve by GMRES preconditioned with inexact Schur complement
 
@@ -90,9 +80,11 @@ function main(model)
   PS_solver = BackslashSolver()
   PS_ns = numerical_setup(symbolic_setup(PS_solver,PS),PS)
 
+  A = sysmat[Block(1,1)]
   A_solver = BackslashSolver()
   A_ns = numerical_setup(symbolic_setup(A_solver,A),A)
 
+  B = sysmat[Block(1,2)]; C = sysmat[Block(2,1)]
   psc_solver = SchurComplementSolver(A_ns,B,C,PS_ns);
 
   gmres = GMRESSolver(20,psc_solver,1e-10)
@@ -103,13 +95,8 @@ function main(model)
 
   xh = FEFunction(X,x)
   uh, ph = xh
-  err_u3 = l2_error(uh,u_ref,dΩ) 
-  err_p3 = l2_error(ph,p_ref,dΩ)
-
-  @test err_u1 < 1.e-4
-  @test err_u3 < 1.e-4
-  @test err_p1 < 1.e-4
-  @test err_p3 < 1.e-4
+  @test l2_error(uh,u_ref,dΩ) < 1.e-4
+  @test l2_error(ph,p_ref,dΩ) < 1.e-4
 end
 
 num_ranks = (2,2)
