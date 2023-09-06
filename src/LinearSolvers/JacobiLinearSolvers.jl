@@ -22,7 +22,7 @@ function Gridap.Algebra.numerical_setup!(ns::JacobiNumericalSetup, A::AbstractMa
 end
 
 function Gridap.Algebra.numerical_setup(ss::JacobiSymbolicSetup,A::PSparseMatrix)
-  inv_diag=map(own_values(A)) do a
+  inv_diag = map(own_values(A)) do a
     1.0 ./ diag(a)
   end
   return JacobiNumericalSetup(inv_diag)

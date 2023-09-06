@@ -77,17 +77,47 @@ end
 
 Gridap.FESpaces.get_dof_value_type(a::PatchFESpace) = Gridap.FESpaces.get_dof_value_type(a.Vh)
 Gridap.FESpaces.get_free_dof_ids(a::PatchFESpace)   = Base.OneTo(a.num_dofs)
-Gridap.FESpaces.get_cell_dof_ids(a::PatchFESpace)   = a.patch_cell_dofs_ids
-Gridap.FESpaces.get_cell_dof_ids(a::PatchFESpace,::Triangulation) = a.patch_cell_dofs_ids
 Gridap.FESpaces.get_fe_basis(a::PatchFESpace)       = get_fe_basis(a.Vh)
 Gridap.FESpaces.ConstraintStyle(::PatchFESpace)     = Gridap.FESpaces.UnConstrained()
 Gridap.FESpaces.get_vector_type(a::PatchFESpace)    = get_vector_type(a.Vh)
 Gridap.FESpaces.get_fe_dof_basis(a::PatchFESpace)   = get_fe_dof_basis(a.Vh)
 
+# get_cell_dof_ids
+
+Gridap.FESpaces.get_cell_dof_ids(a::PatchFESpace)   = a.patch_cell_dofs_ids
+Gridap.FESpaces.get_cell_dof_ids(a::PatchFESpace,::Triangulation) = @notimplemented
+
+function Gridap.FESpaces.get_cell_dof_ids(a::PatchFESpace,trian::PatchTriangulation)
+  return get_cell_dof_ids(trian.trian,a,trian)
+end
+
+function Gridap.FESpaces.get_cell_dof_ids(::Triangulation,a::PatchFESpace,trian::PatchTriangulation)
+  return a.patch_cell_dofs_ids
+end
+
+function Gridap.FESpaces.get_cell_dof_ids(::BoundaryTriangulation,a::PatchFESpace,trian::PatchTriangulation)
+  cell_dof_ids     = get_cell_dof_ids(a)
+  pfaces_to_pcells = trian.pfaces_to_pcells
+  return lazy_map(Reindex(cell_dof_ids),lazy_map(x->x[1],pfaces_to_pcells))
+end
+
+function Gridap.FESpaces.get_cell_dof_ids(::SkeletonTriangulation,a::PatchFESpace,trian::PatchTriangulation)
+  cell_dof_ids     = get_cell_dof_ids(a)
+  pfaces_to_pcells = trian.pfaces_to_pcells
+  
+  plus         = lazy_map(Reindex(cell_dof_ids),lazy_map(x->x[1],pfaces_to_pcells))
+  minus        = lazy_map(Reindex(cell_dof_ids),lazy_map(x->x[2],pfaces_to_pcells))
+  return lazy_map(Gridap.Fields.BlockMap(2,[1,2]),plus,minus)
+end
+
+# scatter dof values
+
 function Gridap.FESpaces.scatter_free_and_dirichlet_values(f::PatchFESpace,free_values,dirichlet_values)
   cell_vals = Gridap.Fields.PosNegReindex(free_values,dirichlet_values)
   return lazy_map(Broadcasting(cell_vals),f.patch_cell_dofs_ids)
 end
+
+# Construction of the patch cell dofs ids
 
 function setup_cell_reffe(model::DiscreteModel,reffe::Tuple{<:Gridap.FESpaces.ReferenceFEName,Any,Any}; kwargs...)
   basis, reffe_args,reffe_kwargs = reffe

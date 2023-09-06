@@ -88,7 +88,7 @@ function setup_finest_level_cache(mh::ModelHierarchy,smatrices::Vector{<:Abstrac
   parts = get_level_parts(mh,1)
   if i_am_in(parts)
     Ah = smatrices[1]
-    rh = pfill(0.0, partition(axes(Ah,2)))
+    rh = allocate_col_vector(Ah)
     cache = rh
   end
   return cache
@@ -156,14 +156,14 @@ function setup_coarsest_solver_cache(mh::ModelHierarchy,coarsest_solver::PETScLi
 end
 
 function allocate_level_work_vectors(mh::ModelHierarchy,smatrices::Vector{<:AbstractMatrix},lev::Integer)
-  dxh   = pfill(0.0,partition(axes(smatrices[lev],2)))
-  Adxh  = pfill(0.0,partition(axes(smatrices[lev],1)))
+  dxh   = allocate_col_vector(smatrices[lev])
+  Adxh  = allocate_row_vector(smatrices[lev])
 
   cparts = get_level_parts(mh,lev+1)
   if i_am_in(cparts)
     AH  = smatrices[lev+1]
-    rH  = pfill(0.0,partition(axes(AH,2)))
-    dxH = pfill(0.0,partition(axes(AH,2)))
+    rH  = allocate_col_vector(AH)
+    dxH = allocate_col_vector(AH)
   else
     rH  = nothing
     dxH = nothing

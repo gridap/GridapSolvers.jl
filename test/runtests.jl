@@ -44,7 +44,7 @@ function run_tests(testdir)
           np = 4
           extra_args = ""
         else
-          np = nprocs
+          np = 4 # nprocs
           extra_args = ""
         end
         if ! image_file_exists
@@ -63,4 +63,11 @@ end
 run_tests(joinpath(@__DIR__, "mpi"))
 
 # Sequential tests
+@time @testset "BlockDiagonalSmoothersPETScTests" begin include("seq/BlockDiagonalSmoothersPETScTests.jl") end
+@time @testset "BlockDiagonalSmoothersTests" begin include("seq/BlockDiagonalSmoothersTests.jl") end
+@time @testset "DistributedPatchFESpacesTests" begin include("seq/DistributedPatchFESpacesTests.jl") end
+@time @testset "GMRESSolversTests" begin include("seq/GMRESSolversTests.jl") end
+@time @testset "IterativeSolversTests" begin include("seq/IterativeSolversTests.jl") end
 @time @testset "PatchLinearSolverTests" begin include("seq/PatchLinearSolverTests.jl") end
+@time @testset "SymGaussSeidelSmoothersTests" begin include("seq/SymGaussSeidelSmoothersTests.jl") end
+@time @testset "SchurComplementSolversTests" begin include("seq/SchurComplementSolversTests.jl") end

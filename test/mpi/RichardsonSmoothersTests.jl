@@ -5,8 +5,8 @@ using MPI
 using Gridap
 using GridapDistributed
 using PartitionedArrays
-using GridapP4est
 using IterativeSolvers
+using GridapP4est
 
 using GridapSolvers
 using GridapSolvers.LinearSolvers
