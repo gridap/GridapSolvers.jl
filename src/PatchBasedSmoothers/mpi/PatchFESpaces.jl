@@ -1,11 +1,3 @@
-# Rationale behind distributed PatchFESpace:
-# 1. Patches have an owner. Only owners compute subspace correction.
-#    If am not owner of a patch, all dofs in my patch become -1. [DONE]
-# 2. Subspace correction on an owned patch may affect DoFs  which
-#    are non-owned. These corrections should be sent to the owner
-#    process. I.e., NO -> O (reversed) communication. [PENDING]
-# 3. Each processor needs to know how many patches "touch" its owned DoFs.
-#    This requires NO->O communication as well. [PENDING]
 
 function PatchFESpace(model::GridapDistributed.DistributedDiscreteModel,
                       reffe::Tuple{<:Gridap.FESpaces.ReferenceFEName,Any,Any},
@@ -70,7 +62,6 @@ function inject!(x::PVector,
                  w::PVector,
                  w_sums::PVector)
 
-  #consistent!(y)
   map(partition(x),local_views(Ph),partition(y),partition(w),partition(w_sums)) do x,Ph,y,w,w_sums
     inject!(x,Ph,y,w,w_sums)
   end
@@ -83,15 +74,12 @@ end
 
 function compute_weight_operators(Ph::GridapDistributed.DistributedSingleFieldFESpace,Vh)
   # Local weights and partial sums
-  w = pfill(0.0,partition(Ph.gids))
-  w_sums = pfill(0.0,partition(Vh.gids))
-  map(partition(w),partition(w_sums),local_views(Ph)) do w, w_sums, Ph
-    compute_weight_operators!(Ph,Ph.Vh,w,w_sums)
-  end
-  
-  # partial sums -> global sums
-  assemble!(w_sums) |> fetch# ghost -> owners
-  consistent!(w_sums) |> fetch # repopulate ghosts with owner info
+  w_values, w_sums_values = map(compute_weight_operators,local_views(Ph),local_views(Vh)) |> tuple_of_arrays
+  w      = PVector(w_values,partition(Ph.gids))
+  w_sums = PVector(w_sums_values,partition(Vh.gids))
 
+  # partial sums -> global sums
+  assemble!(w_sums) |> fetch   # ghost -> owners
+  consistent!(w_sums) |> fetch # repopulate ghosts with owner info
   return w, w_sums
 end

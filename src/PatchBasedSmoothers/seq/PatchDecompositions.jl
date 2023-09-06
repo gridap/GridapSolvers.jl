@@ -15,9 +15,8 @@ struct PatchDecomposition{Dc,Dp} <: GridapType
   patch_cells_faces_on_boundary :: Vector{Gridap.Arrays.Table} # Df + overlapped cell -> faces on
 end
 
-num_patches(a::PatchDecomposition) = length(a.patch_cells_overlapped_mesh.ptrs)-1
+num_patches(a::PatchDecomposition) = length(a.patch_cells)
 Gridap.Geometry.num_cells(a::PatchDecomposition) = a.patch_cells_overlapped_mesh.data[end]
-
 
 function PatchDecomposition(
   model::DiscreteModel{Dc,Dp};
@@ -153,40 +152,36 @@ function generate_patch_boundary_faces!(patch_cells_faces_on_boundary,
 
   # Cells facets
   Df = Dc-1
-  cells_facets = Gridap.Geometry.get_faces(topology,Dc,Df)
-  cache_cells_facets = array_cache(cells_facets)
-
-  # Cells around facets
-  cells_around_facets = Gridap.Geometry.get_faces(topology,Df,Dc)
-  cache_cells_around_facets = array_cache(cells_around_facets)
+  cell_to_facets = Gridap.Geometry.get_faces(topology,Dc,Df)
+  cache_cell_to_facets = array_cache(cell_to_facets)
+  facet_to_cells = Gridap.Geometry.get_faces(topology,Df,Dc)
+  cache_facet_to_cells = array_cache(facet_to_cells)
 
   # Go over all cells in the current patch
   for (lpatch_cell,patch_cell) in enumerate(patch_cells)
-    cell_facets = getindex!(cache_cells_facets,cells_facets,patch_cell)
-    # Go over the facets (i.e., faces of dim D-1) in the current cell
+    cell_facets = getindex!(cache_cell_to_facets,cell_to_facets,patch_cell)
+    # Go over the facets (i.e., faces of dim Dc-1) in the current cell
     for (lfacet,facet) in enumerate(cell_facets)
       facet_entity = face_labeling.d_to_dface_to_entity[Df+1][facet]
-
-      cells_around_facet = getindex!(cache_cells_around_facets,cells_around_facets,facet)
+      cells_around_facet = getindex!(cache_facet_to_cells,facet_to_cells,facet)
 
       # Check if facet has a neighboring cell that does not belong to the patch
-      cell_not_in_patch_found = false
+      has_nbor_outside_patch = false
       for c in cells_around_facet
         if c ∉ patch_cells
-          cell_not_in_patch_found = true
+          has_nbor_outside_patch = true
           break
         end
       end
 
       facet_at_global_boundary = (facet_entity ∈ boundary_entities)
       A = (facet_at_global_boundary) && (facet ∉ patch_facets)
-      B = (patch_boundary_style isa PatchBoundaryExclude) && cell_not_in_patch_found
+      B = isa(patch_boundary_style,PatchBoundaryExclude) && has_nbor_outside_patch
       facet_at_patch_boundary = (A || B)
 
       if (facet_at_patch_boundary)
-
-        cell_overlapped_mesh = patch_cells_overlapped_mesh[patch][lpatch_cell]
-        position = patch_cells_faces_on_boundary[Df+1].ptrs[cell_overlapped_mesh]+lfacet-1
+        overlapped_cell = patch_cells_overlapped_mesh[patch][lpatch_cell]
+        position = patch_cells_faces_on_boundary[Df+1].ptrs[overlapped_cell]+lfacet-1
         patch_cells_faces_on_boundary[Df+1].data[position] = true
 
         # Go over the faces of the lower dimension on the boundary of
@@ -223,8 +218,8 @@ end
 # Patch cell faces: 
 #   patch_faces[pcell] = [face1, face2, ...]
 #   where face1, face2, ... are the faces of the overlapped cell `pcell` such that 
-#        - they are NOT on the boundary of the patch
-#        - they are flagged `true` in faces_mask
+#      - they are NOT on the boundary of the patch
+#      - they are flagged `true` in faces_mask
 function get_patch_cell_faces(PD::PatchDecomposition,Df::Integer)
   model    = PD.model
   topo     = get_grid_topology(model)
@@ -295,8 +290,8 @@ end
 # Patch faces: 
 #   patch_faces[patch] = [face1, face2, ...]
 #   where face1, face2, ... are the faces of the patch such that 
-#        - they are NOT on the boundary of the patch
-#        - they are flagged `true` in faces_mask
+#      - they are NOT on the boundary of the patch
+#      - they are flagged `true` in faces_mask
 function get_patch_faces(PD::PatchDecomposition{Dc},Df::Integer,faces_mask) where Dc
   model    = PD.model
   topo     = get_grid_topology(model)

@@ -1,16 +1,3 @@
-# ON another note. Related to FE assembly. We are going to need:
-# "Por otra parte, tb podemos tener metodos q reciben una patch-cell array y la
-# aplanan para q parezca una cell array (aunq con cells repetidas). Combinando las
-# patch-cell local matrices y cell_dofs aplanadas puedes usar el assembly verbatim si
-# quieres ensamblar la matriz."
-
-# Another note. During FE assembly we may end computing the cell matrix of a given cell
-# more than once due to cell overlapping among patches (recall the computation of these
-# matrices is lazy, it occurs on first touch). Can we live with that or should we pay
-# attention on how to avoid this? I think that Gridap already includes tools for
-# taking profit of this, I think it is called MemoArray, but it might be something else
-# (not 100% sure, to investigate)
-
 
 struct PatchBasedLinearSolver{A,B} <: Gridap.Algebra.LinearSolver
   bilinear_form  :: Function
@@ -55,8 +42,8 @@ function Gridap.Algebra.numerical_setup(ss::PatchBasedSymbolicSetup,A::AbstractM
 end
 
 function _patch_based_solver_caches(Ph::PatchFESpace,Vh::FESpace,Ap::AbstractMatrix)
-  rp        = _allocate_row_vector(Ap)
-  dxp       = _allocate_col_vector(Ap)
+  rp        = allocate_row_vector(Ap)
+  dxp       = allocate_col_vector(Ap)
   return rp, dxp
 end
 
@@ -70,24 +57,8 @@ function _patch_based_solver_caches(Ph::GridapDistributed.DistributedSingleField
   return rp, dxp, r, x
 end
 
-function _allocate_col_vector(A::AbstractMatrix)
-  zeros(size(A,2))
-end
-
-function _allocate_row_vector(A::AbstractMatrix)
-  zeros(size(A,1))
-end
-
-function _allocate_col_vector(A::PSparseMatrix)
-  pfill(0.0,partition(axes(A,2)))
-end
-
-function _allocate_row_vector(A::PSparseMatrix)
-  pfill(0.0,partition(axes(A,1)))
-end
-
 function Gridap.Algebra.numerical_setup!(ns::PatchBasedSmootherNumericalSetup, A::AbstractMatrix)
-  Gridap.Helpers.@notimplemented
+  @notimplemented
 end
 
 function Gridap.Algebra.solve!(x::AbstractVector,ns::PatchBasedSmootherNumericalSetup,r::AbstractVector)

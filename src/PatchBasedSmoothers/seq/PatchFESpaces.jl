@@ -204,6 +204,7 @@ function generate_patch_cell_dofs_ids!(patch_cell_dofs_ids,
   else
     g2l = Dict{Int,Int}()
     Dc  = length(patch_cells_faces_on_boundary)
+    d_to_cell_to_dface = [Gridap.Geometry.get_faces(topology,Dc,d) for d in 0:Dc-1]
 
     # Loop over cells of the patch (local_cell_id_within_patch)
     for (lpatch_cell,patch_cell) in enumerate(patch_cells)
@@ -211,38 +212,27 @@ function generate_patch_cell_dofs_ids!(patch_cell_dofs_ids,
       s = patch_cell_dofs_ids.ptrs[cell_overlapped_mesh]
       e = patch_cell_dofs_ids.ptrs[cell_overlapped_mesh+1]-1
       current_patch_cell_dofs_ids = view(patch_cell_dofs_ids.data,s:e)
-      face_offset = 0
       ctype = cell_conformity.cell_ctype[patch_cell]
-      for d = 0:Dc-1
-        cells_d_faces = Gridap.Geometry.get_faces(topology,Dc,d)
-        cell_d_face   = cells_d_faces[patch_cell]
 
-        # 1) DoFs belonging to faces (Df < Dc)
-        for (lf,f) in enumerate(cell_d_face)
-          # A) If current face is on the patch boundary
-          if (patch_cells_faces_on_boundary[d+1][cell_overlapped_mesh][lf])
-            # assign negative indices to DoFs owned by face
-            for ldof in cell_conformity.ctype_lface_own_ldofs[ctype][face_offset+lf]
-              gdof = global_space_cell_dofs_ids[patch_cell][ldof]
+      # 1) DoFs belonging to faces (Df < Dc)
+      face_offset = 0
+      for d = 0:Dc-1
+        num_cell_faces = length(d_to_cell_to_dface[d+1][patch_cell])
+        for lface in 1:num_cell_faces
+          for ldof in cell_conformity.ctype_lface_own_ldofs[ctype][face_offset+lface]
+            gdof = global_space_cell_dofs_ids[patch_cell][ldof]
+            
+            face_in_patch_boundary = patch_cells_faces_on_boundary[d+1][cell_overlapped_mesh][lface]
+            dof_is_dirichlet = (gdof < 0)
+            if face_in_patch_boundary || dof_is_dirichlet
               current_patch_cell_dofs_ids[ldof] = -1
-            end
-          else
-            # B) If current face is not in patch boundary,
-            # rely on the existing glued info (available at global_space_cell_dof_ids)
-            # (we will need a Dict{Int,Int} to hold the correspondence among global
-            # space and patch cell dofs IDs)
-            for ldof in cell_conformity.ctype_lface_own_ldofs[ctype][face_offset+lf]
-              gdof = global_space_cell_dofs_ids[patch_cell][ldof]
-              if (gdof > 0)
-                if gdof in keys(g2l)
-                  current_patch_cell_dofs_ids[ldof] = g2l[gdof]
-                else
-                  g2l[gdof] = free_dofs_offset
-                  current_patch_cell_dofs_ids[ldof] = free_dofs_offset
-                  free_dofs_offset += 1
-                end
+            else
+              if gdof in keys(g2l)
+                current_patch_cell_dofs_ids[ldof] = g2l[gdof]
               else
-                current_patch_cell_dofs_ids[ldof] = -1
+                g2l[gdof] = free_dofs_offset
+                current_patch_cell_dofs_ids[ldof] = free_dofs_offset
+                free_dofs_offset += 1
               end
             end
           end
@@ -323,6 +313,12 @@ function generate_dof_to_pdof!(dof_to_pdof,Vh,PD,patch_cell_dofs_ids)
   end
 end
 
+function generate_dof_to_pdof(Vh,PD,patch_cell_dofs_ids)
+  dof_to_pdof = allocate_dof_to_pdof(Vh,PD,patch_cell_dofs_ids)
+  generate_dof_to_pdof!(dof_to_pdof,Vh,PD,patch_cell_dofs_ids)
+  return dof_to_pdof
+end
+
 # x \in  PatchFESpace
 # y \in  SingleFESpace
 # TO-DO: Replace PatchFESpace by a proper operator.
@@ -355,20 +351,6 @@ function inject!(x,Ph::PatchFESpace,y)
   inject!(x,Ph::PatchFESpace,y,w,w_sums)
 end
 
-function inject!(x,Ph::PatchFESpace,y,w)
-  dof_to_pdof = Ph.dof_to_pdof
-
-  ptrs = dof_to_pdof.ptrs
-  data = dof_to_pdof.data
-  for dof in 1:length(dof_to_pdof)
-    x[dof] = 0.0
-    for k in ptrs[dof]:ptrs[dof+1]-1
-      pdof = data[k]
-      x[dof] += y[pdof] * w[pdof]
-    end
-  end
-end
-
 function inject!(x,Ph::PatchFESpace,y,w,w_sums)
   dof_to_pdof = Ph.dof_to_pdof
   
@@ -378,19 +360,15 @@ function inject!(x,Ph::PatchFESpace,y,w,w_sums)
     x[dof] = 0.0
     for k in ptrs[dof]:ptrs[dof+1]-1
       pdof = data[k]
-      x[dof] += y[pdof] * w[pdof] / w_sums[dof]
+      x[dof] += y[pdof] * w[pdof]
     end
+    x[dof] /= w_sums[dof]
   end
 end
 
 function compute_weight_operators(Ph::PatchFESpace,Vh)
-  w = Fill(1.0,num_free_dofs(Ph))
+  w      = Fill(1.0,num_free_dofs(Ph))
   w_sums = zeros(num_free_dofs(Vh))
-  inject!(w_sums,Ph,w,Fill(1.0,num_free_dofs(Vh)))
+  inject!(w_sums,Ph,w,Fill(1.0,num_free_dofs(Ph)),Fill(1.0,num_free_dofs(Vh)))
   return w, w_sums
-end
-
-function compute_weight_operators!(Ph::PatchFESpace,Vh,w,w_sums)
-  fill!(w,1.0)
-  inject!(w_sums,Ph,w,Fill(1.0,num_free_dofs(Ph)))
 end
