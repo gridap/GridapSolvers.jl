@@ -48,10 +48,9 @@ end
 function prolongate!(x::PVector,
                      Ph::GridapDistributed.DistributedSingleFieldFESpace,
                      y::PVector)
-   map(partition(x),local_views(Ph),partition(y)) do x,Ph,y
-     prolongate!(x,Ph,y)
-   end
-   consistent!(x) |> fetch
+  map(partition(x),local_views(Ph),partition(y)) do x,Ph,y
+    prolongate!(x,Ph,y)
+  end
 end
 
 # x \in  SingleFESpace
@@ -60,7 +59,8 @@ function inject!(x::PVector,
                  Ph::GridapDistributed.DistributedSingleFieldFESpace,
                  y::PVector,
                  w::PVector,
-                 w_sums::PVector)
+                 w_sums::PVector;
+                 make_consistent::Bool=true)
 
   map(partition(x),local_views(Ph),partition(y),partition(w),partition(w_sums)) do x,Ph,y,w,w_sums
     inject!(x,Ph,y,w,w_sums)
@@ -68,7 +68,9 @@ function inject!(x::PVector,
 
   # Exchange local contributions 
   assemble!(x) |> fetch
-  consistent!(x) |> fetch # TO CONSIDER: Is this necessary? Do we need ghosts for later?
+  if make_consistent
+    consistent!(x) |> fetch
+  end
   return x
 end
 

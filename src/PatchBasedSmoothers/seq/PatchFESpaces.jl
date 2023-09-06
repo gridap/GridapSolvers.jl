@@ -76,7 +76,7 @@ Gridap.FESpaces.get_fe_dof_basis(a::PatchFESpace)   = get_fe_dof_basis(a.Vh)
 
 # get_cell_dof_ids
 
-Gridap.FESpaces.get_cell_dof_ids(a::PatchFESpace)   = a.patch_cell_dofs_ids
+Gridap.FESpaces.get_cell_dof_ids(a::PatchFESpace) = a.patch_cell_dofs_ids
 Gridap.FESpaces.get_cell_dof_ids(a::PatchFESpace,::Triangulation) = @notimplemented
 
 function Gridap.FESpaces.get_cell_dof_ids(a::PatchFESpace,trian::PatchTriangulation)
@@ -327,27 +327,19 @@ end
 
 # x \in  PatchFESpace
 # y \in  SingleFESpace
-# TO-DO: Replace PatchFESpace by a proper operator.
 function prolongate!(x::AbstractVector{T},Ph::PatchFESpace,y::AbstractVector{T}) where T
   Gridap.Helpers.@check num_free_dofs(Ph.Vh) == length(y)
   Gridap.Helpers.@check num_free_dofs(Ph) == length(x)
-
-  # Gather y cell-wise
-  dv = get_dirichlet_dof_values(Ph.Vh)
-  y_cell_wise = scatter_free_and_dirichlet_values(Ph.Vh,y,dv)
-
-  # Gather y cell-wise in overlapped mesh
-  y_cell_wise_with_overlap = lazy_map(Broadcasting(Reindex(y_cell_wise)),
-                                    Ph.patch_decomposition.patch_cells.data)
-
-  Gridap.FESpaces._free_and_dirichlet_values_fill!(
-    x,
-    [1.0], # We need an array of size 1 as we put -1 everywhere at the patch boundaries
-    array_cache(y_cell_wise_with_overlap),
-    array_cache(Ph.patch_cell_dofs_ids),
-    y_cell_wise_with_overlap,
-    Ph.patch_cell_dofs_ids,
-    Gridap.Arrays.IdentityVector(length(Ph.patch_cell_dofs_ids)))
+  dof_to_pdof = Ph.dof_to_pdof
+  
+  ptrs = dof_to_pdof.ptrs
+  data = dof_to_pdof.data
+  for dof in 1:length(dof_to_pdof)
+    for k in ptrs[dof]:ptrs[dof+1]-1
+      pdof = data[k]
+      x[pdof] = y[dof]
+    end
+  end
 end
 
 # x \in  SingleFESpace
