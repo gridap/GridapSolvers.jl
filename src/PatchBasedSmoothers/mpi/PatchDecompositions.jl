@@ -1,5 +1,5 @@
 
-struct DistributedPatchDecomposition{Dc,Dp,A,B} <: GridapType
+struct DistributedPatchDecomposition{Dr,Dc,Dp,A,B} <: GridapType
   patch_decompositions::A
   model::B
 end
@@ -18,7 +18,7 @@ function PatchDecomposition(model::GridapDistributed.DistributedDiscreteModel{Dc
   end
   A = typeof(patch_decompositions)
   B = typeof(model)
-  return DistributedPatchDecomposition{Dc,Dp,A,B}(patch_decompositions,model)
+  return DistributedPatchDecomposition{Dr,Dc,Dp,A,B}(patch_decompositions,model)
 end
 
 function PatchDecomposition(mh::ModelHierarchy;kwargs...)
@@ -41,13 +41,7 @@ function Gridap.Geometry.Triangulation(a::DistributedPatchDecomposition)
   return GridapDistributed.DistributedTriangulation(trians,a.model)
 end
 
-function get_patch_root_dim(a::DistributedPatchDecomposition)
-  patch_root_dim = -1
-  map(a.patch_decompositions) do patch_decomposition
-    patch_root_dim = patch_decomposition.Dr
-  end
-  return patch_root_dim
-end
+get_patch_root_dim(::DistributedPatchDecomposition{Dr}) where Dr = Dr
 
 function mark_interface_facets!(model::GridapDistributed.DistributedDiscreteModel{Dc,Dp}) where {Dc,Dp}
   face_labeling = get_face_labeling(model)
