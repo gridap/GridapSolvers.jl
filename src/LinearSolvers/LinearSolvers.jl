@@ -16,10 +16,7 @@ using PartitionedArrays
 using GridapPETSc
 
 using GridapDistributed
-
 using GridapSolvers.MultilevelTools
-
-import LinearAlgebra: mul!, ldiv!
 
 export JacobiLinearSolver
 export RichardsonSmoother
@@ -36,7 +33,6 @@ export IS_SSORSolver
 export GMRESSolver
 export SchurComplementSolver
 
-include("Helpers.jl")
 include("IdentityLinearSolvers.jl")
 include("JacobiLinearSolvers.jl")
 include("RichardsonSmoothers.jl")
