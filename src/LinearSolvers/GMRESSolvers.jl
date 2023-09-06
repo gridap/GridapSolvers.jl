@@ -2,7 +2,7 @@
 # GMRES Solver
 struct GMRESSolver <: Gridap.Algebra.LinearSolver
   m  ::Int
-  Pl
+  Pl ::Gridap.Algebra.LinearSolver
   tol::Float64
 end
 
@@ -107,7 +107,7 @@ function Gridap.Algebra.solve!(x::AbstractVector,ns::GMRESNumericalSetup,b::Abst
     iter += 1
   end
   println("   Exiting GMRES solver.")
-  println("   > Num Iter: ", iter-1," - Final residual: ", β)
+  println("   > Num Iter: ", iter," - Final residual: ", β)
 
   return x
 end
