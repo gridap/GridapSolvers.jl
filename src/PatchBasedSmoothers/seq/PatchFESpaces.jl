@@ -74,6 +74,13 @@ Gridap.FESpaces.ConstraintStyle(::PatchFESpace)     = Gridap.FESpaces.UnConstrai
 Gridap.FESpaces.get_vector_type(a::PatchFESpace)    = get_vector_type(a.Vh)
 Gridap.FESpaces.get_fe_dof_basis(a::PatchFESpace)   = get_fe_dof_basis(a.Vh)
 
+function Gridap.CellData.get_triangulation(a::PatchFESpace)
+  PD = a.patch_decomposition
+  patch_cells = Gridap.Arrays.Table(PD.patch_cells)
+  trian = get_triangulation(a.Vh)
+  return PatchTriangulation(trian,PD,patch_cells,nothing,nothing)
+end
+
 # get_cell_dof_ids
 
 Gridap.FESpaces.get_cell_dof_ids(a::PatchFESpace) = a.patch_cell_dofs_ids
