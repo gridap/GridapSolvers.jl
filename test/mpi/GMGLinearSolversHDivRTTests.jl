@@ -32,8 +32,9 @@ function get_patch_smoothers(tests,patch_spaces,patch_decompositions,biform,qdeg
       Vh = get_fe_space(tests,lev)
       Ω  = Triangulation(PD)
       dΩ = Measure(Ω,qdegree)
-      a(u,v) = biform(u,v,dΩ) 
-      patch_smoother = PatchBasedLinearSolver(a,Ph,Vh,LUSolver())
+      a(u,v) = biform(u,v,dΩ)
+      local_solver = LUSolver() # IS_ConjugateGradientSolver(;reltol=1.e-6)
+      patch_smoother = PatchBasedLinearSolver(a,Ph,Vh,local_solver)
       smoothers[lev] = RichardsonSmoother(patch_smoother,1,1.0/3.0)
     end
   end
@@ -42,6 +43,9 @@ end
 
 function main(parts, coarse_grid_partition, num_parts_x_level, num_refs_coarse, order, α)
   GridapP4est.with(parts) do
+    t = PTimer(parts,verbose=true)
+
+    tic!(t;barrier=true)
     domain       = (0,1,0,1)
     num_levels   = length(num_parts_x_level)
     cparts       = generate_subparts(parts,num_parts_x_level[num_levels])
@@ -53,15 +57,21 @@ function main(parts, coarse_grid_partition, num_parts_x_level, num_refs_coarse, 
     reffe     = ReferenceFE(raviart_thomas,Float64,order)
     tests     = TestFESpace(mh,reffe;dirichlet_tags="boundary")
     trials    = TrialFESpace(tests,u)
+    toc!(t,"Model Hierarchy + FESpace Hierarchy")
 
+    tic!(t;barrier=true)
     patch_decompositions = PatchDecomposition(mh)
     patch_spaces = PatchFESpace(mh,reffe,DivConformity(),patch_decompositions,tests)
+    toc!(t,"Patch Decomposition + FESpaces")
 
+    tic!(t;barrier=true)
     biform(u,v,dΩ)  = ∫(v⋅u)dΩ + ∫(α*divergence(v)⋅divergence(u))dΩ
     liform(v,dΩ)    = ∫(v⋅f)dΩ
     smatrices, A, b = compute_hierarchy_matrices(trials,biform,liform,qdegree)
+    toc!(t,"Hierarchy matrices assembly")
 
     # Preconditioner
+    tic!(t;barrier=true)
     smoothers = get_patch_smoothers(tests,patch_spaces,patch_decompositions,biform,qdegree)
     restrictions, prolongations = setup_transfer_operators(trials,qdegree;mode=:residual)
 
@@ -77,15 +87,18 @@ function main(parts, coarse_grid_partition, num_parts_x_level, num_refs_coarse, 
                           mode=:preconditioner)
     ss = symbolic_setup(gmg,A)
     ns = numerical_setup(ss,A)
+    toc!(t,"Preconditioner setup")
 
     # Solve 
     x = pfill(0.0,partition(axes(A,2)))
+    tic!(t;barrier=true)
     x, history = IterativeSolvers.cg!(x,A,b;
                           verbose=i_am_main(parts),
                           reltol=1.0e-8,
                           Pl=ns,
                           log=true,
                           maxiter=10)
+    toc!(t,"Solver")
 
     # Error norms and print solution
     model = get_model(mh,1)
