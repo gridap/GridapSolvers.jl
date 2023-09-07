@@ -334,14 +334,12 @@ end
 
 # x \in  PatchFESpace
 # y \in  SingleFESpace
-function prolongate!(x::AbstractVector{T},Ph::PatchFESpace,y::AbstractVector{T}) where T
-  Gridap.Helpers.@check num_free_dofs(Ph.Vh) == length(y)
-  Gridap.Helpers.@check num_free_dofs(Ph) == length(x)
+function prolongate!(x,Ph::PatchFESpace,y;dof_ids=LinearIndices(y))
   dof_to_pdof = Ph.dof_to_pdof
   
   ptrs = dof_to_pdof.ptrs
   data = dof_to_pdof.data
-  for dof in 1:length(dof_to_pdof)
+  for dof in dof_ids
     for k in ptrs[dof]:ptrs[dof+1]-1
       pdof = data[k]
       x[pdof] = y[dof]

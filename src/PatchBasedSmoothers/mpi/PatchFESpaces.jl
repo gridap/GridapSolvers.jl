@@ -45,16 +45,32 @@ end
 
 # x \in  PatchFESpace
 # y \in  SingleFESpace
+# x is always consistent at the end since Ph has no ghosts
 function prolongate!(x::PVector,
                      Ph::GridapDistributed.DistributedSingleFieldFESpace,
-                     y::PVector)
-  map(partition(x),local_views(Ph),partition(y)) do x,Ph,y
-    prolongate!(x,Ph,y)
+                     y::PVector;
+                     is_consistent::Bool=false)
+  if is_consistent 
+    map(prolongate!,partition(x),local_views(Ph),partition(y))
+  else
+    # Communicate ghosts
+    rows = axes(y,1)
+    t = consistent!(y)
+    # Start copying owned dofs
+    map(partition(x),local_views(Ph),partition(y),own_to_local(rows)) do x,Ph,y,ids
+      prolongate!(x,Ph,y;dof_ids=ids)
+    end
+    # Wait for transfer to end and copy ghost dofs
+    wait(t)
+    map(partition(x),local_views(Ph),partition(y),ghost_to_local(rows)) do x,Ph,y,ids
+      prolongate!(x,Ph,y;dof_ids=ids)
+    end
   end
 end
 
 # x \in  SingleFESpace
 # y \in  PatchFESpace
+# y is always consistent at the start since Ph has no ghosts
 function inject!(x::PVector,
                  Ph::GridapDistributed.DistributedSingleFieldFESpace,
                  y::PVector,
