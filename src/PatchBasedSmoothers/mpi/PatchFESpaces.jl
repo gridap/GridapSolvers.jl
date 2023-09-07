@@ -53,10 +53,9 @@ function prolongate!(x::PVector,
   if is_consistent 
     map(prolongate!,partition(x),local_views(Ph),partition(y))
   else
-    # Communicate ghosts
+    # Transfer ghosts while copying owned dofs
     rows = axes(y,1)
     t = consistent!(y)
-    # Start copying owned dofs
     map(partition(x),local_views(Ph),partition(y),own_to_local(rows)) do x,Ph,y,ids
       prolongate!(x,Ph,y;dof_ids=ids)
     end
