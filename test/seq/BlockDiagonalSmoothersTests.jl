@@ -112,7 +112,7 @@ function main(model,solvers)
   BDSss = symbolic_setup(BDS,A)
   BDSns = numerical_setup(BDSss,A)
 
-  x = GridapSolvers.LinearSolvers.allocate_col_vector(A)
+  x = GridapSolvers.allocate_col_vector(A)
   x = cg!(x,A,b;verbose=true,Pl=BDSns,reltol=1.0e-12)
   @test is_same_vector(x,x_star,Xb,X)
 
@@ -121,7 +121,7 @@ function main(model,solvers)
   BDSss = symbolic_setup(BDS,A)
   BDSns = numerical_setup(BDSss,A)
 
-  x = GridapSolvers.LinearSolvers.allocate_col_vector(A)
+  x = GridapSolvers.allocate_col_vector(A)
   x = cg!(x,A,b;verbose=true,Pl=BDSns,reltol=1.0e-12)
   @test is_same_vector(x,x_star,Xb,X)
 end

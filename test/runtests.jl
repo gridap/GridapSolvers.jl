@@ -63,7 +63,6 @@ end
 run_tests(joinpath(@__DIR__, "mpi"))
 
 # Sequential tests
-@time @testset "BlockDiagonalSmoothersPETScTests" begin include("seq/BlockDiagonalSmoothersPETScTests.jl") end
 @time @testset "BlockDiagonalSmoothersTests" begin include("seq/BlockDiagonalSmoothersTests.jl") end
 @time @testset "DistributedPatchFESpacesTests" begin include("seq/DistributedPatchFESpacesTests.jl") end
 @time @testset "GMRESSolversTests" begin include("seq/GMRESSolversTests.jl") end

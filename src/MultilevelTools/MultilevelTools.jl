@@ -3,7 +3,9 @@ module MultilevelTools
 using MPI
 using LinearAlgebra
 using FillArrays
+using BlockArrays
 using IterativeSolvers
+
 using Gridap
 using Gridap.Helpers
 using Gridap.Algebra
@@ -17,12 +19,9 @@ using GridapDistributed: redistribute_cell_dofs, redistribute_cell_dofs!, get_re
 using GridapDistributed: redistribute_free_values, redistribute_free_values!, get_redistribute_free_values_cache
 using GridapDistributed: redistribute_fe_function
 using GridapDistributed: get_old_and_new_parts
-import GridapDistributed: generate_subparts
+using GridapDistributed: generate_subparts, local_views
 
-import LinearAlgebra: mul!
-import GridapDistributed: local_views
-
-
+export allocate_col_vector, allocate_row_vector
 export change_parts, num_parts, i_am_in
 export generate_level_parts, generate_subparts
 
@@ -39,6 +38,7 @@ export RestrictionOperator, ProlongationOperator
 export setup_transfer_operators
 export mul!
 
+include("Algebra.jl")
 include("SubpartitioningTools.jl")
 include("GridapFixes.jl")
 include("RefinementTools.jl")
@@ -46,6 +46,4 @@ include("ModelHierarchies.jl")
 include("FESpaceHierarchies.jl")
 include("DistributedGridTransferOperators.jl")
 
-
 end
-

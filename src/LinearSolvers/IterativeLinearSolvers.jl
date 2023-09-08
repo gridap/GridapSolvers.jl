@@ -82,6 +82,14 @@ function Gridap.Algebra.numerical_setup(::IterativeLinearSolverType,
   IterativeLinearSolverNS(ss.solver,A,nothing)
 end
 
+function Gridap.Algebra.numerical_setup(::CGIterativeSolverType,
+                                        ss::IterativeLinearSolverSS,
+                                        A::AbstractMatrix)
+  x = allocate_col_vector(A)
+  caches = IterativeSolvers.CGStateVariables(zero(x), similar(x), similar(x))
+  return IterativeLinearSolverNS(ss.solver,A,caches)
+end
+
 function Gridap.Algebra.numerical_setup(::SSORIterativeSolverType,
                                         ss::IterativeLinearSolverSS,
                                         A::AbstractMatrix)
@@ -131,8 +139,8 @@ function Gridap.Algebra.solve!(::CGIterativeSolverType,
                                x::AbstractVector,
                                ns::IterativeLinearSolverNS,
                                y::AbstractVector)
-  A, kwargs = ns.A, ns.solver.kwargs
-  return cg!(x,A,y;kwargs...)
+  A, kwargs, caches = ns.A, ns.solver.kwargs, ns.caches
+  return cg!(x,A,y;kwargs...,statevars=caches)
 end
 
 function Gridap.Algebra.solve!(::GMRESIterativeSolverType,

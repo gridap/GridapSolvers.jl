@@ -55,22 +55,14 @@ function PatchFESpace(model::DiscreteModel,
   cell_conformity = CellConformity(cell_reffe,conformity)
 
   cell_dofs_ids = get_cell_dof_ids(Vh)
-  num_cells_overlapped_mesh = num_cells(patch_decomposition)
-  patch_cell_dofs_ids = allocate_patch_cell_dofs_ids(num_cells_overlapped_mesh,
-                                                   patch_decomposition.patch_cells,
-                                                   cell_dofs_ids)
+  patch_cell_dofs_ids, num_dofs = 
+    generate_patch_cell_dofs_ids(get_grid_topology(model),
+                                 patch_decomposition.patch_cells,
+                                 patch_decomposition.patch_cells_overlapped,
+                                 patch_decomposition.patch_cells_faces_on_boundary,
+                                 cell_dofs_ids,cell_conformity,patches_mask)
 
-  num_dofs = generate_patch_cell_dofs_ids!(patch_cell_dofs_ids,
-                                         get_grid_topology(model),
-                                         patch_decomposition.patch_cells,
-                                         patch_decomposition.patch_cells_overlapped_mesh,
-                                         patch_decomposition.patch_cells_faces_on_boundary,
-                                         cell_dofs_ids,
-                                         cell_conformity,
-                                         patches_mask)
-
-  dof_to_pdof = allocate_dof_to_pdof(Vh,patch_decomposition,patch_cell_dofs_ids)
-  generate_dof_to_pdof!(dof_to_pdof,Vh,patch_decomposition,patch_cell_dofs_ids)
+  dof_to_pdof = generate_dof_to_pdof(Vh,patch_decomposition,patch_cell_dofs_ids)
 
   return PatchFESpace(num_dofs,patch_cell_dofs_ids,Vh,patch_decomposition,dof_to_pdof)
 end
@@ -82,9 +74,16 @@ Gridap.FESpaces.ConstraintStyle(::PatchFESpace)     = Gridap.FESpaces.UnConstrai
 Gridap.FESpaces.get_vector_type(a::PatchFESpace)    = get_vector_type(a.Vh)
 Gridap.FESpaces.get_fe_dof_basis(a::PatchFESpace)   = get_fe_dof_basis(a.Vh)
 
+function Gridap.CellData.get_triangulation(a::PatchFESpace)
+  PD = a.patch_decomposition
+  patch_cells = Gridap.Arrays.Table(PD.patch_cells)
+  trian = get_triangulation(a.Vh)
+  return PatchTriangulation(trian,PD,patch_cells,nothing,nothing)
+end
+
 # get_cell_dof_ids
 
-Gridap.FESpaces.get_cell_dof_ids(a::PatchFESpace)   = a.patch_cell_dofs_ids
+Gridap.FESpaces.get_cell_dof_ids(a::PatchFESpace) = a.patch_cell_dofs_ids
 Gridap.FESpaces.get_cell_dof_ids(a::PatchFESpace,::Triangulation) = @notimplemented
 
 function Gridap.FESpaces.get_cell_dof_ids(a::PatchFESpace,trian::PatchTriangulation)
@@ -105,8 +104,8 @@ function Gridap.FESpaces.get_cell_dof_ids(::SkeletonTriangulation,a::PatchFESpac
   cell_dof_ids     = get_cell_dof_ids(a)
   pfaces_to_pcells = trian.pfaces_to_pcells
   
-  plus         = lazy_map(Reindex(cell_dof_ids),lazy_map(x->x[1],pfaces_to_pcells))
-  minus        = lazy_map(Reindex(cell_dof_ids),lazy_map(x->x[2],pfaces_to_pcells))
+  plus  = lazy_map(Reindex(cell_dof_ids),lazy_map(x->x[1],pfaces_to_pcells))
+  minus = lazy_map(Reindex(cell_dof_ids),lazy_map(x->x[2],pfaces_to_pcells))
   return lazy_map(Gridap.Fields.BlockMap(2,[1,2]),plus,minus)
 end
 
@@ -125,22 +124,38 @@ function setup_cell_reffe(model::DiscreteModel,reffe::Tuple{<:Gridap.FESpaces.Re
   return cell_reffe
 end
 
-function allocate_patch_cell_dofs_ids(num_cells_overlapped_mesh,cell_patches,cell_dof_ids)
-  cache   = array_cache(cell_patches)
-  cache_cdofids = array_cache(cell_dof_ids)
+function generate_patch_cell_dofs_ids(topology,
+                                      patch_cells,
+                                      patch_cells_overlapped,
+                                      patch_cells_faces_on_boundary,
+                                      cell_dofs_ids,
+                                      cell_conformity,
+                                      patches_mask)
+  patch_cell_dofs_ids = allocate_patch_cell_dofs_ids(patch_cells,cell_dofs_ids)
+  num_dofs = generate_patch_cell_dofs_ids!(patch_cell_dofs_ids,topology,
+                                           patch_cells,patch_cells_overlapped,
+                                           patch_cells_faces_on_boundary,
+                                           cell_dofs_ids,cell_conformity,patches_mask)
+  return patch_cell_dofs_ids, num_dofs
+end
 
-  ptrs    = Vector{Int}(undef,num_cells_overlapped_mesh+1)
-  ptrs[1] = 1; gcell_overlapped_mesh = 1
-  for patch = 1:length(cell_patches)
-    cells_patch = getindex!(cache,cell_patches,patch)
-    for cell in cells_patch
-      current_cell_dof_ids = getindex!(cache_cdofids,cell_dof_ids,cell)
-      ptrs[gcell_overlapped_mesh+1] = ptrs[gcell_overlapped_mesh]+length(current_cell_dof_ids)
-      gcell_overlapped_mesh += 1
+function allocate_patch_cell_dofs_ids(patch_cells,cell_dofs_ids)
+  cache_cells = array_cache(patch_cells)
+  cache_cdofs = array_cache(cell_dofs_ids)
+
+  num_overlapped_cells = length(patch_cells.data)
+  ptrs    = Vector{Int}(undef,num_overlapped_cells+1)
+  ptrs[1] = 1; ncells = 1
+  for patch = 1:length(patch_cells)
+    cells = getindex!(cache_cells,patch_cells,patch)
+    for cell in cells
+      current_cell_dof_ids = getindex!(cache_cdofs,cell_dofs_ids,cell)
+      ptrs[ncells+1] = ptrs[ncells]+length(current_cell_dof_ids)
+      ncells += 1
     end
   end
 
-  @check num_cells_overlapped_mesh+1 == gcell_overlapped_mesh
+  @check num_overlapped_cells+1 == ncells
   data = Vector{Int}(undef,ptrs[end]-1)
   return Gridap.Arrays.Table(data,ptrs)
 end
@@ -148,7 +163,7 @@ end
 function generate_patch_cell_dofs_ids!(patch_cell_dofs_ids,
                                        topology,
                                        patch_cells,
-                                       patch_cells_overlapped_mesh,
+                                       patch_cells_overlapped,
                                        patch_cells_faces_on_boundary,
                                        cell_dofs_ids,
                                        cell_conformity,
@@ -163,7 +178,7 @@ function generate_patch_cell_dofs_ids!(patch_cell_dofs_ids,
                                     topology,
                                     patch,
                                     current_patch_cells,
-                                    patch_cells_overlapped_mesh,
+                                    patch_cells_overlapped,
                                     patch_cells_faces_on_boundary,
                                     cell_dofs_ids,
                                     cell_conformity;
@@ -186,17 +201,17 @@ function generate_patch_cell_dofs_ids!(patch_cell_dofs_ids,
                                        topology,
                                        patch::Integer,
                                        patch_cells::AbstractVector{<:Integer},
-                                       patch_cells_overlapped_mesh::Gridap.Arrays.Table,
+                                       patch_cells_overlapped::Gridap.Arrays.Table,
                                        patch_cells_faces_on_boundary,
                                        global_space_cell_dofs_ids,
                                        cell_conformity;
                                        free_dofs_offset=1,
                                        mask=false)
 
-  o  = patch_cells_overlapped_mesh.ptrs[patch]
+  o  = patch_cells_overlapped.ptrs[patch]
   if mask
     for lpatch_cell = 1:length(patch_cells)
-      cell_overlapped_mesh = patch_cells_overlapped_mesh.data[o+lpatch_cell-1]
+      cell_overlapped_mesh = patch_cells_overlapped.data[o+lpatch_cell-1]
       s = patch_cell_dofs_ids.ptrs[cell_overlapped_mesh]
       e = patch_cell_dofs_ids.ptrs[cell_overlapped_mesh+1]-1
       patch_cell_dofs_ids.data[s:e] .= -1
@@ -204,46 +219,34 @@ function generate_patch_cell_dofs_ids!(patch_cell_dofs_ids,
   else
     g2l = Dict{Int,Int}()
     Dc  = length(patch_cells_faces_on_boundary)
+    d_to_cell_to_dface = [Gridap.Geometry.get_faces(topology,Dc,d) for d in 0:Dc-1]
 
     # Loop over cells of the patch (local_cell_id_within_patch)
     for (lpatch_cell,patch_cell) in enumerate(patch_cells)
-      cell_overlapped_mesh = patch_cells_overlapped_mesh.data[o+lpatch_cell-1]
+      cell_overlapped_mesh = patch_cells_overlapped.data[o+lpatch_cell-1]
       s = patch_cell_dofs_ids.ptrs[cell_overlapped_mesh]
       e = patch_cell_dofs_ids.ptrs[cell_overlapped_mesh+1]-1
       current_patch_cell_dofs_ids = view(patch_cell_dofs_ids.data,s:e)
-      face_offset = 0
       ctype = cell_conformity.cell_ctype[patch_cell]
-      for d = 0:Dc-1
-        cells_d_faces = Gridap.Geometry.get_faces(topology,Dc,d)
-        cell_d_face   = cells_d_faces[patch_cell]
 
-        # 1) DoFs belonging to faces (Df < Dc)
-        for (lf,f) in enumerate(cell_d_face)
-          # A) If current face is on the patch boundary
-          if (patch_cells_faces_on_boundary[d+1][cell_overlapped_mesh][lf])
-            # assign negative indices to DoFs owned by face
-            for ldof in cell_conformity.ctype_lface_own_ldofs[ctype][face_offset+lf]
-              gdof = global_space_cell_dofs_ids[patch_cell][ldof]
+      # 1) DoFs belonging to faces (Df < Dc)
+      face_offset = 0
+      for d = 0:Dc-1
+        num_cell_faces = length(d_to_cell_to_dface[d+1][patch_cell])
+        for lface in 1:num_cell_faces
+          for ldof in cell_conformity.ctype_lface_own_ldofs[ctype][face_offset+lface]
+            gdof = global_space_cell_dofs_ids[patch_cell][ldof]
+            
+            face_in_patch_boundary = patch_cells_faces_on_boundary[d+1][cell_overlapped_mesh][lface]
+            dof_is_dirichlet = (gdof < 0)
+            if face_in_patch_boundary || dof_is_dirichlet
               current_patch_cell_dofs_ids[ldof] = -1
-            end
-          else
-            # B) If current face is not in patch boundary,
-            # rely on the existing glued info (available at global_space_cell_dof_ids)
-            # (we will need a Dict{Int,Int} to hold the correspondence among global
-            # space and patch cell dofs IDs)
-            for ldof in cell_conformity.ctype_lface_own_ldofs[ctype][face_offset+lf]
-              gdof = global_space_cell_dofs_ids[patch_cell][ldof]
-              if (gdof > 0)
-                if gdof in keys(g2l)
-                  current_patch_cell_dofs_ids[ldof] = g2l[gdof]
-                else
-                  g2l[gdof] = free_dofs_offset
-                  current_patch_cell_dofs_ids[ldof] = free_dofs_offset
-                  free_dofs_offset += 1
-                end
-              else
-                current_patch_cell_dofs_ids[ldof] = -1
-              end
+            elseif gdof in keys(g2l)
+              current_patch_cell_dofs_ids[ldof] = g2l[gdof]
+            else
+              g2l[gdof] = free_dofs_offset
+              current_patch_cell_dofs_ids[ldof] = free_dofs_offset
+              free_dofs_offset += 1
             end
           end
         end
@@ -260,7 +263,13 @@ function generate_patch_cell_dofs_ids!(patch_cell_dofs_ids,
   return free_dofs_offset
 end
 
-function allocate_dof_to_pdof(Vh,PD,patch_cell_dofs_ids)
+function generate_dof_to_pdof(Vh,PD,patch_cell_dofs_ids)
+  dof_to_pdof = _allocate_dof_to_pdof(Vh,PD,patch_cell_dofs_ids)
+  _generate_dof_to_pdof!(dof_to_pdof,Vh,PD,patch_cell_dofs_ids)
+  return dof_to_pdof
+end
+
+function _allocate_dof_to_pdof(Vh,PD,patch_cell_dofs_ids)
   touched = Dict{Int,Bool}()
   cell_mesh_overlapped = 1
   cache_patch_cells  = array_cache(PD.patch_cells)
@@ -291,7 +300,7 @@ function allocate_dof_to_pdof(Vh,PD,patch_cell_dofs_ids)
   return Gridap.Arrays.Table(data,ptrs)
 end
 
-function generate_dof_to_pdof!(dof_to_pdof,Vh,PD,patch_cell_dofs_ids)
+function _generate_dof_to_pdof!(dof_to_pdof,Vh,PD,patch_cell_dofs_ids)
   touched = Dict{Int,Bool}()
   cell_mesh_overlapped = 1
   cache_patch_cells  = array_cache(PD.patch_cells)
@@ -325,27 +334,17 @@ end
 
 # x \in  PatchFESpace
 # y \in  SingleFESpace
-# TO-DO: Replace PatchFESpace by a proper operator.
-function prolongate!(x::AbstractVector{T},Ph::PatchFESpace,y::AbstractVector{T}) where T
-  Gridap.Helpers.@check num_free_dofs(Ph.Vh) == length(y)
-  Gridap.Helpers.@check num_free_dofs(Ph) == length(x)
-
-  # Gather y cell-wise
-  dv = get_dirichlet_dof_values(Ph.Vh)
-  y_cell_wise = scatter_free_and_dirichlet_values(Ph.Vh,y,dv)
-
-  # Gather y cell-wise in overlapped mesh
-  y_cell_wise_with_overlap = lazy_map(Broadcasting(Reindex(y_cell_wise)),
-                                    Ph.patch_decomposition.patch_cells.data)
-
-  Gridap.FESpaces._free_and_dirichlet_values_fill!(
-    x,
-    [1.0], # We need an array of size 1 as we put -1 everywhere at the patch boundaries
-    array_cache(y_cell_wise_with_overlap),
-    array_cache(Ph.patch_cell_dofs_ids),
-    y_cell_wise_with_overlap,
-    Ph.patch_cell_dofs_ids,
-    Gridap.Arrays.IdentityVector(length(Ph.patch_cell_dofs_ids)))
+function prolongate!(x,Ph::PatchFESpace,y;dof_ids=LinearIndices(y))
+  dof_to_pdof = Ph.dof_to_pdof
+  
+  ptrs = dof_to_pdof.ptrs
+  data = dof_to_pdof.data
+  for dof in dof_ids
+    for k in ptrs[dof]:ptrs[dof+1]-1
+      pdof = data[k]
+      x[pdof] = y[dof]
+    end
+  end
 end
 
 # x \in  SingleFESpace
@@ -353,20 +352,6 @@ end
 function inject!(x,Ph::PatchFESpace,y)
   w, w_sums = compute_weight_operators(Ph,Ph.Vh)
   inject!(x,Ph::PatchFESpace,y,w,w_sums)
-end
-
-function inject!(x,Ph::PatchFESpace,y,w)
-  dof_to_pdof = Ph.dof_to_pdof
-
-  ptrs = dof_to_pdof.ptrs
-  data = dof_to_pdof.data
-  for dof in 1:length(dof_to_pdof)
-    x[dof] = 0.0
-    for k in ptrs[dof]:ptrs[dof+1]-1
-      pdof = data[k]
-      x[dof] += y[pdof] * w[pdof]
-    end
-  end
 end
 
 function inject!(x,Ph::PatchFESpace,y,w,w_sums)
@@ -378,19 +363,15 @@ function inject!(x,Ph::PatchFESpace,y,w,w_sums)
     x[dof] = 0.0
     for k in ptrs[dof]:ptrs[dof+1]-1
       pdof = data[k]
-      x[dof] += y[pdof] * w[pdof] / w_sums[dof]
+      x[dof] += y[pdof] * w[pdof]
     end
+    x[dof] /= w_sums[dof]
   end
 end
 
 function compute_weight_operators(Ph::PatchFESpace,Vh)
-  w = Fill(1.0,num_free_dofs(Ph))
+  w      = Fill(1.0,num_free_dofs(Ph))
   w_sums = zeros(num_free_dofs(Vh))
-  inject!(w_sums,Ph,w,Fill(1.0,num_free_dofs(Vh)))
+  inject!(w_sums,Ph,w,Fill(1.0,num_free_dofs(Ph)),Fill(1.0,num_free_dofs(Vh)))
   return w, w_sums
-end
-
-function compute_weight_operators!(Ph::PatchFESpace,Vh,w,w_sums)
-  fill!(w,1.0)
-  inject!(w_sums,Ph,w,Fill(1.0,num_free_dofs(Ph)))
 end
