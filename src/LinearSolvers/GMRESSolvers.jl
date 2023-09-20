@@ -4,6 +4,11 @@ struct GMRESSolver <: Gridap.Algebra.LinearSolver
   m  ::Int
   Pl ::Gridap.Algebra.LinearSolver
   tol::Float64
+  verbose::Bool
+end
+
+function GMRESSolver(m,Pl;tol=1e-6,verbose=false)
+  return GMRESSolver(m,Pl,tol,verbose)
 end
 
 struct GMRESSymbolicSetup <: Gridap.Algebra.SymbolicSetup
@@ -47,9 +52,9 @@ end
 
 function Gridap.Algebra.solve!(x::AbstractVector,ns::GMRESNumericalSetup,b::AbstractVector)
   solver, A, Pl, caches = ns.solver, ns.A, ns.Pl_ns, ns.caches
-  m, tol = solver.m, solver.tol
+  m, tol, verbose = solver.m, solver.tol, solver.verbose
   w, V, Z, H, g, c, s = caches
-  println(" > Starting GMRES solver: ")
+  verbose && println(" > Starting GMRES solver: ")
 
   # Initial residual
   mul!(w,A,x); w .= b .- w
@@ -57,7 +62,7 @@ function Gridap.Algebra.solve!(x::AbstractVector,ns::GMRESNumericalSetup,b::Abst
   β    = norm(w)
   iter = 0
   while (β > tol)
-    println("   > Iteration ", iter," - Residual: ", β)
+    verbose && println("   > Iteration ", iter," - Residual: ", β)
     fill!(H,0.0)
     
     # Arnoldi process
@@ -65,7 +70,7 @@ function Gridap.Algebra.solve!(x::AbstractVector,ns::GMRESNumericalSetup,b::Abst
     V[1] .= w ./ β
     j = 1
     while ( j < m+1 && β > tol )
-      println("      > Inner iteration ", j," - Residual: ", β)
+      verbose && println("      > Inner iteration ", j," - Residual: ", β)
       # Arnoldi orthogonalization by Modified Gram-Schmidt
       solve!(Z[j],Pl,V[j])
       mul!(w,A,Z[j])
@@ -106,8 +111,8 @@ function Gridap.Algebra.solve!(x::AbstractVector,ns::GMRESNumericalSetup,b::Abst
 
     iter += 1
   end
-  println("   Exiting GMRES solver.")
-  println("   > Num Iter: ", iter," - Final residual: ", β)
+  verbose && println("   > Num Iter: ", iter," - Final residual: ", β)
+  verbose && println("   Exiting GMRES solver.")
 
   return x
 end
