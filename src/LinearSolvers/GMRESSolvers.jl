@@ -61,7 +61,7 @@ function Gridap.Algebra.solve!(x::AbstractVector,ns::GMRESNumericalSetup,b::Abst
   mul!(w,A,x); w .= b .- w
 
   β    = norm(w); β0 = β
-  converged = (β > atol || β > rtol*β0)
+  converged = (β < atol || β < rtol*β0)
   iter = 0
   while !converged
     verbose && println("   > Iteration ", iter," - Residual: ", β)
@@ -95,7 +95,7 @@ function Gridap.Algebra.solve!(x::AbstractVector,ns::GMRESNumericalSetup,b::Abst
       H[j,j] = c[j]*H[j,j] + s[j]*H[j+1,j]; H[j+1,j] = 0.0
       g[j+1] = -s[j]*g[j]; g[j] = c[j]*g[j]
 
-      β  = abs(g[j+1]); converged = (β > atol || β > rtol*β0)
+      β  = abs(g[j+1]); converged = (β < atol || β < rtol*β0)
       j += 1
     end
     j = j-1
