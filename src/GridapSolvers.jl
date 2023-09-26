@@ -1,9 +1,11 @@
 module GridapSolvers
 
+  include("SolverInterfaces/SolverInterfaces.jl")
   include("MultilevelTools/MultilevelTools.jl")
   include("LinearSolvers/LinearSolvers.jl")
   include("PatchBasedSmoothers/PatchBasedSmoothers.jl")
 
+  using GridapSolvers.SolverInterfaces
   using GridapSolvers.MultilevelTools
   using GridapSolvers.LinearSolvers
   using GridapSolvers.PatchBasedSmoothers
