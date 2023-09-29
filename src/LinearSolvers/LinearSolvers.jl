@@ -41,6 +41,7 @@ include("GMGLinearSolvers.jl")
 include("BlockDiagonalSmoothers.jl")
 include("IterativeLinearSolvers.jl")
 include("GMRESSolvers.jl")
+include("CGSolvers.jl")
 include("SchurComplementSolvers.jl")
 
 end
