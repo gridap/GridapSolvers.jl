@@ -1,15 +1,15 @@
-
 # GMRES Solver
 struct GMRESSolver <: Gridap.Algebra.LinearSolver
-  m   ::Int
-  Pl  ::Gridap.Algebra.LinearSolver
-  atol::Float64
-  rtol::Float64
-  verbose::Bool
+  m       :: Int
+  Pr      :: Union{Gridap.Algebra.LinearSolver,Nothing}
+  Pl      :: Union{Gridap.Algebra.LinearSolver,Nothing}
+  atol    :: Float64
+  rtol    :: Float64
+  verbose :: Bool
 end
 
-function GMRESSolver(m,Pl;atol=1e-12,rtol=1.e-6,verbose=false)
-  return GMRESSolver(m,Pl,atol,rtol,verbose)
+function GMRESSolver(m;Pr=nothing,Pl=nothing,atol=1e-12,rtol=1.e-6,verbose=false)
+  return GMRESSolver(m,Pr,Pl,atol,rtol,verbose)
 end
 
 struct GMRESSymbolicSetup <: Gridap.Algebra.SymbolicSetup
@@ -23,65 +23,72 @@ end
 mutable struct GMRESNumericalSetup <: Gridap.Algebra.NumericalSetup
   solver
   A
+  Pr_ns
   Pl_ns
   caches
 end
 
-function get_gmres_caches(m,A)
-  w = allocate_col_vector(A)
-  V = [allocate_col_vector(A) for i in 1:m+1]
-  Z = [allocate_col_vector(A) for i in 1:m]
+function get_solver_caches(solver::GMRESSolver,A)
+  m, Pl, Pr = solver.m, solver.Pl, solver.Pr
+
+  V  = [allocate_col_vector(A) for i in 1:m+1]
+  zr = !isa(Pr,Nothing) ? allocate_col_vector(A) : nothing
+  zl = !isa(Pl,Nothing) ? allocate_col_vector(A) : nothing
 
   H = zeros(m+1,m)  # Hessenberg matrix
   g = zeros(m+1)    # Residual vector
   c = zeros(m)      # Gibens rotation cosines
   s = zeros(m)      # Gibens rotation sines
-  return (w,V,Z,H,g,c,s)
+  return (V,zr,zl,H,g,c,s)
 end
 
 function Gridap.Algebra.numerical_setup(ss::GMRESSymbolicSetup, A::AbstractMatrix)
   solver = ss.solver
-  Pl_ns  = numerical_setup(symbolic_setup(solver.Pl,A),A)
-  caches = get_gmres_caches(solver.m,A)
-  return GMRESNumericalSetup(solver,A,Pl_ns,caches)
+  Pr_ns  = isa(solver.Pl,Nothing) ? nothing : numerical_setup(symbolic_setup(solver.Pr,A),A)
+  Pl_ns  = isa(solver.Pl,Nothing) ? nothing : numerical_setup(symbolic_setup(solver.Pl,A),A)
+  caches = get_solver_caches(solver,A)
+  return GMRESNumericalSetup(solver,A,Pr_ns,Pl_ns,caches)
 end
 
 function Gridap.Algebra.numerical_setup!(ns::GMRESNumericalSetup, A::AbstractMatrix)
-  numerical_setup!(ns.Pl_ns,A)
+  if !isa(ns.Pr_ns,Nothing)
+    numerical_setup!(ns.Pr_ns,A)
+  end
+  if !isa(ns.Pl_ns,Nothing)
+    numerical_setup!(ns.Pl_ns,A)
+  end
   ns.A = A
 end
 
 function Gridap.Algebra.solve!(x::AbstractVector,ns::GMRESNumericalSetup,b::AbstractVector)
-  solver, A, Pl, caches = ns.solver, ns.A, ns.Pl_ns, ns.caches
+  solver, A, Pl, Pr, caches = ns.solver, ns.A, ns.Pl_ns, ns.Pr_ns, ns.caches
   m, atol, rtol, verbose = solver.m, solver.atol, solver.rtol, solver.verbose
-  w, V, Z, H, g, c, s = caches
+  V, zr, zl, H, g, c, s = caches
   verbose && println(" > Starting GMRES solver: ")
 
   # Initial residual
-  mul!(w,A,x); w .= b .- w
-
-  β    = norm(w); β0 = β
-  converged = (β < atol || β < rtol*β0)
+  krylov_residual!(V[1],x,A,b,Pl,zl)
+  β    = norm(V[1]); β0 = β
   iter = 0
+  converged = (β < atol || β < rtol*β0)
   while !converged
     verbose && println("   > Iteration ", iter," - Residual: ", β)
     fill!(H,0.0)
     
     # Arnoldi process
-    fill!(g,0.0); g[1] = β
-    V[1] .= w ./ β
     j = 1
+    V[1] ./= β
+    fill!(g,0.0); g[1] = β
     while ( j < m+1 && !converged )
       verbose && println("      > Inner iteration ", j," - Residual: ", β)
       # Arnoldi orthogonalization by Modified Gram-Schmidt
-      solve!(Z[j],Pl,V[j])
-      mul!(w,A,Z[j])
+      krylov_mul!(V[j+1],A,V[j],Pr,Pl,zr,zl)
       for i in 1:j
-        H[i,j] = dot(w,V[i])
-        w .= w .- H[i,j] .* V[i]
+        H[i,j] = dot(V[j+1],V[i])
+        V[j+1] .= V[j+1] .- H[i,j] .* V[i]
       end
-      H[j+1,j] = norm(w)
-      V[j+1] = w ./ H[j+1,j]
+      H[j+1,j] = norm(V[j+1])
+      V[j+1] ./= H[j+1,j]
 
       # Update QR
       for i in 1:j-1
@@ -106,10 +113,19 @@ function Gridap.Algebra.solve!(x::AbstractVector,ns::GMRESNumericalSetup,b::Abst
     end
 
     # Update solution & residual
-    for i in 1:j
-      x .+= g[i] .* Z[i]
+    if isa(Pr,Nothing)
+      for i in 1:j
+        x .+= g[i] .* V[i]
+      end
+    else
+      fill!(zl,0.0)
+      for i in 1:j
+        zl .+= g[i] .* V[i]
+      end
+      solve!(zr,Pr,zl)
+      x .+= zr
     end
-    mul!(w,A,x); w .= b .- w
+    krylov_residual!(V[1],x,A,b,Pl,zl)
 
     iter += 1
   end

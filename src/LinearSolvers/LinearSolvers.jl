@@ -23,6 +23,7 @@ export RichardsonSmoother
 export SymGaussSeidelSmoother
 export GMGLinearSolver
 export BlockDiagonalSmoother
+export SchurComplementSolver
 
 # Wrappers for IterativeSolvers.jl
 export IS_ConjugateGradientSolver
@@ -30,8 +31,17 @@ export IS_GMRESSolver
 export IS_MINRESSolver
 export IS_SSORSolver
 
+# Krylov solvers 
+export CGSolver
 export GMRESSolver
-export SchurComplementSolver
+export FGMRESSolver
+export MINRESSolver
+
+include("Krylov/KrylovUtils.jl")
+include("Krylov/CGSolvers.jl")
+include("Krylov/GMRESSolvers.jl")
+include("Krylov/FGMRESSolvers.jl")
+include("Krylov/MINRESSolvers.jl")
 
 include("IdentityLinearSolvers.jl")
 include("JacobiLinearSolvers.jl")
@@ -40,8 +50,6 @@ include("SymGaussSeidelSmoothers.jl")
 include("GMGLinearSolvers.jl")
 include("BlockDiagonalSmoothers.jl")
 include("IterativeLinearSolvers.jl")
-include("GMRESSolvers.jl")
-include("CGSolvers.jl")
 include("SchurComplementSolvers.jl")
 
 end

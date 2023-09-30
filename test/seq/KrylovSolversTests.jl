@@ -40,15 +40,18 @@ function main(model)
   l(v)   = ∫(v⋅f)*dΩ
   op = AffineFEOperator(a,l,Uh,Vh)
   
-  Pl = JacobiLinearSolver()
+  P = JacobiLinearSolver()
 
-  gmres = LinearSolvers.GMRESSolver(40,Pl;rtol=1.e-8,verbose=true)
+  gmres = LinearSolvers.GMRESSolver(40;Pr=P,Pl=P,rtol=1.e-8,verbose=true)
   test_solver(gmres,op,Uh,dΩ)
 
-  pcg = LinearSolvers.CGSolver(Pl;verbose=true)
+  fgmres = LinearSolvers.FGMRESSolver(40,P;rtol=1.e-8,verbose=true)
+  test_solver(fgmres,op,Uh,dΩ)
+
+  pcg = LinearSolvers.CGSolver(P;verbose=true)
   test_solver(pcg,op,Uh,dΩ)
 
-  fpcg = LinearSolvers.CGSolver(Pl;flexible=true,verbose=true)
+  fpcg = LinearSolvers.CGSolver(P;flexible=true,verbose=true)
   test_solver(fpcg,op,Uh,dΩ)
 end
 
