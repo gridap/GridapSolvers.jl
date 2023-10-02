@@ -1,15 +1,14 @@
 
 struct CGSolver <: Gridap.Algebra.LinearSolver
   Pl       :: Gridap.Algebra.LinearSolver
-  maxiter  :: Int64
-  atol     :: Float64
-  rtol     :: Float64
+  info     :: SolverTolerances{Float64}
   flexible :: Bool
   verbose  :: Bool
 end
 
-function CGSolver(Pl;maxiter=10000,atol=1e-12,rtol=1.e-6,flexible=false,verbose=false)
-  return CGSolver(Pl,maxiter,atol,rtol,flexible,verbose)
+function CGSolver(Pl;maxiter=1000,atol=1e-12,rtol=1.e-6,flexible=false,verbose=false)
+  tols = SolverTolerances{Float64}(maxiter=maxiter,atol=atol,rtol=rtol)
+  return CGSolver(Pl,tols,flexible,verbose)
 end
 
 struct CGSymbolicSetup <: Gridap.Algebra.SymbolicSetup

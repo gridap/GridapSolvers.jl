@@ -10,7 +10,7 @@ function SolverTolerances{T}(;maxits=1000, atol=eps(T), rtol=T(1.e-5), dtol=T(In
   return SolverTolerances{T}(maxits, atol, rtol, dtol)
 end
 
-get_solver_tolerances(s::Solver) = @abstractmethod
+get_solver_tolerances(s::Gridap.Algebra.LinearSolver) = @abstractmethod
 
 function set_solver_tolerances!(a::SolverTolerances{T};
                                 maxits = 1000,
@@ -24,7 +24,15 @@ function set_solver_tolerances!(a::SolverTolerances{T};
   return a
 end
 
-function set_solver_tolerances!(s::Solver;kwargs...)
+function finished(tols::SolverTolerances,niter,e_r,e_a)
+  return (niter > tols.maxits) || converged(tols,niter,e_r,e_a)
+end
+
+function converged(tols::SolverTolerances,niter,e_r,e_a)
+  return (e_r < tols.rtol) || (e_a < tols.atol)
+end
+
+function set_solver_tolerances!(s::Gridap.Algebra.LinearSolver;kwargs...)
   a = get_solver_tolerances(s)
   return set_solver_tolerances!(a;kwargs...)
 end
@@ -35,4 +43,8 @@ function Base.show(io::IO,k::MIME"text/plain",t::SolverTolerances{T}) where T
   println(io,"  - atol: $(t.atol)")
   println(io,"  - rtol: $(t.rtol)")
   println(io,"  - dtol: $(t.dtol)")
+end
+
+function Base.summary(t::SolverTolerances{T}) where T
+  return "Tolerances: maxits=$(t.maxits), atol=$(t.atol), rtol=$(t.rtol), dtol=$(t.dtol)"
 end

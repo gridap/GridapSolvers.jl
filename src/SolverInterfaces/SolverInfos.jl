@@ -6,6 +6,25 @@
   SOLVER_DIVERGED_BREAKDOWN = 3
 end
 
+@enum SolverVerboseLevel begin
+  SOLVER_VERBOSE_NONE = 0
+  SOLVER_VERBOSE_LOW  = 1
+  SOLVER_VERBOSE_HIGH = 2
+end
+
+@enum SolverLogLevel begin
+  SOLVER_LOG_NONE = 0
+  SOLVER_LOG_SELF = 1
+  SOLVER_LOG_ALL  = 2
+end
+
+"""
+ConvergenceLog
+ConvergenceTracker
+ConvergenceMonitor
+
+"""
+
 struct SolverInfo{T<:Real}
   name :: String
   tols :: SolverTolerances{T}
@@ -15,15 +34,12 @@ end
 SolverInfo(name::String) = SolverInfo(name,SolverTolerances{Float64}())
 SolverInfo(name::String,tols::SolverTolerances) = SolverInfo(name,tols,Dict{Symbol, Any}())
 
-function get_solver_info(::Solver)
+function get_solver_info(::Gridap.Algebra.LinearSolver)
   @abstractmethod
 end
 
 function log_info!(a::SolverInfo,key::Symbol,val)
-  if haskey(a.data, key)
-    @warn("SolverInfo[$(a.name)] - Key $key already exists! Overwriting...")
-  end
-  push!(a.data[key], val)
+  a.data[key] = val
 end
 
 function log_iteration_info!(a::SolverInfo,key::Symbol,val::T) where T
@@ -34,7 +50,7 @@ function log_iteration_info!(a::SolverInfo,key::Symbol,val::T) where T
   push!(a.data[log_key], val)
 end
 
-function log_convergence_info!(a::SolverInfo{T}, niter::Int, e_rel::T, e_abs::T)
+function log_convergence_info!(a::SolverInfo{T}, niter::Int, e_rel::T, e_abs::T) where T
   tols = a.tols
   if e_abs < tols.atol
     flag = SOLVER_CONVERGED_ATOL
@@ -52,43 +68,35 @@ function log_convergence_info!(a::SolverInfo{T}, niter::Int, e_rel::T, e_abs::T)
   return a
 end
 
-function log_iteration_error!(a::SolverInfo{T}, e_rel::T, e_abs::T)
+function log_iteration_error!(a::SolverInfo{T}, e_rel::T, e_abs::T) where T
   log_iteration_info!(a,:err_rel,e_rel)
   log_iteration_info!(a,:err_abs,e_abs)
 end
 
 function Base.show(io::IO,k::MIME"text/plain",a::SolverInfo)
   println(io,"SolverInfo[$(a.name)]")
-  show(io,k,a.tols)
+  println(io," > " * summary(a.tols))
 
   d = a.data
   if haskey(d,:convergence_flag)
-    println(io,"Convergence data:")
+    println(io," > Convergence:")
     println(io,"  - conv flag: $(d[:convergence_flag])")
     println(io,"  - num iters: $(d[:num_iters])")
     println(io,"  - rel error: $(d[:err_rel])")
     println(io,"  - abs error: $(d[:err_abs])")
   else
-    println(io,"Convergence not set.")
+    println(io," > Convergence not set.")
   end
 end
 
-
-# Solver Hierarchies
-
-AbstractTrees.children(s::Solver) = []
-AbstractTrees.node_value(s::Solver) = get_solver_info(s)
-
-function Base.show(io::IO,a::Solver)
-  AbstractTrees.print_tree(io,a)
-end
-
-# LinearSolvers that depend on the non-linear solution
-
-function Gridap.Algebra.numerical_setup!(ns::Solver,A::AbstractMatrix,x::AbstractVector)
-  numerical_setup!(ns,A)
-end
-
-function allocate_solver_caches(ns::Solver,args...;kwargs...)
-  @abstractmethod
+function Base.summary(a::SolverInfo) 
+  msg = "[$(a.name)]["
+  if haskey(a.data,:convergence_flag)
+    msg *= "conv_flag=$(a.data[:convergence_flag]), "
+    msg *= "niter=$(a.data[:num_iters]), "
+    msg *= "err_rel=$(a.data[:err_rel]), "
+    msg *= "err_abs=$(a.data[:err_abs])"
+  end
+  msg *= "]"
+  return msg
 end
