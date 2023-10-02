@@ -48,11 +48,14 @@ function main(model)
   fgmres = LinearSolvers.FGMRESSolver(40,P;rtol=1.e-8,verbose=true)
   test_solver(fgmres,op,Uh,dΩ)
 
-  pcg = LinearSolvers.CGSolver(P;verbose=true)
+  pcg = LinearSolvers.CGSolver(P;rtol=1.e-8,verbose=true)
   test_solver(pcg,op,Uh,dΩ)
 
-  fpcg = LinearSolvers.CGSolver(P;flexible=true,verbose=true)
+  fpcg = LinearSolvers.CGSolver(P;flexible=true,rtol=1.e-8,verbose=true)
   test_solver(fpcg,op,Uh,dΩ)
+
+  minres = LinearSolvers.MINRESSolver(;rtol=1.e-8,verbose=true)
+  test_solver(minres,op,Uh,dΩ)
 end
 
 # Completely serial
@@ -68,6 +71,6 @@ parts = with_debug() do distribute
 end
 
 model  = CartesianDiscreteModel(parts,num_ranks,domain,mesh_partition)
-@test main(model)
+main(model)
 
 end

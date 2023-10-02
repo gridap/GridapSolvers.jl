@@ -1,16 +1,14 @@
-
-
 # MINRES Solver
 struct MINRESSolver <: Gridap.Algebra.LinearSolver
-  m   ::Int
-  Pl  ::Gridap.Algebra.LinearSolver
-  atol::Float64
-  rtol::Float64
-  verbose::Bool
+  Pr      :: Union{Gridap.Algebra.LinearSolver,Nothing}
+  Pl      :: Union{Gridap.Algebra.LinearSolver,Nothing}
+  atol    :: Float64
+  rtol    :: Float64
+  verbose :: Bool
 end
 
-function MINRESSolver(m,Pl;atol=1e-12,rtol=1.e-6,verbose=false)
-  return MINRESSolver(m,Pl,atol,rtol,verbose)
+function MINRESSolver(;Pr=nothing,Pl=nothing,atol=1e-12,rtol=1.e-6,verbose=false)
+  return MINRESSolver(Pr,Pl,atol,rtol,verbose)
 end
 
 struct MINRESSymbolicSetup <: Gridap.Algebra.SymbolicSetup
@@ -24,90 +22,87 @@ end
 mutable struct MINRESNumericalSetup <: Gridap.Algebra.NumericalSetup
   solver
   A
+  Pr_ns
   Pl_ns
   caches
 end
 
-function get_MINRES_caches(m,A)
-  w = allocate_col_vector(A)
-  V = [allocate_col_vector(A) for i in 1:3]
-  Z = [allocate_col_vector(A) for i in 1:3]
+function get_solver_caches(solver::MINRESSolver,A)
+  Pl, Pr = solver.Pl, solver.Pr
 
-  H = zeros(m+1,m)  # Hessenberg matrix
-  g = zeros(m+1)    # Residual vector
-  c = zeros(m)      # Gibens rotation cosines
-  s = zeros(m)      # Gibens rotation sines
-  return (w,V,Z,H,g,c,s)
+  V  = [allocate_col_vector(A) for i in 1:3]
+  Z  = [allocate_col_vector(A) for i in 1:3]
+  zr = !isa(Pr,Nothing) ? allocate_col_vector(A) : nothing
+  zl = !isa(Pl,Nothing) ? allocate_col_vector(A) : nothing
+
+  H = zeros(4) # Hessenberg matrix
+  g = zeros(2) # Residual vector
+  c = zeros(2) # Gibens rotation cosines
+  s = zeros(2) # Gibens rotation sines
+  return (V,Z,zr,zl,H,g,c,s)
 end
 
 function Gridap.Algebra.numerical_setup(ss::MINRESSymbolicSetup, A::AbstractMatrix)
   solver = ss.solver
-  Pl_ns  = numerical_setup(symbolic_setup(solver.Pl,A),A)
-  caches = get_MINRES_caches(solver.m,A)
-  return MINRESNumericalSetup(solver,A,Pl_ns,caches)
+  Pr_ns  = isa(solver.Pl,Nothing) ? nothing : numerical_setup(symbolic_setup(solver.Pr,A),A)
+  Pl_ns  = isa(solver.Pl,Nothing) ? nothing : numerical_setup(symbolic_setup(solver.Pl,A),A)
+  caches = get_solver_caches(solver,A)
+  return MINRESNumericalSetup(solver,A,Pr_ns,Pl_ns,caches)
 end
 
 function Gridap.Algebra.numerical_setup!(ns::MINRESNumericalSetup, A::AbstractMatrix)
-  numerical_setup!(ns.Pl_ns,A)
+  if !isa(ns.Pr_ns,Nothing)
+    numerical_setup!(ns.Pr_ns,A)
+  end
+  if !isa(ns.Pl_ns,Nothing)
+    numerical_setup!(ns.Pl_ns,A)
+  end
   ns.A = A
 end
 
 function Gridap.Algebra.solve!(x::AbstractVector,ns::MINRESNumericalSetup,b::AbstractVector)
-  solver, A, Pl, caches = ns.solver, ns.A, ns.Pl_ns, ns.caches
-  m, atol, rtol, verbose = solver.m, solver.atol, solver.rtol, solver.verbose
-  w, V, Z, H, g, c, s = caches
+  solver, A, Pl, Pr, caches = ns.solver, ns.A, ns.Pl_ns, ns.Pr_ns, ns.caches
+  atol, rtol, verbose = solver.atol, solver.rtol, solver.verbose
+  V, Z, zr, zl, H, g, c, s = caches
   verbose && println(" > Starting MINRES solver: ")
 
-  # Initial residual
-  mul!(w,A,x); w .= b .- w
+  Vjm1, Vj, Vjp1 = V
+  Zjm1, Zj, Zjp1 = Z
 
-  β    = norm(w); β0 = β
-  converged = (β < atol || β < rtol*β0)
+  fill!(Vjm1,0.0); fill!(Vjp1,0.0); copy!(Vj,b)
+  fill!(H,0.0), fill!(c,1.0); fill!(s,0.0); fill!(g,0.0)
+
+  mul!(Vj,A,x,-1.0,1.0)
+  β    = norm(Vj); β0 = β; Vj ./= β; g[1] = β
   iter = 0
+  converged = (β < atol || β < rtol*β0)
   while !converged
     verbose && println("   > Iteration ", iter," - Residual: ", β)
-    fill!(H,0.0)
-    
-    # Arnoldi process
-    fill!(g,0.0); g[1] = β
-    V[1] .= w ./ β
-    j = 1
-    
-    # Arnoldi orthogonalization by Modified Gram-Schmidt
-    solve!(Z[j],Pl,V[j])
-    mul!(w,A,Z[j])
-    for i in 1:j
-      H[i,j] = dot(w,V[i])
-      w .= w .- H[i,j] .* V[i]
-    end
-    H[j+1,j] = norm(w)
-    V[j+1] = w ./ H[j+1,j]
+
+    mul!(Vjp1,A,Vj)
+    H[3] = dot(Vjp1,Vj)
+    Vjp1 .= Vjp1 .- H[3] .* Vj .- H[2] .* Vjm1
+    H[4] = norm(Vjp1)
+    Vjp1 ./= H[4]
 
     # Update QR
-    for i in 1:j-1
-      γ = c[i]*H[i,j] + s[i]*H[i+1,j]
-      H[i+1,j] = -s[i]*H[i,j] + c[i]*H[i+1,j]
-      H[i,j] = γ
-    end
+    H[1] = s[1]*H[2]; H[2] = c[1]*H[2]
+    γ = c[2]*H[2] + s[2]*H[3]; H[3] = -s[2]*H[2] + c[2]*H[3]; H[2] = γ
 
     # New Givens rotation, update QR and residual
-    c[j], s[j], _ = LinearAlgebra.givensAlgorithm(H[j,j],H[j+1,j])
-    H[j,j] = c[j]*H[j,j] + s[j]*H[j+1,j]; H[j+1,j] = 0.0
-    g[j+1] = -s[j]*g[j]; g[j] = c[j]*g[j]
+    c[1], s[1] = c[2], s[2]
+    c[2], s[2], H[3] = LinearAlgebra.givensAlgorithm(H[3],H[4])
+    g[2] = -s[2]*g[1]; g[1] = c[2]*g[1]
 
-    β  = abs(g[j+1]); converged = (β < atol || β < rtol*β0)
+    # Update solution
+    Zjp1 .= Vj .- H[2] .* Zj .- H[1] .* Zjm1
+    Zjp1 ./= H[3]
+    x .+= g[1] .* Zjp1
 
-    # Solve least squares problem Hy = g by backward substitution
-    for i in j:-1:1
-      g[i] = (g[i] - dot(H[i,i+1:j],g[i+1:j])) / H[i,i]
-    end
-
-    # Update solution & residual
-    for i in 1:j
-      x .+= g[i] .* Z[i]
-    end
-    mul!(w,A,x); w .= b .- w
-
+    β  = abs(g[2]); converged = (β < atol || β < rtol*β0)
+    Vjm1, Vj, Vjp1 = Vj, Vjp1, Vjm1
+    Zjm1, Zj, Zjp1 = Zj, Zjp1, Zjm1
+    g[1] = g[2]; H[2] = H[4];
     iter += 1
   end
   verbose && println("   > Num Iter: ", iter," - Final residual: ", β)
@@ -115,7 +110,3 @@ function Gridap.Algebra.solve!(x::AbstractVector,ns::MINRESNumericalSetup,b::Abs
 
   return x
 end
-
-
-
-
