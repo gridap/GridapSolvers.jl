@@ -54,7 +54,7 @@ function main(model)
   fpcg = LinearSolvers.CGSolver(P;flexible=true,rtol=1.e-8,verbose=true)
   test_solver(fpcg,op,Uh,dΩ)
 
-  minres = LinearSolvers.MINRESSolver(;rtol=1.e-8,verbose=true)
+  minres = LinearSolvers.MINRESSolver(;Pl=P,Pr=P,rtol=1.e-8,verbose=true)
   test_solver(minres,op,Uh,dΩ)
 end
 

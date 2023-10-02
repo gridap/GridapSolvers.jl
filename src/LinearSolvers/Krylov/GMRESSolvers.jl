@@ -33,7 +33,7 @@ function get_solver_caches(solver::GMRESSolver,A)
 
   V  = [allocate_col_vector(A) for i in 1:m+1]
   zr = !isa(Pr,Nothing) ? allocate_col_vector(A) : nothing
-  zl = !isa(Pl,Nothing) ? allocate_col_vector(A) : nothing
+  zl = !isa(Pr,Nothing) ? allocate_col_vector(A) : nothing
 
   H = zeros(m+1,m)  # Hessenberg matrix
   g = zeros(m+1)    # Residual vector
@@ -44,7 +44,7 @@ end
 
 function Gridap.Algebra.numerical_setup(ss::GMRESSymbolicSetup, A::AbstractMatrix)
   solver = ss.solver
-  Pr_ns  = isa(solver.Pl,Nothing) ? nothing : numerical_setup(symbolic_setup(solver.Pr,A),A)
+  Pr_ns  = isa(solver.Pr,Nothing) ? nothing : numerical_setup(symbolic_setup(solver.Pr,A),A)
   Pl_ns  = isa(solver.Pl,Nothing) ? nothing : numerical_setup(symbolic_setup(solver.Pl,A),A)
   caches = get_solver_caches(solver,A)
   return GMRESNumericalSetup(solver,A,Pr_ns,Pl_ns,caches)
