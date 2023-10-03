@@ -5,12 +5,6 @@
   SOLVER_VERBOSE_HIGH = 2
 end
 
-@enum SolverLogLevel begin
-  SOLVER_LOG_NONE = 0
-  SOLVER_LOG_SELF = 1
-  SOLVER_LOG_ALL  = 2
-end
-
 mutable struct ConvergenceLog{T<:Real}
   name      :: String
   tols      :: SolverTolerances{T}
@@ -86,4 +80,19 @@ function finalize!(log::ConvergenceLog{T},r::T) where T
     println(t,rpad(string(repeat('-',15),footer),55,'-'))
   end
   return flag
+end
+
+function Base.show(io::IO,k::MIME"text/plain",log::ConvergenceLog)
+  println(io,"ConvergenceLog[$(log.name)]")
+  println(io," > tols: $(summary(log.tols))")
+  println(io," > num_iter: $(log.num_iters)")
+  println(io," > residual: $(log.residuals[log.num_iters+1])")
+end
+
+function Base.summary(log::ConvergenceLog)
+  r_abs = log.residuals[log.num_iters+1]
+  r_rel = r_abs / log.residuals[1]
+  flag  = finished_flag(log.tols,log.num_iters,r_abs,r_rel)
+  msg   = "Convergence[$(log.name)]: conv_flag=$(flag), niter=$(log.num_iters), r_abs=$(r_abs), r_rel=$(r_rel)"
+  return msg
 end

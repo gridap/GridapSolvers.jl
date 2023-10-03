@@ -8,11 +8,11 @@ struct FGMRESSolver <: Gridap.Algebra.LinearSolver
   inner_log :: ConvergenceLog{Float64}
 end
 
-function FGMRESSolver(m,Pr;Pl=nothing,maxiter=100,atol=1e-12,rtol=1.e-6,verbose=false)
+function FGMRESSolver(m,Pr;Pl=nothing,maxiter=100,atol=1e-12,rtol=1.e-6,verbose=false,name="FGMRES")
   outer_tols = SolverTolerances{Float64}(maxiter=maxiter,atol=atol,rtol=rtol)
-  outer_log  = ConvergenceLog("FGMRES",outer_tols,verbose=verbose)
+  outer_log  = ConvergenceLog(name,outer_tols,verbose=verbose)
   inner_tols = SolverTolerances{Float64}(maxiter=m,atol=atol,rtol=rtol)
-  inner_log  = ConvergenceLog("FGMRES_inner",inner_tols,verbose=verbose,nested=true)
+  inner_log  = ConvergenceLog("$(name)_inner",inner_tols,verbose=verbose,nested=true)
   return FGMRESSolver(m,Pr,Pl,outer_log,inner_log)
 end
 

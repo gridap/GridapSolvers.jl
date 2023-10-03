@@ -5,9 +5,9 @@ struct MINRESSolver <: Gridap.Algebra.LinearSolver
   log :: ConvergenceLog{Float64}
 end
 
-function MINRESSolver(;Pr=nothing,Pl=nothing,maxiter=1000,atol=1e-12,rtol=1.e-6,verbose=false)
+function MINRESSolver(;Pr=nothing,Pl=nothing,maxiter=1000,atol=1e-12,rtol=1.e-6,verbose=false,name="MINRES")
   tols = SolverTolerances{Float64}(maxiter=maxiter,atol=atol,rtol=rtol)
-  log  = ConvergenceLog("MINRES",tols,verbose=verbose)
+  log  = ConvergenceLog(name,tols,verbose=verbose)
   return MINRESSolver(Pr,Pl,log)
 end
 

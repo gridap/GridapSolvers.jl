@@ -5,8 +5,7 @@ struct CGSolver <: Gridap.Algebra.LinearSolver
   flexible :: Bool
 end
 
-function CGSolver(Pl;maxiter=1000,atol=1e-12,rtol=1.e-6,flexible=false,verbose=0)
-  name = flexible ? "FCG" : "CG"
+function CGSolver(Pl;maxiter=1000,atol=1e-12,rtol=1.e-6,flexible=false,verbose=0,name="CG")
   tols = SolverTolerances{Float64}(;maxiter=maxiter,atol=atol,rtol=rtol)
   log  = ConvergenceLog(name,tols;verbose=verbose)
   return CGSolver(Pl,log,flexible)

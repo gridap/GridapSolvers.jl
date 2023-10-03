@@ -15,6 +15,6 @@ include("SolverInfos.jl")
 export ConvergenceLog, init!, update!, finalize!, reset!
 
 export SolverInfo, SolverTolerances
-export SolverVerboseLevel, SolverLogLevel, SolverConvergenceFlag
+export SolverVerboseLevel, SolverConvergenceFlag
 
 end

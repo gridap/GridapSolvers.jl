@@ -7,11 +7,11 @@ struct GMRESSolver <: Gridap.Algebra.LinearSolver
   inner_log :: ConvergenceLog{Float64}
 end
 
-function GMRESSolver(m;Pr=nothing,Pl=nothing,maxiter=100,atol=1e-12,rtol=1.e-6,verbose=false)
+function GMRESSolver(m;Pr=nothing,Pl=nothing,maxiter=100,atol=1e-12,rtol=1.e-6,verbose=false,name="GMRES")
   outer_tols = SolverTolerances{Float64}(maxiter=maxiter,atol=atol,rtol=rtol)
-  outer_log  = ConvergenceLog("GMRES",outer_tols,verbose=verbose)
+  outer_log  = ConvergenceLog(name,outer_tols,verbose=verbose)
   inner_tols = SolverTolerances{Float64}(maxiter=m,atol=atol,rtol=rtol)
-  inner_log  = ConvergenceLog("GMRES_inner",inner_tols,verbose=verbose,nested=true)
+  inner_log  = ConvergenceLog("$(name)_inner",inner_tols,verbose=verbose,nested=true)
   return GMRESSolver(m,Pr,Pl,outer_log,inner_log)
 end
 
