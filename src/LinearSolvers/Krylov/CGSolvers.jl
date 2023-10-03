@@ -1,16 +1,17 @@
 
 struct CGSolver <: Gridap.Algebra.LinearSolver
   Pl       :: Gridap.Algebra.LinearSolver
-  maxiter  :: Int64
-  atol     :: Float64
-  rtol     :: Float64
+  log      :: ConvergenceLog{Float64}
   flexible :: Bool
-  verbose  :: Bool
 end
 
-function CGSolver(Pl;maxiter=10000,atol=1e-12,rtol=1.e-6,flexible=false,verbose=false)
-  return CGSolver(Pl,maxiter,atol,rtol,flexible,verbose)
+function CGSolver(Pl;maxiter=1000,atol=1e-12,rtol=1.e-6,flexible=false,verbose=0,name="CG")
+  tols = SolverTolerances{Float64}(;maxiter=maxiter,atol=atol,rtol=rtol)
+  log  = ConvergenceLog(name,tols;verbose=verbose)
+  return CGSolver(Pl,log,flexible)
 end
+
+AbstractTrees.children(s::CGSolver) = [s.Pl]
 
 struct CGSymbolicSetup <: Gridap.Algebra.SymbolicSetup
   solver
@@ -49,27 +50,24 @@ end
 
 function Gridap.Algebra.solve!(x::AbstractVector,ns::CGNumericalSetup,b::AbstractVector)
   solver, A, Pl, caches = ns.solver, ns.A, ns.Pl_ns, ns.caches
-  maxiter, atol, rtol = solver.maxiter, solver.atol, solver.rtol
-  flexible, verbose = solver.flexible, solver.verbose
+  flexible, log = solver.flexible, solver.log
   w,p,z,r = caches
-  verbose && println(" > Starting CG solver: ")
 
   # Initial residual
   mul!(w,A,x); r .= b .- w
   fill!(p,0.0); γ = 1.0
 
-  res  = norm(r); res_0 = res
-  iter = 0; converged = false
-  while !converged && (iter < maxiter)
-    verbose && println("   > Iteration ", iter," - Residual: ", res)
+  res  = norm(r)
+  done = init!(log,res)
+  while !done
 
     if !flexible # β = (zₖ₊₁ ⋅ rₖ₊₁)/(zₖ ⋅ rₖ)
       solve!(z, Pl, r)
       β = γ; γ = dot(z, r); β = γ / β
     else         # β = (zₖ₊₁ ⋅ (rₖ₊₁-rₖ))/(zₖ ⋅ rₖ)
-      β = γ; γ = dot(z, r)
+      δ = dot(z, r)
       solve!(z, Pl, r)
-      γ = dot(z, r) - γ; β = γ / β
+      β = γ; γ = dot(z, r); β = (γ-δ) / β
     end
     p .= z .+ β .* p
 
@@ -81,12 +79,10 @@ function Gridap.Algebra.solve!(x::AbstractVector,ns::CGNumericalSetup,b::Abstrac
     x .+= α .* p
     r .-= α .* w
 
-    res = norm(r)
-    converged = (res < atol || res < rtol*res_0)
-    iter += 1
+    res  = norm(r)
+    done = update!(log,res)
   end
-  verbose && println("   > Num Iter: ", iter," - Final residual: ", res)
-  verbose && println("   Exiting CG solver.")
 
+  finalize!(log,res)
   return x
 end

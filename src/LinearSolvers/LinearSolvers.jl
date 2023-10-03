@@ -1,6 +1,7 @@
 module LinearSolvers
 
 using Printf
+using AbstractTrees
 using LinearAlgebra
 using SparseArrays
 using SparseMatricesCSR
@@ -17,6 +18,7 @@ using GridapPETSc
 
 using GridapDistributed
 using GridapSolvers.MultilevelTools
+using GridapSolvers.SolverInterfaces
 
 export JacobiLinearSolver
 export RichardsonSmoother
