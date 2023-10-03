@@ -31,7 +31,7 @@ function krylov_residual!(r,x,A,b,Pl,w)
   w .= b .- w
   solve!(r,Pl,w)
 end
-function krylov_residual!(r,x,A,b,Pl::Nothing,w::Nothing)
+function krylov_residual!(r,x,A,b,Pl::Nothing,w)
   mul!(r,A,x)
   r .= b .- r
 end

@@ -1,22 +1,4 @@
 
-@enum SolverConvergenceFlag begin
-  SOLVER_CONVERGED_ATOL     = 0
-  SOLVER_CONVERGED_RTOL     = 1
-  SOLVER_DIVERGED_MAXITER   = 2
-  SOLVER_DIVERGED_BREAKDOWN = 3
-end
-
-@enum SolverVerboseLevel begin
-  SOLVER_VERBOSE_NONE = 0
-  SOLVER_VERBOSE_LOW  = 1
-  SOLVER_VERBOSE_HIGH = 2
-end
-
-@enum SolverLogLevel begin
-  SOLVER_LOG_NONE = 0
-  SOLVER_LOG_SELF = 1
-  SOLVER_LOG_ALL  = 2
-end
 
 """
 ConvergenceLog

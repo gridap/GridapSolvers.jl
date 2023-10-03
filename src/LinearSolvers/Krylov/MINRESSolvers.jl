@@ -1,14 +1,14 @@
 # MINRES Solver
 struct MINRESSolver <: Gridap.Algebra.LinearSolver
-  Pr      :: Union{Gridap.Algebra.LinearSolver,Nothing}
-  Pl      :: Union{Gridap.Algebra.LinearSolver,Nothing}
-  atol    :: Float64
-  rtol    :: Float64
-  verbose :: Bool
+  Pr  :: Union{Gridap.Algebra.LinearSolver,Nothing}
+  Pl  :: Union{Gridap.Algebra.LinearSolver,Nothing}
+  log :: ConvergenceLog{Float64}
 end
 
-function MINRESSolver(;Pr=nothing,Pl=nothing,atol=1e-12,rtol=1.e-6,verbose=false)
-  return MINRESSolver(Pr,Pl,atol,rtol,verbose)
+function MINRESSolver(;Pr=nothing,Pl=nothing,maxiter=1000,atol=1e-12,rtol=1.e-6,verbose=false)
+  tols = SolverTolerances{Float64}(maxiter=maxiter,atol=atol,rtol=rtol)
+  log  = ConvergenceLog("MINRES",tols,verbose=verbose)
+  return MINRESSolver(Pr,Pl,log)
 end
 
 struct MINRESSymbolicSetup <: Gridap.Algebra.SymbolicSetup
@@ -62,9 +62,8 @@ end
 
 function Gridap.Algebra.solve!(x::AbstractVector,ns::MINRESNumericalSetup,b::AbstractVector)
   solver, A, Pl, Pr, caches = ns.solver, ns.A, ns.Pl_ns, ns.Pr_ns, ns.caches
-  atol, rtol, verbose = solver.atol, solver.rtol, solver.verbose
   V, W, zr, zl, H, g, c, s = caches
-  verbose && println(" > Starting MINRES solver: ")
+  log = solver.log
 
   Vjm1, Vj, Vjp1 = V
   Wjm1, Wj, Wjp1 = W
@@ -74,12 +73,10 @@ function Gridap.Algebra.solve!(x::AbstractVector,ns::MINRESNumericalSetup,b::Abs
   fill!(H,0.0), fill!(c,1.0); fill!(s,0.0); fill!(g,0.0)
 
   krylov_residual!(Vj,x,A,b,Pl,zl)
-  β    = norm(Vj); β0 = β; Vj ./= β; g[1] = β
-  iter = 0
-  converged = (β < atol || β < rtol*β0)
-  while !converged
-    verbose && println("   > Iteration ", iter," - Residual: ", β)
-
+  β    = norm(Vj); Vj ./= β; g[1] = β
+  done = init!(log,β)
+  while !done
+    # Lanczos process
     krylov_mul!(Vjp1,A,Vj,Pr,Pl,zr,zl)
     H[3] = dot(Vjp1,Vj)
     Vjp1 .= Vjp1 .- H[3] .* Vj .- H[2] .* Vjm1
@@ -105,14 +102,13 @@ function Gridap.Algebra.solve!(x::AbstractVector,ns::MINRESNumericalSetup,b::Abs
       x .+= g[1] .* zr
     end
 
-    β  = abs(g[2]); converged = (β < atol || β < rtol*β0)
+    β  = abs(g[2])
     Vjm1, Vj, Vjp1 = Vj, Vjp1, Vjm1
     Wjm1, Wj, Wjp1 = Wj, Wjp1, Wjm1
     g[1] = g[2]; H[2] = H[4];
-    iter += 1
+    done = update!(log,β)
   end
-  verbose && println("   > Num Iter: ", iter," - Final residual: ", β)
-  verbose && println("   Exiting MINRES solver.")
-
+  
+  finalize!(log,β)
   return x
 end

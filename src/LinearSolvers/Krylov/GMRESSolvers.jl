@@ -1,15 +1,18 @@
 # GMRES Solver
 struct GMRESSolver <: Gridap.Algebra.LinearSolver
-  m       :: Int
-  Pr      :: Union{Gridap.Algebra.LinearSolver,Nothing}
-  Pl      :: Union{Gridap.Algebra.LinearSolver,Nothing}
-  atol    :: Float64
-  rtol    :: Float64
-  verbose :: Bool
+  m         :: Int
+  Pr        :: Union{Gridap.Algebra.LinearSolver,Nothing}
+  Pl        :: Union{Gridap.Algebra.LinearSolver,Nothing}
+  outer_log :: ConvergenceLog{Float64}
+  inner_log :: ConvergenceLog{Float64}
 end
 
-function GMRESSolver(m;Pr=nothing,Pl=nothing,atol=1e-12,rtol=1.e-6,verbose=false)
-  return GMRESSolver(m,Pr,Pl,atol,rtol,verbose)
+function GMRESSolver(m;Pr=nothing,Pl=nothing,maxiter=100,atol=1e-12,rtol=1.e-6,verbose=false)
+  outer_tols = SolverTolerances{Float64}(maxiter=maxiter,atol=atol,rtol=rtol)
+  outer_log  = ConvergenceLog("GMRES",outer_tols,verbose=verbose)
+  inner_tols = SolverTolerances{Float64}(maxiter=m,atol=atol,rtol=rtol)
+  inner_log  = ConvergenceLog("GMRES_inner",inner_tols,verbose=verbose,nested=true)
+  return GMRESSolver(m,Pr,Pl,outer_log,inner_log)
 end
 
 struct GMRESSymbolicSetup <: Gridap.Algebra.SymbolicSetup
@@ -33,7 +36,7 @@ function get_solver_caches(solver::GMRESSolver,A)
 
   V  = [allocate_col_vector(A) for i in 1:m+1]
   zr = !isa(Pr,Nothing) ? allocate_col_vector(A) : nothing
-  zl = !isa(Pr,Nothing) ? allocate_col_vector(A) : nothing
+  zl = allocate_col_vector(A)
 
   H = zeros(m+1,m)  # Hessenberg matrix
   g = zeros(m+1)    # Residual vector
@@ -62,25 +65,21 @@ end
 
 function Gridap.Algebra.solve!(x::AbstractVector,ns::GMRESNumericalSetup,b::AbstractVector)
   solver, A, Pl, Pr, caches = ns.solver, ns.A, ns.Pl_ns, ns.Pr_ns, ns.caches
-  m, atol, rtol, verbose = solver.m, solver.atol, solver.rtol, solver.verbose
+  log, ilog = solver.outer_log, solver.inner_log
   V, zr, zl, H, g, c, s = caches
-  verbose && println(" > Starting GMRES solver: ")
 
   # Initial residual
   krylov_residual!(V[1],x,A,b,Pl,zl)
-  β    = norm(V[1]); β0 = β
-  iter = 0
-  converged = (β < atol || β < rtol*β0)
-  while !converged
-    verbose && println("   > Iteration ", iter," - Residual: ", β)
-    fill!(H,0.0)
-    
+  β    = norm(V[1])
+  done = init!(log,β)
+  while !done
     # Arnoldi process
     j = 1
     V[1] ./= β
+    fill!(H,0.0)
     fill!(g,0.0); g[1] = β
-    while ( j < m+1 && !converged )
-      verbose && println("      > Inner iteration ", j," - Residual: ", β)
+    idone = init!(ilog,β)
+    while !idone
       # Arnoldi orthogonalization by Modified Gram-Schmidt
       krylov_mul!(V[j+1],A,V[j],Pr,Pl,zr,zl)
       for i in 1:j
@@ -102,8 +101,9 @@ function Gridap.Algebra.solve!(x::AbstractVector,ns::GMRESNumericalSetup,b::Abst
       H[j,j] = c[j]*H[j,j] + s[j]*H[j+1,j]; H[j+1,j] = 0.0
       g[j+1] = -s[j]*g[j]; g[j] = c[j]*g[j]
 
-      β  = abs(g[j+1]); converged = (β < atol || β < rtol*β0)
+      β  = abs(g[j+1])
       j += 1
+      idone = update!(ilog,β)
     end
     j = j-1
 
@@ -126,11 +126,8 @@ function Gridap.Algebra.solve!(x::AbstractVector,ns::GMRESNumericalSetup,b::Abst
       x .+= zr
     end
     krylov_residual!(V[1],x,A,b,Pl,zl)
-
-    iter += 1
+    done = update!(log,β)
   end
-  verbose && println("   > Num Iter: ", iter," - Final residual: ", β)
-  verbose && println("   Exiting GMRES solver.")
-
+  finalize!(log,β)
   return x
 end

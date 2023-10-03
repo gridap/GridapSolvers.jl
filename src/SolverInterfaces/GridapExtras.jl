@@ -3,9 +3,10 @@
 AbstractTrees.children(s::Gridap.Algebra.LinearSolver) = []
 AbstractTrees.nodevalue(s::Gridap.Algebra.LinearSolver) = get_solver_info(s)
 
-function Base.show(io::IO,a::Gridap.Algebra.LinearSolver)
-  AbstractTrees.print_tree(io,a)
-end
+
+#function Base.show(io::IO,a::Gridap.Algebra.LinearSolver)
+#  AbstractTrees.print_tree(io,a)
+#end
 
 # LinearSolvers that depend on the non-linear solution
 
