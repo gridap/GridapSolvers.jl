@@ -27,12 +27,11 @@ op = AffineFEOperator(a,l,Uh,Vh)
 A, b = get_matrix(op), get_vector(op);
 P = JacobiLinearSolver()
 
-solver = LinearSolvers.CGSolver(P;rtol=1.e-8,verbose=true)
-ns = numerical_setup(symbolic_setup(solver,A),A)
-x = LinearSolvers.allocate_col_vector(A)
-solve!(x,ns,b)
-
 solver = LinearSolvers.GMRESSolver(10;Pl=P,rtol=1.e-8,verbose=2)
 ns = numerical_setup(symbolic_setup(solver,A),A)
 x = LinearSolvers.allocate_col_vector(A)
 solve!(x,ns,b)
+
+
+
+using AbstractTrees

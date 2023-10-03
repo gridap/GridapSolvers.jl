@@ -1,9 +1,9 @@
 
 # FGMRES Solver
 struct FGMRESSolver <: Gridap.Algebra.LinearSolver
-  m       :: Int
-  Pr      :: Gridap.Algebra.LinearSolver
-  Pl      :: Union{Gridap.Algebra.LinearSolver,Nothing}
+  m         :: Int
+  Pr        :: Gridap.Algebra.LinearSolver
+  Pl        :: Union{Gridap.Algebra.LinearSolver,Nothing}
   outer_log :: ConvergenceLog{Float64}
   inner_log :: ConvergenceLog{Float64}
 end
@@ -15,6 +15,8 @@ function FGMRESSolver(m,Pr;Pl=nothing,maxiter=100,atol=1e-12,rtol=1.e-6,verbose=
   inner_log  = ConvergenceLog("$(name)_inner",inner_tols,verbose=verbose,nested=true)
   return FGMRESSolver(m,Pr,Pl,outer_log,inner_log)
 end
+
+AbstractTrees.children(s::FGMRESSolver) = [s.Pr,s.Pl]
 
 struct FGMRESSymbolicSetup <: Gridap.Algebra.SymbolicSetup
   solver

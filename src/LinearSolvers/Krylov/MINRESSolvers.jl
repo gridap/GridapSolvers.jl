@@ -11,6 +11,8 @@ function MINRESSolver(;Pr=nothing,Pl=nothing,maxiter=1000,atol=1e-12,rtol=1.e-6,
   return MINRESSolver(Pr,Pl,log)
 end
 
+AbstractTrees.children(s::MINRESSolver) = [s.Pr,s.Pl]
+
 struct MINRESSymbolicSetup <: Gridap.Algebra.SymbolicSetup
   solver
 end

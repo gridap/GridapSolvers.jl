@@ -1,6 +1,7 @@
 module LinearSolvers
 
 using Printf
+using AbstractTrees
 using LinearAlgebra
 using SparseArrays
 using SparseMatricesCSR

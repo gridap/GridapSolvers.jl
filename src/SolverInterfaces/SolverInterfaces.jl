@@ -12,9 +12,10 @@ include("SolverTolerances.jl")
 include("ConvergenceLogs.jl")
 include("SolverInfos.jl")
 
+export SolverVerboseLevel, SolverConvergenceFlag
+export SolverTolerances, get_solver_tolerances, set_solver_tolerances!
 export ConvergenceLog, init!, update!, finalize!, reset!
 
-export SolverInfo, SolverTolerances
-export SolverVerboseLevel, SolverConvergenceFlag
+export SolverInfo
 
 end

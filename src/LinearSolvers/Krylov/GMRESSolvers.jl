@@ -15,6 +15,8 @@ function GMRESSolver(m;Pr=nothing,Pl=nothing,maxiter=100,atol=1e-12,rtol=1.e-6,v
   return GMRESSolver(m,Pr,Pl,outer_log,inner_log)
 end
 
+AbstractTrees.children(s::GMRESSolver) = [s.Pr,s.Pl]
+
 struct GMRESSymbolicSetup <: Gridap.Algebra.SymbolicSetup
   solver
 end
