@@ -22,19 +22,19 @@ struct PatchBasedSmootherNumericalSetup{A,B,C} <: Gridap.Algebra.NumericalSetup
 end
 
 function Gridap.Algebra.numerical_setup(ss::PatchBasedSymbolicSetup,A::AbstractMatrix)
-  Ph, Vh = ss.solver.Ph, ss.solver.Vh
+  Ph, Vh, solver = ss.solver.Ph, ss.solver.Vh, ss.solver
   weights = compute_weight_operators(Ph,Vh)
 
   assembler = SparseMatrixAssembler(Ph,Ph)
   Ap        = assemble_matrix(solver.bilinear_form,assembler,Ph,Ph)
-  Ap_ns     = numerical_setup(symbolic_setup(ss.solver.local_solver,Ap),Ap)
+  Ap_ns     = numerical_setup(symbolic_setup(solver.local_solver,Ap),Ap)
 
   # Caches
   rp        = allocate_row_vector(Ap)
   dxp       = allocate_col_vector(Ap)
   caches    = (rp,dxp)
   
-  return PatchBasedSmootherNumericalSetup(ss.solver,Ap_ns,weights,caches)
+  return PatchBasedSmootherNumericalSetup(solver,Ap_ns,weights,caches)
 end
 
 function Gridap.Algebra.numerical_setup(ss::PatchBasedSymbolicSetup,A::PSparseMatrix)
@@ -59,7 +59,7 @@ function Gridap.Algebra.numerical_setup(ss::PatchBasedSymbolicSetup,A::PSparseMa
   x      = pfill(0.0,partition(Vh.gids))
   caches = (rp,dxp,r,x)
   
-  return PatchBasedSmootherNumericalSetup(ss.solver,Ap_ns,weights,caches)
+  return PatchBasedSmootherNumericalSetup(solver,Ap_ns,weights,caches)
 end
 
 function Gridap.Algebra.numerical_setup!(ns::PatchBasedSmootherNumericalSetup, A::AbstractMatrix)
