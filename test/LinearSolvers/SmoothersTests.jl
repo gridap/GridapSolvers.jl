@@ -32,7 +32,7 @@ function smoothers_driver(parts,model,P)
   ss = symbolic_setup(P,A)
   ns = numerical_setup(ss,A)
 
-  x = pfill(1.0,partition(axes(A,2)))
+  x = LinearSolvers.allocate_col_vector(A)
   x, history = IterativeSolvers.cg!(x,A,b;
                                     verbose=i_am_main(parts),
                                     reltol=1.0e-8,

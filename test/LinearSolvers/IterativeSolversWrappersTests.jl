@@ -70,7 +70,7 @@ function main(distribute,np)
 
   if prod(np) == 1
     verbose && println("> Testing SSOR")
-    ssor_solver = IS_SSORSolver(2.0/3.0;maxiter=1000,verbose=verbose)
+    ssor_solver = IS_SSORSolver(2.0/3.0;maxiter=1000)
     test_solver(ssor_solver,op,Uh,dΩ)
 
     verbose && println("> Testing GMRES")
