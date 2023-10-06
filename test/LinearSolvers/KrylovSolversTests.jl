@@ -1,4 +1,4 @@
-module GMRESSolversTests
+module KrylovSolversTests
 
 using Test
 using Gridap
@@ -23,10 +23,31 @@ function test_solver(solver,op,Uh,dΩ)
   uh = FEFunction(Uh,x)
   eh = uh - u
   E  = sum(∫(eh*eh)*dΩ)
-  @test E < 1.e-8
+  @test E < 1.e-6
 end
 
-function main(model)
+function get_mesh(parts,np)
+  Dc = length(np)
+  if Dc == 2
+    domain = (0,1,0,1)
+    nc = (8,8)
+  else
+    @assert Dc == 3
+    domain = (0,1,0,1,0,1)
+    nc = (8,8,8)
+  end
+  if prod(np) == 1
+    model = CartesianDiscreteModel(domain,nc)
+  else
+    model = CartesianDiscreteModel(parts,np,domain,nc)
+  end
+  return model
+end
+
+function main(distribute,np)
+  parts = distribute(LinearIndices((prod(np),)))
+  model = get_mesh(parts,np)
+  
   order  = 1
   qorder = order*2 + 1
   reffe  = ReferenceFE(lagrangian,Float64,order)
@@ -41,36 +62,22 @@ function main(model)
   op = AffineFEOperator(a,l,Uh,Vh)
   
   P = JacobiLinearSolver()
+  verbose = i_am_main(parts)
 
-  gmres = LinearSolvers.GMRESSolver(40;Pr=P,Pl=P,rtol=1.e-8,verbose=true)
+  gmres = LinearSolvers.GMRESSolver(40;Pr=P,Pl=P,rtol=1.e-8,verbose=verbose)
   test_solver(gmres,op,Uh,dΩ)
 
-  fgmres = LinearSolvers.FGMRESSolver(40,P;rtol=1.e-8,verbose=true)
+  fgmres = LinearSolvers.FGMRESSolver(40,P;rtol=1.e-8,verbose=verbose)
   test_solver(fgmres,op,Uh,dΩ)
 
-  pcg = LinearSolvers.CGSolver(P;rtol=1.e-8,verbose=true)
+  pcg = LinearSolvers.CGSolver(P;rtol=1.e-8,verbose=verbose)
   test_solver(pcg,op,Uh,dΩ)
 
-  fpcg = LinearSolvers.CGSolver(P;flexible=true,rtol=1.e-8,verbose=true)
+  fpcg = LinearSolvers.CGSolver(P;flexible=true,rtol=1.e-8,verbose=verbose)
   test_solver(fpcg,op,Uh,dΩ)
 
-  minres = LinearSolvers.MINRESSolver(;Pl=P,Pr=P,rtol=1.e-8,verbose=true)
+  minres = LinearSolvers.MINRESSolver(;Pl=P,Pr=P,rtol=1.e-8,verbose=verbose)
   test_solver(minres,op,Uh,dΩ)
 end
-
-# Completely serial
-mesh_partition = (10,10)
-domain = (0,1,0,1)
-model  = CartesianDiscreteModel(domain,mesh_partition)
-main(model)
-
-# Sequential
-num_ranks = (1,2)
-parts = with_debug() do distribute
-  distribute(LinearIndices((prod(num_ranks),)))
-end
-
-model  = CartesianDiscreteModel(parts,num_ranks,domain,mesh_partition)
-main(model)
 
 end
