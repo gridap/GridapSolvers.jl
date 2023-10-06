@@ -50,7 +50,8 @@ function main_driver(parts,mh)
   l(v,dΩ)   = ∫(v⋅u)*dΩ
   mats, A, b = compute_hierarchy_matrices(trials,a,l,qdegree)
 
-  for lev in 1:num_levels-1
+  nlevs = num_levels(mh)
+  for lev in 1:nlevs-1
     parts_h = get_level_parts(mh,lev)
     parts_H = get_level_parts(mh,lev+1)
 
@@ -119,3 +120,5 @@ function main(distribute,np,Dc,np_x_level)
   mh = get_model_hierarchy(parts,Dc,np_x_level)
   main_driver(parts,mh)
 end
+
+end # module DistributedGridTransferOperatorsTests

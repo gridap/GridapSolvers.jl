@@ -8,6 +8,7 @@ using Test
 
 using GridapSolvers
 using GridapSolvers.MultilevelTools
+using GridapDistributed: redistribute_cell_dofs, redistribute_fe_function, redistribute_free_values
 
 function get_model_hierarchy(parts,Dc,num_parts_x_level)
   mh = GridapP4est.with(parts) do
@@ -91,3 +92,5 @@ function main(distribute,np,Dc,np_x_level)
   mh = get_model_hierarchy(parts,Dc,np_x_level)
   main_driver(parts,mh)
 end
+
+end # module RedistributeToolsTests

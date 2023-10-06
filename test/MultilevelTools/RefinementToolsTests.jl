@@ -38,8 +38,9 @@ function main_driver(parts,mh)
   tests  = TestFESpace(mh,reffe;conformity=:H1,dirichlet_tags="boundary")
   trials = TrialFESpace(tests,sol)
 
+  nlevs = num_levels(mh)
   quad_order = 2*order+1
-  for lev in 1:num_levels-1
+  for lev in 1:nlevs-1
     fparts = get_level_parts(mh,lev)
     cparts = get_level_parts(mh,lev+1)
 
@@ -106,4 +107,6 @@ function main(distribute,np,Dc,np_x_level)
   parts = distribute(LinearIndices((np,)))
   mh = get_model_hierarchy(parts,Dc,np_x_level)
   main_driver(parts,mh)
+end
+
 end

@@ -77,7 +77,7 @@ function get_mesh(parts,np)
   return model
 end
 
-function main_driver(model,solvers)
+function main_driver(D,model,solvers)
   order  = 2
   reffeᵤ = ReferenceFE(lagrangian,VectorValue{D,Float64},order)
   V = TestFESpace(model,reffeᵤ,conformity=:H1,dirichlet_tags=["boundary"])
@@ -134,15 +134,16 @@ end
 
 function main(distribute,np,use_petsc::Bool)
   parts = distribute(LinearIndices((prod(np),)))
+  Dc = length(np)
   model = get_mesh(parts,np)
   if use_petsc
     GridapPETSc.with() do
       solvers = Fill(PETScLinearSolver(set_ksp_options),2)
-      main_driver(model,solvers)
+      main_driver(Dc,model,solvers)
     end
   else
     solvers = Fill(LUSolver(),2)
-    main_driver(model,solvers)
+    main_driver(Dc,model,solvers)
   end
 end
 

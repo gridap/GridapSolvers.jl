@@ -62,7 +62,7 @@ function Gridap.Algebra.solve!(x::AbstractBlockVector,ns::SchurComplementNumeric
 
   # Solve Schur complement
   solve!(x_u,A,y_u)                      # x_u = A^-1 y_u
-  copy!(bp,y_p); mul!(bp,C,du,1.0,-1.0)  # bp  = C*(A^-1 y_u) - y_p
+  copy!(bp,y_p); mul!(bp,C,du,-1.0,1.0)  # bp  = C*(A^-1 y_u) - y_p
   solve!(x_p,S,bp)                       # x_p = S^-1 bp
 
   mul!(bu,B,x_p)         # bu  = B*x_p
