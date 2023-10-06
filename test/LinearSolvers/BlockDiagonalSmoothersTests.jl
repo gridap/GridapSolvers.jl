@@ -59,19 +59,25 @@ function is_same_vector(x1::BlockPVector,x2,X1,X2)
   _is_same_vector(_x1,_x2,X1,X2)
 end
 
-function main(model,use_petsc::Bool)
-  if use_petsc
-    GridapPETSc.with() do
-      solvers = Fill(PETScLinearSolver(set_ksp_options),2)
-      main(model,solvers)
-    end
+function get_mesh(parts,np)
+  Dc = length(np)
+  if Dc == 2
+    domain = (0,1,0,1)
+    nc = (8,8)
   else
-    solvers = Fill(LUSolver(),2)
-    main(model,solvers)
+    @assert Dc == 3
+    domain = (0,1,0,1,0,1)
+    nc = (8,8,8)
   end
+  if prod(np) == 1
+    model = CartesianDiscreteModel(domain,nc)
+  else
+    model = CartesianDiscreteModel(parts,np,domain,nc)
+  end
+  return model
 end
 
-function main(model,solvers)
+function main_driver(model,solvers)
   order  = 2
   reffeᵤ = ReferenceFE(lagrangian,VectorValue{D,Float64},order)
   V = TestFESpace(model,reffeᵤ,conformity=:H1,dirichlet_tags=["boundary"])
@@ -126,24 +132,18 @@ function main(model,solvers)
   @test is_same_vector(x,x_star,Xb,X)
 end
 
-num_ranks = (2,2)
-parts = with_debug() do distribute
-  distribute(LinearIndices((prod(num_ranks),)))
+function main(distribute,np,use_petsc::Bool)
+  parts = distribute(LinearIndices((prod(np),)))
+  model = get_mesh(parts,np)
+  if use_petsc
+    GridapPETSc.with() do
+      solvers = Fill(PETScLinearSolver(set_ksp_options),2)
+      main_driver(model,solvers)
+    end
+  else
+    solvers = Fill(LUSolver(),2)
+    main_driver(model,solvers)
+  end
 end
-
-D = 2
-n = 10
-domain = Tuple(repeat([0,1],D))
-mesh_partition = (n,n)
-
-# Serial
-model = CartesianDiscreteModel(domain,mesh_partition)
-main(model,false)
-main(model,true)
-
-# Distributed, sequential
-model = CartesianDiscreteModel(parts,num_ranks,domain,mesh_partition)
-main(model,false)
-main(model,true)
 
 end

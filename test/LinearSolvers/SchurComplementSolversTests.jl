@@ -27,6 +27,24 @@ function l2_error(x,sol,X,dΩ)
   return l2_error(xh,sol,dΩ)
 end
 
+function get_mesh(parts,np)
+  Dc = length(np)
+  if Dc == 2
+    domain = (0,1,0,1)
+    nc = (8,8)
+  else
+    @assert Dc == 3
+    domain = (0,1,0,1,0,1)
+    nc = (8,8,8)
+  end
+  if prod(np) == 1
+    model = CartesianDiscreteModel(domain,nc)
+  else
+    model = CartesianDiscreteModel(parts,np,domain,nc)
+  end
+  return model
+end
+
 # Darcy solution
 const β_U = 50.0
 const γ = 100.0
@@ -35,7 +53,9 @@ u_ref(x) = VectorValue(x[1]+x[2],-x[2])
 p_ref(x) = 2.0*x[1]-1.0
 f_ref(x) = u_ref(x) + ∇(p_ref)(x)
 
-function main(model)
+function main(distribute,np)
+  parts = distribute(LinearIndices((prod(np),)))
+  model = get_mesh(parts,np)
 
   labels = get_face_labeling(model)
   add_tag_from_tags!(labels,"dirichlet",[1,2,3,4,5,6,7])
@@ -98,23 +118,5 @@ function main(model)
   @test l2_error(uh,u_ref,dΩ) < 1.e-4
   @test l2_error(ph,p_ref,dΩ) < 1.e-4
 end
-
-num_ranks = (2,2)
-parts = with_debug() do distribute
-  distribute(LinearIndices((prod(num_ranks),)))
-end
-
-D = 2
-n = 60
-domain    = Tuple(repeat([0,1],D))
-mesh_partition = (n,n)
-
-# Serial
-model     = CartesianDiscreteModel(domain,mesh_partition)
-main(model)
-
-# Distributed, sequential
-model     = CartesianDiscreteModel(parts,num_ranks,domain,mesh_partition)
-main(model)
 
 end
