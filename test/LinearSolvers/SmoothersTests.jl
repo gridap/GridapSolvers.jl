@@ -1,4 +1,4 @@
-module RichardsonSmoothersTests
+module SmoothersTests
 
 using Test
 using MPI
@@ -10,10 +10,7 @@ using IterativeSolvers
 using GridapSolvers
 using GridapSolvers.LinearSolvers
 
-function main(parts,num_ranks,mesh_partition)
-  domain = (0,1,0,1)
-  model  = CartesianDiscreteModel(parts,num_ranks,domain,mesh_partition)
-
+function smoothers_driver(parts,model,P)
   sol(x) = x[1] + x[2]
   f(x)   = -Δ(sol)(x)
 
@@ -32,7 +29,6 @@ function main(parts,num_ranks,mesh_partition)
   op = AffineFEOperator(a,l,Uh,Vh)
   A, b = get_matrix(op), get_vector(op)
 
-  P  = SymGaussSeidelSmoother(10)
   ss = symbolic_setup(P,A)
   ns = numerical_setup(ss,A)
 
@@ -54,13 +50,46 @@ function main(parts,num_ranks,mesh_partition)
   @test E < 1.e-8
 end
 
-mesh_partition = (32,32)
-num_ranks = (2,2)
-parts = with_mpi() do distribute
-  distribute(LinearIndices((prod(num_ranks),)))
+function main_smoother_driver(parts,model,smoother)
+  if smoother === :richardson
+    P = RichardsonSmoother(JacobiLinearSolver(),5,2.0/3.0)
+  elseif smoother === :sym_gauss_seidel
+    P = SymGaussSeidelSmoother(5)
+  else
+    error("Unknown smoother")
+  end
+  smoothers_driver(parts,model,P)
 end
 
-main(parts,num_ranks,mesh_partition)
-MPI.Finalize()
-
+function get_mesh(parts,np)
+  Dc = length(np)
+  if Dc == 2
+    domain = (0,1,0,1)
+    nc = (8,8)
+  else
+    @assert Dc == 3
+    domain = (0,1,0,1,0,1)
+    nc = (8,8,8)
+  end
+  if prod(np) == 1
+    model = CartesianDiscreteModel(domain,nc)
+  else
+    model = CartesianDiscreteModel(parts,np,domain,nc)
+  end
+  return model
 end
+
+function main(distribute,np)
+  parts = distribute(LinearIndices((prod(np),)))
+  model = get_mesh(parts,np)
+
+  for smoother in [:richardson,:sym_gauss_seidel]
+    if i_am_main(parts)
+      println(repeat("=",80))
+      println("Testing smoother $smoother with Dc=$(length(np))")
+    end
+    main_smoother_driver(parts,model,smoother)
+  end
+end
+
+end # module SmoothersTests

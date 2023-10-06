@@ -10,7 +10,8 @@ using GridapP4est
 using GridapSolvers
 using GridapSolvers.MultilevelTools
 
-function main(parts,num_parts_x_level)
+function main(distribute,np,num_parts_x_level)
+  parts = distribute(LinearIndices((prod(np),)))
   GridapP4est.with(parts) do
     # Start from coarse, refine models
     domain       = (0,1,0,1)
@@ -38,14 +39,5 @@ function main(parts,num_parts_x_level)
     trials = TrialFESpace(tests,sol)
   end
 end
-
-num_parts_x_level = [4,4,2,2] # Procs in each refinement level
-
-num_ranks = num_parts_x_level[1]
-parts = with_mpi() do distribute
-  distribute(LinearIndices((prod(num_ranks),)))
-end
-main(parts,num_parts_x_level)
-MPI.Finalize()
 
 end

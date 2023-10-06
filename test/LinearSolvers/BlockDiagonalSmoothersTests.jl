@@ -66,7 +66,7 @@ function main(model,use_petsc::Bool)
       main(model,solvers)
     end
   else
-    solvers = Fill(BackslashSolver(),2)
+    solvers = Fill(LUSolver(),2)
     main(model,solvers)
   end
 end
