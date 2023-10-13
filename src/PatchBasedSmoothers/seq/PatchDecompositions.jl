@@ -61,13 +61,15 @@ function compute_patch_cells_faces_on_boundary(model::DiscreteModel,
                                                patch_boundary_style,
                                                boundary_tag_names)
   patch_cell_faces_on_boundary = _allocate_patch_cells_faces_on_boundary(model,patch_cells)
-  _compute_patch_cells_faces_on_boundary!(patch_cell_faces_on_boundary,
-                                         model,
-                                         patch_cells,
-                                         patch_cells_overlapped,
-                                         patch_facets,
-                                         patch_boundary_style,
-                                         boundary_tag_names)
+  if !isa(patch_boundary_style,PatchBoundaryInclude)
+    _compute_patch_cells_faces_on_boundary!(patch_cell_faces_on_boundary,
+                                          model,
+                                          patch_cells,
+                                          patch_cells_overlapped,
+                                          patch_facets,
+                                          patch_boundary_style,
+                                          boundary_tag_names)
+  end
   return patch_cell_faces_on_boundary
 end
 
@@ -166,11 +168,8 @@ function _compute_patch_cells_faces_on_boundary!(patch_cells_faces_on_boundary,
           break
         end
       end
-
-      facet_at_global_boundary = (facet_entity ∈ boundary_entities)
-      A = (facet_at_global_boundary) && (facet ∉ patch_facets)
-      B = isa(patch_boundary_style,PatchBoundaryExclude) && has_nbor_outside_patch
-      facet_at_patch_boundary = (A || B)
+      facet_at_global_boundary = (facet_entity ∈ boundary_entities) && (facet ∉ patch_facets)
+      facet_at_patch_boundary  = facet_at_global_boundary || has_nbor_outside_patch
 
       if (facet_at_patch_boundary)
         # Mark the facet as boundary
