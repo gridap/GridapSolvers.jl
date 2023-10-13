@@ -72,6 +72,23 @@ end
 # y is always consistent at the start since Ph has no ghosts
 function inject!(x::PVector,
                  Ph::GridapDistributed.DistributedSingleFieldFESpace,
+                 y::PVector;
+                 make_consistent::Bool=true)
+
+  map(partition(x),local_views(Ph),partition(y)) do x,Ph,y
+    inject!(x,Ph,y)
+  end
+
+  # Exchange local contributions 
+  assemble!(x) |> fetch
+  if make_consistent
+    consistent!(x) |> fetch
+  end
+  return x
+end
+
+function inject!(x::PVector,
+                 Ph::GridapDistributed.DistributedSingleFieldFESpace,
                  y::PVector,
                  w::PVector,
                  w_sums::PVector;

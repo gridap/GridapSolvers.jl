@@ -33,7 +33,7 @@ function get_patch_smoothers(tests,patch_spaces,patch_decompositions,biform,qdeg
       a(u,v) = biform(u,v,dΩ)
       local_solver = LUSolver() # IS_ConjugateGradientSolver(;reltol=1.e-6)
       patch_smoother = PatchBasedLinearSolver(a,Ph,Vh,local_solver)
-      smoothers[lev] = RichardsonSmoother(patch_smoother,1,1.0/3.0)
+      smoothers[lev] = RichardsonSmoother(patch_smoother,10,0.2)
     end
   end
   return smoothers

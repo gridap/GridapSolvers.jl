@@ -75,7 +75,7 @@ function Gridap.Algebra.solve!(x::AbstractVector,ns::PatchBasedSmootherNumerical
 
   prolongate!(rp,Ph,r)
   solve!(dxp,Ap_ns,rp)
-  inject!(x,Ph,dxp,w,w_sums)
+  inject!(x,Ph,dxp)
 
   return x
 end
@@ -90,7 +90,7 @@ function Gridap.Algebra.solve!(x_mat::PVector,ns::PatchBasedSmootherNumericalSet
   copy!(r,r_mat)
   prolongate!(rp,Ph,r)
   map(solve!,partition(dxp),Ap_ns,partition(rp))
-  inject!(x,Ph,dxp,w,w_sums)
+  inject!(x,Ph,dxp)
   copy!(x_mat,x)
 
   return x_mat

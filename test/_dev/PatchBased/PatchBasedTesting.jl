@@ -19,7 +19,7 @@ parts = with_debug() do distribute
   distribute(LinearIndices((prod(num_ranks),)))
 end
 
-domain = (0.0,1.0,0.0,1.0)
+domain = (0,1,0,1)
 mesh_partition = (2,4)
 model = CartesianDiscreteModel(domain,mesh_partition)
 

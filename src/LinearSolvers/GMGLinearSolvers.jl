@@ -186,7 +186,7 @@ end
 function solve_coarsest_level!(parts::AbstractArray,::LinearSolver,xh::PVector,rh::PVector,caches)
   if (num_parts(parts) == 1)
     map(own_values(xh),own_values(rh)) do xh, rh
-       solve!(xh,caches,rh)
+      solve!(xh,caches,rh)
     end
   else
     solve!(xh,caches,rh)

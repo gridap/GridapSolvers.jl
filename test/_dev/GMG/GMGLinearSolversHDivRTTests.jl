@@ -20,6 +20,8 @@ using GridapSolvers.PatchBasedSmoothers
 u(x) = VectorValue(x[1],x[2])
 f(x) = VectorValue(2.0*x[2]*(1.0-x[1]*x[1]),2.0*x[1]*(1-x[2]*x[2]))
 
+#u(x) = VectorValue([x[1]*(1.0-x[1]),-x[2]*(1.0-x[2])])
+
 function get_patch_smoothers(tests,patch_spaces,patch_decompositions,biform,qdegree)
   mh = tests.mh
   nlevs = num_levels(mh)
@@ -35,7 +37,7 @@ function get_patch_smoothers(tests,patch_spaces,patch_decompositions,biform,qdeg
       a(u,v) = biform(u,v,dΩ)
       local_solver = LUSolver() # IS_ConjugateGradientSolver(;reltol=1.e-6)
       patch_smoother = PatchBasedLinearSolver(a,Ph,Vh,local_solver)
-      smoothers[lev] = RichardsonSmoother(patch_smoother,1,1.0/3.0)
+      smoothers[lev] = RichardsonSmoother(patch_smoother,10,0.2)
     end
   end
   return smoothers
@@ -60,7 +62,8 @@ function main(parts, coarse_grid_partition, num_parts_x_level, num_refs_coarse, 
     toc!(t,"Model Hierarchy + FESpace Hierarchy")
 
     tic!(t;barrier=true)
-    patch_decompositions = PatchDecomposition(mh)
+    pbs = GridapSolvers.PatchBasedSmoothers.PatchBoundaryExclude()
+    patch_decompositions = PatchDecomposition(mh;patch_boundary_style=pbs)
     patch_spaces = PatchFESpace(mh,reffe,DivConformity(),patch_decompositions,tests)
     toc!(t,"Patch Decomposition + FESpaces")
 
@@ -73,7 +76,7 @@ function main(parts, coarse_grid_partition, num_parts_x_level, num_refs_coarse, 
     # Preconditioner
     tic!(t;barrier=true)
     smoothers = get_patch_smoothers(tests,patch_spaces,patch_decompositions,biform,qdegree)
-    restrictions, prolongations = setup_transfer_operators(trials,qdegree;mode=:residual)
+    restrictions, prolongations = setup_transfer_operators(trials,qdegree;mode=:residual)#,restriction_method=:interpolation)
 
     gmg = GMGLinearSolver(mh,
                           smatrices,
@@ -125,9 +128,9 @@ if !MPI.Initialized()
 end
 
 # Parameters
-order = 0
-coarse_grid_partition = (2,2)
-num_refs_coarse = 2
+order = 1
+coarse_grid_partition = (1,1)
+num_refs_coarse = 3
 
 α = 1.0
 num_parts_x_level = [4,2,1]
@@ -137,43 +140,6 @@ parts = with_mpi() do distribute
 end
 
 num_iters, num_free_dofs2 = main(parts,coarse_grid_partition,num_parts_x_level,num_refs_coarse,order,α)
-
-"""
-
-num_refinements = [1,2,3,4]
-alpha_exps = [0,1,2,3]
-nr = length(num_refinements)
-na = length(alpha_exps)
-
-# Do experiments
-iter_matrix = zeros(Int,nr,na)
-free_dofs   = Vector{Int64}(undef,nr)
-for ref = 1:nr
-  num_parts_x_level = [1 for i=1:num_refinements[ref]+1]
-  for alpha_exp = 1:na
-    α = 10.0^alpha_exps[alpha_exp]
-
-    num_iters, num_free_dofs2 = with_backend(main,MPIBackend(),ranks,coarse_grid_partition,num_parts_x_level,order,α)
-    free_dofs[ref] = num_free_dofs2
-    iter_matrix[ref,alpha_exp] = num_iters
-  end
-end
-
-# Display results
-if i_am_main(parts)
-  println("> α = ", map(exp->10.0^exp,alpha_exp))
-end
-
-for ref = 1:nr
-  if i_am_main(parts)
-    println("> Num Refinements: ", num_refinements[ref])
-    println("  > Num free dofs         : ", free_dofs[ref])
-    println("  > Num Refinements       : ", num_refinements[ref])
-    println("  > Num Iters (per alpha) : ", iter_matrix[ref,:])
-  end
-end
-"""
-
 
 MPI.Finalize()
 end
