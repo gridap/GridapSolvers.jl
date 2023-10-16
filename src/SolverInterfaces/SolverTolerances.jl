@@ -57,11 +57,6 @@ function converged(tols::SolverTolerances,niter,e_r,e_a)
   return (e_r < tols.rtol) || (e_a < tols.atol)
 end
 
-function set_solver_tolerances!(s::Gridap.Algebra.LinearSolver;kwargs...)
-  a = get_solver_tolerances(s)
-  return set_solver_tolerances!(a;kwargs...)
-end
-
 function Base.show(io::IO,k::MIME"text/plain",t::SolverTolerances{T}) where T
   println(io,"SolverTolerances{$T}:")
   println(io,"  - maxiter: $(t.maxiter)")
