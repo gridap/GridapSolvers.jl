@@ -34,7 +34,7 @@ function set_solver_tolerances!(a::SolverTolerances{T};
   return a
 end
 
-function finished_flag(tols::SolverTolerances,niter,e_r,e_a)
+function finished_flag(tols::SolverTolerances,niter,e_a,e_r)
   if !finished(tols,niter,e_r,e_a)
     @warn "finished_flag() called with unfinished solver!"
   end
@@ -49,11 +49,11 @@ function finished_flag(tols::SolverTolerances,niter,e_r,e_a)
   end
 end
 
-function finished(tols::SolverTolerances,niter,e_r,e_a)
-  return (niter >= tols.maxiter) || converged(tols,niter,e_r,e_a)
+function finished(tols::SolverTolerances,niter,e_a,e_r)
+  return (niter >= tols.maxiter) || converged(tols,niter,e_a,e_r)
 end
 
-function converged(tols::SolverTolerances,niter,e_r,e_a)
+function converged(tols::SolverTolerances,niter,e_a,e_r)
   return (e_r < tols.rtol) || (e_a < tols.atol)
 end
 
