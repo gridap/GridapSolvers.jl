@@ -68,7 +68,8 @@ struct GMGNumericalSetup{A,B,C,D,E} <: Gridap.Algebra.NumericalSetup
     else
       post_smoothers_caches = pre_smoothers_caches
     end
-    coarsest_solver_cache = setup_coarsest_solver_cache(mh,coarsest_solver,smatrices)
+    #coarsest_solver_cache = setup_coarsest_solver_cache(mh,coarsest_solver,smatrices)
+    coarsest_solver_cache = coarse_solver_caches(mh,coarsest_solver,smatrices)
 
     A = typeof(finest_level_cache)
     B = typeof(pre_smoothers_caches)
@@ -107,6 +108,17 @@ function setup_smoothers_caches(mh::ModelHierarchy,smoothers::AbstractVector{<:L
     end
   end
   return caches
+end
+
+function coarse_solver_caches(mh,s,mats)
+  cache = nothing
+  nlevs = num_levels(mh)
+  parts = get_level_parts(mh,nlevs)
+  if i_am_in(parts)
+    mat = mats[nlevs]
+    cache = numerical_setup(symbolic_setup(s, mat), mat)
+  end
+  return cache
 end
 
 function setup_coarsest_solver_cache(mh::ModelHierarchy,coarsest_solver::LinearSolver,smatrices::Vector{<:AbstractMatrix})
@@ -214,9 +226,10 @@ function apply_GMG_level!(lev::Integer,xh::Union{PVector,Nothing},rh::Union{PVec
   if i_am_in(parts)
     if (lev == num_levels(mh)) 
       ## Coarsest level
-      coarsest_solver = ns.solver.coarsest_solver
-      coarsest_solver_cache = ns.coarsest_solver_cache
-      solve_coarsest_level!(parts,coarsest_solver,xh,rh,coarsest_solver_cache)
+      #coarsest_solver = ns.solver.coarsest_solver
+      #coarsest_solver_cache = ns.coarsest_solver_cache
+      #solve_coarsest_level!(parts,coarsest_solver,xh,rh,coarsest_solver_cache)
+      solve!(xh, ns.coarsest_solver_cache, rh)
     else 
       ## General case
       Ah = ns.solver.smatrices[lev]
