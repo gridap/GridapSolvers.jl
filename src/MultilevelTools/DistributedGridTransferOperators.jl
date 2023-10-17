@@ -35,13 +35,16 @@ function DistributedGridTransferOperator(lev::Int,sh::FESpaceHierarchy,qdegree::
   # Refinement
   if (op_type == :prolongation) || (restriction_method ∈ [:interpolation,:dof_mask])
     cache_refine = _get_interpolation_cache(lev,sh,qdegree,mode)
-  else
+  elseif mode == :solution
     cache_refine = _get_projection_cache(lev,sh,qdegree,mode)
+  else
+    cache_refine = _get_dual_projection_cache(lev,sh,qdegree)
+    restriction_method = :dual_projection
   end
 
   # Redistribution
   redist = has_redistribution(mh,lev)
-  cache_redist = _get_redistribution_cache(lev,sh,mode,op_type,cache_refine)
+  cache_redist = _get_redistribution_cache(lev,sh,mode,op_type,restriction_method,cache_refine)
 
   cache = cache_refine, cache_redist
   return DistributedGridTransferOperator(op_type,redist,restriction_method,sh,cache)
@@ -115,7 +118,39 @@ function _get_projection_cache(lev::Int,sh::FESpaceHierarchy,qdegree::Int,mode::
   return cache_refine
 end
 
-function _get_redistribution_cache(lev::Int,sh::FESpaceHierarchy,mode::Symbol,op_type::Symbol,cache_refine)
+function _get_dual_projection_cache(lev::Int,sh::FESpaceHierarchy,qdegree::Int)
+  mh = sh.mh
+  cparts = get_level_parts(mh,lev+1)
+
+  if i_am_in(cparts)
+    model_h = get_model_before_redist(mh,lev)
+    Uh   = get_fe_space_before_redist(sh,lev)
+    Ωh   = Triangulation(model_h)
+    dΩh  = Measure(Ωh,qdegree)
+    uh   = FEFunction(Uh,zero_free_values(Uh),zero_dirichlet_values(Uh))
+
+    model_H = get_model(mh,lev+1)
+    UH   = get_fe_space(sh,lev+1)
+    ΩH   = Triangulation(model_H)
+    dΩhH = Measure(ΩH,Ωh,qdegree)
+
+    Mh = assemble_matrix((u,v)->∫(v⋅u)*dΩh,Uh,Uh)
+    #Mh_solver = IS_ConjugateGradientSolver(reltol=1.e-8)
+    #Mh_ns = numerical_setup(symbolic_setup(Mh_solver,Mh),Mh)
+
+    assem = SparseMatrixAssembler(UH,UH)
+    rh = allocate_col_vector(Mh)
+    cache_refine = model_h, Uh, UH, Mh, rh, uh, assem, dΩhH
+  else
+    model_h = get_model_before_redist(mh,lev)
+    Uh      = get_fe_space_before_redist(sh,lev)
+    cache_refine = model_h, Uh, nothing, nothing, nothing, nothing, nothing, nothing
+  end
+
+  return cache_refine
+end
+
+function _get_redistribution_cache(lev::Int,sh::FESpaceHierarchy,mode::Symbol,op_type::Symbol,restriction_method::Symbol,cache_refine)
   mh = sh.mh
   redist = has_redistribution(mh,lev)
   if !redist 
@@ -130,10 +165,14 @@ function _get_redistribution_cache(lev::Int,sh::FESpaceHierarchy,mode::Symbol,op
   glue        = mh.levels[lev].red_glue
 
   if op_type == :prolongation
-    model_h, Uh, fv_h, dv_h = cache_refine
+    model_h, Uh, fv_h, dv_h, UH, fv_H, dv_H = cache_refine
     cache_exchange = get_redistribute_free_values_cache(fv_h_red,Uh_red,fv_h,dv_h,Uh,model_h_red,glue;reverse=false)
+  elseif restriction_method == :projection
+    model_h, Uh, fv_h, dv_h, VH, AH, lH, xH, bH, bH0, assem = cache_refine
+    cache_exchange = get_redistribute_free_values_cache(fv_h,Uh,fv_h_red,dv_h_red,Uh_red,model_h,glue;reverse=true)
   else
-    model_h, Uh, fv_h, dv_h = cache_refine
+    model_h, Uh, UH, Mh, rh, uh, assem, dΩhH = cache_refine
+    fv_h = isa(uh,Nothing) ? nothing : get_free_dof_values(uh)
     cache_exchange = get_redistribute_free_values_cache(fv_h,Uh,fv_h_red,dv_h_red,Uh_red,model_h,glue;reverse=true)
   end
 
@@ -307,4 +346,43 @@ function LinearAlgebra.mul!(y::Union{PVector,Nothing},A::DistributedGridTransfer
   end
 
   return y 
+end
+
+###############################################################
+
+function LinearAlgebra.mul!(y::PVector,A::DistributedGridTransferOperator{Val{:restriction},Val{false},Val{:dual_projection}},x::PVector)
+  cache_refine, cache_redist = A.cache
+  model_h, Uh, VH, Mh, rh, uh, assem, dΩhH = cache_refine
+  fv_h = get_free_dof_values(uh)
+
+  IterativeSolvers.cg!(rh,Mh,x;reltol=1.0e-06)
+  copy!(fv_h,rh)
+  consistent!(fv_h) |> fetch
+  v = get_fe_basis(VH)
+  assemble_vector!(y,assem,collect_cell_vector(VH,∫(v⋅uh)*dΩhH))
+  
+  return y
+end
+
+function LinearAlgebra.mul!(y::Union{PVector,Nothing},A::DistributedGridTransferOperator{Val{:restriction},Val{true},Val{:dual_projection}},x::PVector)
+  cache_refine, cache_redist = A.cache
+  model_h, Uh, VH, Mh, rh, uh, assem, dΩhH = cache_refine
+  fv_h_red, dv_h_red, Uh_red, model_h_red, glue, cache_exchange = cache_redist
+  fv_h = isa(uh,Nothing) ? nothing : get_free_dof_values(uh)
+
+  # 1 - Redistribute from fine partition to coarse partition
+  copy!(fv_h_red,x)
+  consistent!(fv_h_red) |> fetch
+  redistribute_free_values!(cache_exchange,fv_h,Uh,fv_h_red,dv_h_red,Uh_red,model_h,glue;reverse=true)
+
+  # 2 - Solve f2c projection coarse partition
+  if !isa(y,Nothing)
+    IterativeSolvers.cg!(rh,Mh,fv_h;reltol=1.0e-06)
+    copy!(fv_h,rh)
+    consistent!(fv_h) |> fetch
+    v = get_fe_basis(VH)
+    assemble_vector!(y,assem,collect_cell_vector(VH,∫(v⋅uh)*dΩhH))
+  end
+
+  return y
 end

@@ -64,6 +64,24 @@ xH_star = get_free_dof_values(solve(opH))
 Ah, bh = get_matrix(oph), get_vector(oph);
 AH, bH = get_matrix(opH), get_vector(opH);
 
+
+Mhh = assemble_matrix((u,v)->∫(u⋅v)*dΩh,Vh,Vh)
+
+function compute_MhH()
+  MhH = zeros(num_free_dofs(Vh),num_free_dofs(VH))
+  xHi = fill(0.0,num_free_dofs(VH))
+  for iH in 1:num_free_dofs(VH)
+    fill!(xHi,0.0); xHi[iH] = 1.0
+    vHi = FEFunction(VH,xHi)
+    vH = assemble_vector((v)->∫(v⋅vHi)*dΩh,Vh)
+    MhH[:,iH] .= vH
+  end
+  return MhH
+end
+
+MhH = compute_MhH()
+
+
 # Projection operators 
 
 function Λ_project(xh)
@@ -180,9 +198,9 @@ function smooth!(x,r)
   niter = 10
   for i in 1:niter
     _r = bh - Λ_project(x)
-    prolongate!(rp,Ph,_r,w,w_sums)
+    PatchBasedSmoothers.prolongate!(rp,Ph,r,w,w_sums)
     dxp = Ap\rp
-    inject!(dx,Ph,dxp,w,w_sums)
+    PatchBasedSmoothers.inject!(dx,Ph,dxp,w,w_sums)
 
     x .+= β*dx
     r .-= β*A*dx
@@ -195,6 +213,12 @@ niters = 10
 
 wH = randn(size(AH,2))
 wh = project_c2f(wH)
+
+function project_f2c_bis(rh)
+  Qrh = Mhh\rh
+  uh  = FEFunction(Vh,Qrh)
+  assemble_vector(v->∫(v⋅uh)*dΩHh,VH)
+end
 
 iter = 0
 error = norm(bh - Ah*xh)
@@ -210,7 +234,14 @@ while iter < niters && error > 1.0e-10
   println("    > norm(xh) = ",norm(xh))
   println("    > norm(rh) = ",norm(rh))
 
-  rH = project_f2c(rh)
+  #rH = project_f2c(rh)
+  #xH = project_f2c(xh)
+  #rH = bH - AH*xH
+
+  #Qrh = Mhh\rh
+  #rH = transpose(MhH)*Qrh
+  rH = project_f2c_bis(rh)
+
   qH = AH\rH
   qh = project_c2f(qH)
 
@@ -264,3 +295,16 @@ end
 using IterativeSolvers
 x = zeros(size(Ah,2))
 cg!(x,Ah,bh;Pl=smoother_ns.Mns,verbose=true)
+
+
+
+######################################################################################
+
+_s  = IS_ConjugateGradientSolver(maxiter=50,reltol=1.e-16,verbose=true)
+_ns = numerical_setup(symbolic_setup(_s,Mhh),Mhh)
+
+x = zeros(size(Mhh,2))
+_rh = copy(rh)
+solve!(x,_ns,_rh)
+
+norm(rh - Mhh*x)
