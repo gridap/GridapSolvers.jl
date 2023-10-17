@@ -25,7 +25,8 @@ function ProlongationOperator(lev::Int,sh::FESpaceHierarchy,qdegree::Int;kwargs.
 end
 
 function DistributedGridTransferOperator(lev::Int,sh::FESpaceHierarchy,qdegree::Int,op_type::Symbol;
-                                         mode::Symbol=:solution,restriction_method::Symbol=:projection)
+                                         mode::Symbol=:solution,restriction_method::Symbol=:projection,
+                                         solver=LUSolver())
   mh = sh.mh
   @check lev < num_levels(mh)
   @check op_type ∈ [:restriction, :prolongation]
@@ -38,7 +39,7 @@ function DistributedGridTransferOperator(lev::Int,sh::FESpaceHierarchy,qdegree::
   elseif mode == :solution
     cache_refine = _get_projection_cache(lev,sh,qdegree,mode)
   else
-    cache_refine = _get_dual_projection_cache(lev,sh,qdegree)
+    cache_refine = _get_dual_projection_cache(lev,sh,qdegree,solver)
     restriction_method = :dual_projection
   end
 
@@ -118,7 +119,7 @@ function _get_projection_cache(lev::Int,sh::FESpaceHierarchy,qdegree::Int,mode::
   return cache_refine
 end
 
-function _get_dual_projection_cache(lev::Int,sh::FESpaceHierarchy,qdegree::Int)
+function _get_dual_projection_cache(lev::Int,sh::FESpaceHierarchy,qdegree::Int,solver)
   mh = sh.mh
   cparts = get_level_parts(mh,lev+1)
 
@@ -135,12 +136,11 @@ function _get_dual_projection_cache(lev::Int,sh::FESpaceHierarchy,qdegree::Int)
     dΩhH = Measure(ΩH,Ωh,qdegree)
 
     Mh = assemble_matrix((u,v)->∫(v⋅u)*dΩh,Uh,Uh)
-    #Mh_solver = IS_ConjugateGradientSolver(reltol=1.e-8)
-    #Mh_ns = numerical_setup(symbolic_setup(Mh_solver,Mh),Mh)
+    Mh_ns = numerical_setup(symbolic_setup(solver,Mh),Mh)
 
     assem = SparseMatrixAssembler(UH,UH)
     rh = allocate_col_vector(Mh)
-    cache_refine = model_h, Uh, UH, Mh, rh, uh, assem, dΩhH
+    cache_refine = model_h, Uh, UH, Mh_ns, rh, uh, assem, dΩhH
   else
     model_h = get_model_before_redist(mh,lev)
     Uh      = get_fe_space_before_redist(sh,lev)
@@ -352,10 +352,10 @@ end
 
 function LinearAlgebra.mul!(y::PVector,A::DistributedGridTransferOperator{Val{:restriction},Val{false},Val{:dual_projection}},x::PVector)
   cache_refine, cache_redist = A.cache
-  model_h, Uh, VH, Mh, rh, uh, assem, dΩhH = cache_refine
+  model_h, Uh, VH, Mh_ns, rh, uh, assem, dΩhH = cache_refine
   fv_h = get_free_dof_values(uh)
 
-  IterativeSolvers.cg!(rh,Mh,x;reltol=1.0e-06)
+  solve!(rh,Mh_ns,x)
   copy!(fv_h,rh)
   consistent!(fv_h) |> fetch
   v = get_fe_basis(VH)
@@ -366,7 +366,7 @@ end
 
 function LinearAlgebra.mul!(y::Union{PVector,Nothing},A::DistributedGridTransferOperator{Val{:restriction},Val{true},Val{:dual_projection}},x::PVector)
   cache_refine, cache_redist = A.cache
-  model_h, Uh, VH, Mh, rh, uh, assem, dΩhH = cache_refine
+  model_h, Uh, VH, Mh_ns, rh, uh, assem, dΩhH = cache_refine
   fv_h_red, dv_h_red, Uh_red, model_h_red, glue, cache_exchange = cache_redist
   fv_h = isa(uh,Nothing) ? nothing : get_free_dof_values(uh)
 
@@ -377,7 +377,7 @@ function LinearAlgebra.mul!(y::Union{PVector,Nothing},A::DistributedGridTransfer
 
   # 2 - Solve f2c projection coarse partition
   if !isa(y,Nothing)
-    IterativeSolvers.cg!(rh,Mh,fv_h;reltol=1.0e-06)
+    solve!(rh,Mh_ns,fv_h)
     copy!(fv_h,rh)
     consistent!(fv_h) |> fetch
     v = get_fe_basis(VH)
