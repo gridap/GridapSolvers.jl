@@ -31,7 +31,7 @@ function get_patch_smoothers(tests,patch_spaces,patch_decompositions,biform,qdeg
       Ω  = Triangulation(PD)
       dΩ = Measure(Ω,qdegree)
       a(u,v) = biform(u,v,dΩ)
-      local_solver = LUSolver() # IS_ConjugateGradientSolver(;reltol=1.e-6)
+      local_solver = IS_ConjugateGradientSolver(;reltol=1.e-6)
       patch_smoother = PatchBasedLinearSolver(a,Ph,Vh,local_solver)
       smoothers[lev] = RichardsonSmoother(patch_smoother,10,0.2)
     end
@@ -39,7 +39,7 @@ function get_patch_smoothers(tests,patch_spaces,patch_decompositions,biform,qdeg
   return smoothers
 end
 
-function gmg_driver(t,parts,mh,spaces,qdegree,smoothers,biform,liform,u,restriction_method)
+function gmg_driver(t,parts,mh,spaces,qdegree,smoothers,biform,liform,u)
   tests, trials = spaces
 
   tic!(t;barrier=true)
@@ -48,7 +48,11 @@ function gmg_driver(t,parts,mh,spaces,qdegree,smoothers,biform,liform,u,restrict
 
   # Preconditioner
   coarse_solver = LUSolver()
-  restrictions, prolongations = setup_transfer_operators(trials,qdegree;mode=:residual,restriction_method=restriction_method)
+  restrictions, prolongations = setup_transfer_operators(trials,
+                                                         qdegree;
+                                                         mode=:residual,
+                                                         restriction_method=:projection,
+                                                         solver=IS_ConjugateGradientSolver(;reltol=1.e-6))
   gmg = GMGLinearSolver(mh,
                         smatrices,
                         prolongations,
@@ -88,7 +92,7 @@ function gmg_driver(t,parts,mh,spaces,qdegree,smoothers,biform,liform,u,restrict
   return e_l2
 end
 
-function gmg_poisson_driver(t,parts,mh,order,restriction_method)
+function gmg_poisson_driver(t,parts,mh,order)
   tic!(t;barrier=true)
   u(x) = x[1] + x[2]
   f(x) = -Δ(u)(x)
@@ -103,14 +107,14 @@ function gmg_poisson_driver(t,parts,mh,order,restriction_method)
   spaces    = tests, trials
   toc!(t,"FESpaces")
 
-  return gmg_driver(t,parts,mh,spaces,qdegree,smoothers,biform,liform,u,restriction_method)
+  return gmg_driver(t,parts,mh,spaces,qdegree,smoothers,biform,liform,u)
 end
 
-function gmg_laplace_driver(t,parts,mh,order,restriction_method)
+function gmg_laplace_driver(t,parts,mh,order)
   tic!(t;barrier=true)
   α    = 1.0
   u(x) = x[1] + x[2]
-  f(x) = u - α * Δ(u)(x)
+  f(x) = u(x) - α * Δ(u)(x)
   biform(u,v,dΩ) = ∫(v*u)dΩ + ∫(α*∇(v)⋅∇(u))dΩ
   liform(v,dΩ)   = ∫(v*f)dΩ
   qdegree   = 2*order+1
@@ -122,10 +126,10 @@ function gmg_laplace_driver(t,parts,mh,order,restriction_method)
   spaces    = tests, trials
   toc!(t,"FESpaces")
 
-  return gmg_driver(t,parts,mh,spaces,qdegree,smoothers,biform,liform,u,restriction_method)
+  return gmg_driver(t,parts,mh,spaces,qdegree,smoothers,biform,liform,u)
 end
 
-function gmg_vector_laplace_driver(t,parts,mh,order,restriction_method)
+function gmg_vector_laplace_driver(t,parts,mh,order)
   tic!(t;barrier=true)
   Dc   = num_cell_dims(get_model(mh,1))
   α    = 1.0
@@ -142,10 +146,10 @@ function gmg_vector_laplace_driver(t,parts,mh,order,restriction_method)
   spaces    = tests, trials
   toc!(t,"FESpaces")
 
-  return gmg_driver(t,parts,mh,spaces,qdegree,smoothers,biform,liform,u,restriction_method)
+  return gmg_driver(t,parts,mh,spaces,qdegree,smoothers,biform,liform,u)
 end
 
-function gmg_hdiv_driver(t,parts,mh,order,restriction_method)
+function gmg_hdiv_driver(t,parts,mh,order)
   tic!(t;barrier=true)
   Dc   = num_cell_dims(get_model(mh,1))
   α    = 1.0
@@ -167,19 +171,19 @@ function gmg_hdiv_driver(t,parts,mh,order,restriction_method)
   smoothers = get_patch_smoothers(tests,patch_spaces,patch_decompositions,biform,qdegree)
   toc!(t,"Patch Decomposition")
 
-  return gmg_driver(t,parts,mh,spaces,qdegree,smoothers,biform,liform,u,restriction_method)
+  return gmg_driver(t,parts,mh,spaces,qdegree,smoothers,biform,liform,u)
 end
 
-function main_gmg_driver(parts,mh,order,restriction_method,pde)
+function main_gmg_driver(parts,mh,order,pde)
   t = PTimer(parts,verbose=true)
   if     pde == :poisson
-    gmg_poisson_driver(t,parts,mh,order,restriction_method)
+    gmg_poisson_driver(t,parts,mh,order)
   elseif pde == :laplace
-    gmg_laplace_driver(t,parts,mh,order,restriction_method)
+    gmg_laplace_driver(t,parts,mh,order)
   elseif pde == :vector_laplace
-    gmg_vector_laplace_driver(t,parts,mh,order,restriction_method)
+    gmg_vector_laplace_driver(t,parts,mh,order)
   elseif pde == :hdiv
-    gmg_hdiv_driver(t,parts,mh,order,restriction_method)
+    gmg_hdiv_driver(t,parts,mh,order)
   end
 end
 
@@ -198,17 +202,15 @@ end
 
 function main(distribute,np::Integer,nc::Tuple,np_per_level::Vector)
   parts = distribute(LinearIndices((np,)))
-
   mh = get_mesh_hierarchy(parts,nc,np_per_level)
 
   for pde in [:poisson,:laplace,:vector_laplace,:hdiv]
-    restriction_method = :projection
     if i_am_main(parts)
       println(repeat("=",80))
       println("Testing GMG with Dc=$(length(nc)), PDE=$pde")
     end
     order = (pde !== :hdiv) ? 1 : 0
-    main_gmg_driver(parts,mh,order,restriction_method,pde)
+    main_gmg_driver(parts,mh,order,pde)
   end
 end
 
