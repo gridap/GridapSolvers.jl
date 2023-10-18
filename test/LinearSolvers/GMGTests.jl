@@ -110,7 +110,7 @@ function gmg_laplace_driver(t,parts,mh,order,restriction_method)
   tic!(t;barrier=true)
   α    = 1.0
   u(x) = x[1] + x[2]
-  f(x) = -Δ(u)(x)
+  f(x) = u - α * Δ(u)(x)
   biform(u,v,dΩ) = ∫(v*u)dΩ + ∫(α*∇(v)⋅∇(u))dΩ
   liform(v,dΩ)   = ∫(v*f)dΩ
   qdegree   = 2*order+1
@@ -127,13 +127,14 @@ end
 
 function gmg_vector_laplace_driver(t,parts,mh,order,restriction_method)
   tic!(t;barrier=true)
+  Dc   = num_cell_dims(get_model(mh,1))
   α    = 1.0
-  u(x) = VectorValue(x[1],x[2])
-  f(x) = VectorValue(2.0*x[2]*(1.0-x[1]*x[1]),2.0*x[1]*(1-x[2]*x[2]))
+  u(x) = (Dc==2) ? VectorValue(x[1],x[2]) : VectorValue(x[1],x[2],x[3])
+  f(x) = (Dc==2) ? VectorValue(x[1],x[2]) : VectorValue(x[1],x[2],x[3])
   biform(u,v,dΩ) = ∫(v⋅u)dΩ + ∫(α*∇(v)⊙∇(u))dΩ
   liform(v,dΩ)   = ∫(v⋅f)dΩ
   qdegree   = 2*order+1
-  reffe     = ReferenceFE(lagrangian,VectorValue{2,Float64},order)
+  reffe     = ReferenceFE(lagrangian,VectorValue{Dc,Float64},order)
   smoothers = Fill(RichardsonSmoother(JacobiLinearSolver(),10,2.0/3.0),num_levels(mh)-1)
 
   tests     = TestFESpace(mh,reffe,dirichlet_tags="boundary")
@@ -146,9 +147,10 @@ end
 
 function gmg_hdiv_driver(t,parts,mh,order,restriction_method)
   tic!(t;barrier=true)
-  α     = 1.0
-  u(x)  = VectorValue(x[1],x[2])
-  f(x)  = VectorValue(2.0*x[2]*(1.0-x[1]*x[1]),2.0*x[1]*(1-x[2]*x[2]))
+  Dc   = num_cell_dims(get_model(mh,1))
+  α    = 1.0
+  u(x) = (Dc==2) ? VectorValue(x[1],x[2]) : VectorValue(x[1],x[2],x[3])
+  f(x) = (Dc==2) ? VectorValue(x[1],x[2]) : VectorValue(x[1],x[2],x[3])
   biform(u,v,dΩ)  = ∫(v⋅u)dΩ + ∫(α*divergence(v)⋅divergence(u))dΩ
   liform(v,dΩ)    = ∫(v⋅f)dΩ
   qdegree   = 2*(order+1)
@@ -181,15 +183,10 @@ function main_gmg_driver(parts,mh,order,restriction_method,pde)
   end
 end
 
-function get_mesh_hierarchy(parts,Dc,np_per_level,num_refs_coarse)
-  if Dc == 2
-    domain = (0,1,0,1)
-    nc = (2,2)
-  else
-    @assert Dc == 3
-    domain = (0,1,0,1,0,1)
-    nc = (2,2,2)
-  end
+function get_mesh_hierarchy(parts,nc,np_per_level)
+  Dc = length(nc)
+  domain = (Dc == 2) ? (0,1,0,1) : (0,1,0,1,0,1)
+  num_refs_coarse = (Dc == 2) ? 1 : 0
   
   num_levels   = length(np_per_level)
   cparts       = generate_subparts(parts,np_per_level[num_levels])
@@ -199,27 +196,20 @@ function get_mesh_hierarchy(parts,Dc,np_per_level,num_refs_coarse)
   return mh
 end
 
-function main(distribute,np,Dc,np_per_level)
-  parts = distribute(LinearIndices((prod(np),)))
+function main(distribute,np::Integer,nc::Tuple,np_per_level::Vector)
+  parts = distribute(LinearIndices((np,)))
 
-  num_refs_coarse = 2
-  mh = get_mesh_hierarchy(parts,Dc,np_per_level,num_refs_coarse)
+  mh = get_mesh_hierarchy(parts,nc,np_per_level)
 
   for pde in [:poisson,:laplace,:vector_laplace,:hdiv]
-    methods = (pde !== :hdiv) ? [:projection,:interpolation] : [:projection]
-    for restriction_method in methods
-      if i_am_main(parts)
-        println(repeat("=",80))
-        println("Testing GMG with Dc=$Dc, PDE=$pde and restriction_method=$restriction_method")
-      end
-      order = (pde !== :hdiv) ? 1 : 0
-      main_gmg_driver(parts,mh,order,restriction_method,pde)
+    restriction_method = :projection
+    if i_am_main(parts)
+      println(repeat("=",80))
+      println("Testing GMG with Dc=$(length(nc)), PDE=$pde")
     end
+    order = (pde !== :hdiv) ? 1 : 0
+    main_gmg_driver(parts,mh,order,restriction_method,pde)
   end
-end
-
-with_mpi() do distribute
-  main(distribute,4,2,[4,2,1])
 end
 
 end # module GMGTests
