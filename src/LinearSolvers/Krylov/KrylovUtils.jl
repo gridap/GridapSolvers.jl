@@ -19,6 +19,9 @@ function krylov_mul!(y,A,x,Pr::Nothing,Pl,wr,wl)
   mul!(wl,A,x)
   solve!(y,Pl,wl)
 end
+function krylov_mul!(y,A,x,Pr::Nothing,Pl::Nothing,wr,wl)
+  mul!(y,A,x)
+end
 
 """
   Computes the Krylov residual r = Pl⁻¹(A⋅x - b).
