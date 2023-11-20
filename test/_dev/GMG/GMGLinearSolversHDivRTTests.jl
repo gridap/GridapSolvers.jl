@@ -76,7 +76,10 @@ function main(parts, coarse_grid_partition, num_parts_x_level, num_refs_coarse, 
     # Preconditioner
     tic!(t;barrier=true)
     smoothers = get_patch_smoothers(tests,patch_spaces,patch_decompositions,biform,qdegree)
-    restrictions, prolongations = setup_transfer_operators(trials,qdegree;mode=:residual)#,restriction_method=:interpolation)
+    restrictions, prolongations = setup_transfer_operators(trials,
+                                                           qdegree;
+                                                           mode=:residual,
+                                                           solver=IS_ConjugateGradientSolver(reltol=1.e-6))
 
     gmg = GMGLinearSolver(mh,
                           smatrices,

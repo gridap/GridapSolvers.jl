@@ -28,8 +28,8 @@ end
 function test_solver(s,D_j)
   ns = numerical_setup(symbolic_setup(s,D_j),D_j)
 
-  b = GridapSolvers.allocate_col_vector(D_j)
-  x = GridapSolvers.allocate_col_vector(D_j)
+  b = allocate_col_vector(D_j)
+  x = allocate_col_vector(D_j)
 
   fill!(b,1.0)
   solve!(x,ns,b)
@@ -40,9 +40,9 @@ end
 
 function test_smoother(s,D_j)
   ns = numerical_setup(symbolic_setup(s,D_j),D_j)
-  b = GridapSolvers.allocate_col_vector(D_j)
-  x = GridapSolvers.allocate_col_vector(D_j)
-  r = GridapSolvers.allocate_row_vector(D_j)
+  b = allocate_col_vector(D_j)
+  x = allocate_col_vector(D_j)
+  r = allocate_row_vector(D_j)
   fill!(b,1.0)
   fill!(x,1.0)
   mul!(r,D_j,x)
@@ -144,7 +144,7 @@ gmg = GMGLinearSolver(mh,
 solver = FGMRESSolver(100,gmg;rtol=1e-6,verbose=true)
 
 ns = numerical_setup(symbolic_setup(solver,A),A)
-x = GridapSolvers.allocate_col_vector(A)
+x = allocate_col_vector(A)
 solve!(x,ns,b)
 
 
@@ -154,5 +154,5 @@ test_smoother(smoothers[1],A)
 Pl = LinearSolvers.IdentitySolver()
 solver2 = GMRESSolver(1000;Pl=Pl,rtol=1e-6,verbose=true)
 ns2 = numerical_setup(symbolic_setup(solver2,A),A)
-x2 = GridapSolvers.allocate_col_vector(A)
+x2 = allocate_col_vector(A)
 solve!(x2,ns2,b)

@@ -7,6 +7,7 @@ using LinearAlgebra
 using SparseArrays
 using PartitionedArrays
 
+using GridapDistributed
 using GridapSolvers
 using GridapSolvers.LinearSolvers
 
@@ -17,7 +18,7 @@ function test_solver(solver,op,Uh,dΩ)
   A, b = get_matrix(op), get_vector(op);
   ns = numerical_setup(symbolic_setup(solver,A),A)
 
-  x = LinearSolvers.allocate_col_vector(A)
+  x = allocate_col_vector(A)
   solve!(x,ns,b)
 
   u  = interpolate(sol,Uh)

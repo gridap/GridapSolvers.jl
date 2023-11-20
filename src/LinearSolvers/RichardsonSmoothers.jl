@@ -48,12 +48,12 @@ function Gridap.Algebra.solve!(x::AbstractVector,ns::RichardsonSmootherNumerical
 
   iter = 1
   while iter <= ns.smoother.num_smooth_steps
-      solve!(dx,Mns,r)
-      dx .= ns.smoother.damping_factor .* dx
-      x  .= x .+ dx
-      mul!(Adx, ns.A, dx)
-      r  .= r .- Adx
-      iter += 1
+    solve!(dx,Mns,r)
+    dx .= ns.smoother.damping_factor .* dx
+    x  .= x .+ dx
+    mul!(Adx, ns.A, dx)
+    r  .= r .- Adx
+    iter += 1
   end
 end
 

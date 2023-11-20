@@ -21,7 +21,6 @@ using GridapDistributed: redistribute_fe_function
 using GridapDistributed: get_old_and_new_parts
 using GridapDistributed: generate_subparts, local_views
 
-export allocate_col_vector, allocate_row_vector
 export change_parts, num_parts, i_am_in
 export generate_level_parts, generate_subparts
 
@@ -38,7 +37,6 @@ export RestrictionOperator, ProlongationOperator
 export setup_transfer_operators
 export mul!
 
-include("Algebra.jl")
 include("SubpartitioningTools.jl")
 include("GridapFixes.jl")
 include("RefinementTools.jl")
