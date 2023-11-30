@@ -80,16 +80,25 @@ function get_sparse_discrete_operators(model)
   return G, C
 end
 
-function interpolation_matrix(U_in,V_out,dΩ;
-                              strat=FullyAssembledRows(),
-                              Tm=SparseMatrixCSR{0,PetscScalar,PetscInt},
-                              Tv=Vector{PetscScalar})
-
+function interpolation_operator(biform,U_in,V_out;
+                                strat=FullyAssembledRows(),
+                                Tm=SparseMatrixCSR{0,PetscScalar,PetscInt},
+                                Tv=Vector{PetscScalar})
   assem = SparseMatrixAssembler(Tm,Tv,U_in,V_out,strat)
-  biform(u,v) = ∫(u⋅v) * dΩ
   return assemble_matrix(biform,assem,U_in,V_out)
 end
 
+function get_operators(V_H1_sc,V_H1_vec,V_Hcurl,V_Hdiv,dΩ)
+  biform_mass(u,v) = ∫(u⋅v) * dΩ
+  biform_grad(u,v) = ∫(∇(u)⋅v) * dΩ
+  biform_curl(u,v) = ∫((∇×u)⋅v) * dΩ
+  
+  G = interpolation_operator(biform_grad,V_H1_sc,V_Hcurl)
+  C = interpolation_operator(biform_curl,V_Hcurl,V_Hdiv)
+  Π_div  = interpolation_operator(biform_mass,V_H1_vec,V_Hdiv)
+  Π_curl = interpolation_operator(biform_mass,V_H1_vec,V_Hcurl)
+  return G, C, Π_div, Π_curl
+end
 
 ###############################################################################
 
@@ -98,10 +107,14 @@ ranks = with_debug() do distribute
   distribute(LinearIndices((prod(np),)))
 end
 
-model = CartesianDiscreteModel(ranks,np,(0,1,0,1,0,1),(4,4,4))
+model = CartesianDiscreteModel(ranks,np,(0,1,0,1,0,1),(10,10,10))
 trian = Triangulation(model)
 
 order = 1
+
+reffe_H1_sc = ReferenceFE(lagrangian,Float64,order)
+V_H1_sc = FESpace(model,reffe_H1_sc)
+U_H1_sc = TrialFESpace(V_H1_sc)
 
 reffe_H1 = ReferenceFE(lagrangian,VectorValue{3,Float64},order)
 V_H1 = FESpace(model,reffe_H1)
@@ -119,10 +132,8 @@ U_Hcurl = TrialFESpace(V_Hcurl)
 dΩ = Measure(trian,(order+1)*2)
 
 coords = get_dof_coords(trian,V_H1)
-G, C = get_sparse_discrete_operators(model);
 
-Π_div  = interpolation_matrix(U_H1,V_Hdiv,dΩ)
-Π_curl = interpolation_matrix(U_H1,V_Hcurl,dΩ)
+G, C, Π_div, Π_curl = get_operators(V_H1_sc,V_H1,V_Hcurl,V_Hdiv,dΩ);
 
 α  = 1.0
 f(x)   = VectorValue([0.0,0.0,1.0])
@@ -134,7 +145,7 @@ A  = get_matrix(op)
 b  = get_vector(op)
 
 
-function ads_ksp_setup(ksp,rtol,maxits,dim,coords,Π_div,Π_curl)
+function ads_ksp_setup(ksp,rtol,maxits,dim,coords,G,C,Π_div,Π_curl)
   rtol = PetscScalar(rtol)
   atol = GridapPETSc.PETSC.PETSC_DEFAULT
   dtol = GridapPETSc.PETSC.PETSC_DEFAULT
@@ -148,19 +159,23 @@ function ads_ksp_setup(ksp,rtol,maxits,dim,coords,Π_div,Π_curl)
   @check_error_code GridapPETSc.PETSC.KSPGetPC(ksp[],pc)
   @check_error_code GridapPETSc.PETSC.PCSetType(pc[],GridapPETSc.PETSC.PCHYPRE)
 
-  map(partition(coords)) do coords
-    nloc = length(coords)
-    @check_error_code GridapPETSc.PETSC.PCSetCoordinates(pc[],dim,nloc,coords)
-  end
+  #map(partition(coords)) do coords
+  #  nloc = length(coords)
+  #  @check_error_code GridapPETSc.PETSC.PCSetCoordinates(pc[],dim,nloc,coords)
+  #end
 
+  _G = convert(PETScMatrix,G)
+  _C = convert(PETScMatrix,C)
   _Π_div = convert(PETScMatrix,Π_div)
   _Π_curl = convert(PETScMatrix,Π_curl)
+  @check_error_code GridapPETSc.PETSC.PCHYPRESetDiscreteGradient(pc[],_G.mat[])
+  @check_error_code GridapPETSc.PETSC.PCHYPRESetDiscreteCurl(pc[],_C.mat[])
   @check_error_code GridapPETSc.PETSC.PCHYPRESetInterpolations(pc[],dim,_Π_div.mat[],C_NULL,_Π_curl.mat[],C_NULL)
 end
 
-options = "-ksp_monitor -ksp_converged_reason -ksp_error_if_not_converged true"
+options = "-ksp_converged_reason"
 GridapPETSc.with(args=split(options)) do
-  ksp_setup(ksp) = ads_ksp_setup(ksp,1e-8,100,3,coords,Π_div,Π_curl)
+  ksp_setup(ksp) = ads_ksp_setup(ksp,1e-8,100,3,coords,G,C,Π_div,Π_curl)
   solver = PETScLinearSolver(ksp_setup)
   ns = numerical_setup(symbolic_setup(solver,A),A)
   x = pfill(0.0,partition(axes(A,2)))
