@@ -1,8 +1,24 @@
 
 using Gridap, Gridap.Adaptivity, Gridap.ReferenceFEs
 using GridapDistributed, PartitionedArrays
-using GridapP4est
+using GridapP4est, GridapPETSc
 using GridapSolvers, GridapSolvers.MultilevelTools, GridapSolvers.LinearSolvers
+
+function set_ksp_options(ksp)
+  pc       = Ref{GridapPETSc.PETSC.PC}()
+  mumpsmat = Ref{GridapPETSc.PETSC.Mat}()
+  @check_error_code GridapPETSc.PETSC.KSPView(ksp[],C_NULL)
+  @check_error_code GridapPETSc.PETSC.KSPSetType(ksp[],GridapPETSc.PETSC.KSPPREONLY)
+  @check_error_code GridapPETSc.PETSC.KSPGetPC(ksp[],pc)
+  @check_error_code GridapPETSc.PETSC.PCSetType(pc[],GridapPETSc.PETSC.PCLU)
+  @check_error_code GridapPETSc.PETSC.PCFactorSetMatSolverType(pc[],GridapPETSc.PETSC.MATSOLVERMUMPS)
+  @check_error_code GridapPETSc.PETSC.PCFactorSetUpMatSolverType(pc[])
+  @check_error_code GridapPETSc.PETSC.PCFactorGetMatrix(pc[],mumpsmat)
+  @check_error_code GridapPETSc.PETSC.MatMumpsSetIcntl(mumpsmat[],  4, 1)
+  @check_error_code GridapPETSc.PETSC.MatMumpsSetIcntl(mumpsmat[], 28, 2)
+  @check_error_code GridapPETSc.PETSC.MatMumpsSetIcntl(mumpsmat[], 29, 2)
+  @check_error_code GridapPETSc.PETSC.MatMumpsSetCntl(mumpsmat[], 3, 1.0e-6)
+end
 
 function get_patch_smoothers(tests,patch_spaces,patch_decompositions,biform,qdegree)
   mh = tests.mh
@@ -17,7 +33,7 @@ function get_patch_smoothers(tests,patch_spaces,patch_decompositions,biform,qdeg
       Ω  = Triangulation(PD)
       dΩ = Measure(Ω,qdegree)
       a(u,v) = biform(u,v,dΩ)
-      local_solver = LUSolver() # IS_ConjugateGradientSolver(;reltol=1.e-6)
+      local_solver = PETScLinearSolver(set_ksp_options) # IS_ConjugateGradientSolver(;reltol=1.e-6)
       patch_smoother = PatchBasedLinearSolver(a,Ph,Vh,local_solver)
       smoothers[lev] = RichardsonSmoother(patch_smoother,10,0.2)
     end
@@ -32,8 +48,8 @@ np       = 2    # Number of processors
 D        = 2    # Problem dimension
 n_refs_c = 6    # Number of refinements for the coarse model
 n_levels = 2    # Number of refinement levels
-order    = 2    # FE order
-conf     = :H1  # Conformity ∈ [:H1,:HDiv]
+order    = 0    # FE order
+conf     = :HDiv  # Conformity ∈ [:H1,:HDiv]
 
 ranks = with_mpi() do distribute
   distribute(LinearIndices((np,)))
@@ -72,29 +88,35 @@ end
 
 restrictions, prolongations = setup_transfer_operators(trials,qdegree;mode=:residual);
 
-gmg = GMGLinearSolver(mh,
-                      smatrices,
-                      prolongations,
-                      restrictions,
-                      pre_smoothers=smoothers,
-                      post_smoothers=smoothers,
-                      maxiter=1,
-                      rtol=1.0e-10,
-                      verbose=false,
-                      mode=:preconditioner)
+GridapPETSc.with() do
+  gmg = GMGLinearSolver(mh,
+                        smatrices,
+                        prolongations,
+                        restrictions,
+                        pre_smoothers=smoothers,
+                        post_smoothers=smoothers,
+                        coarsest_solver=PETScLinearSolver(set_ksp_options),
+                        maxiter=1,
+                        rtol=1.0e-10,
+                        verbose=false,
+                        mode=:preconditioner)
 
-solver = CGSolver(gmg;maxiter=100,atol=1e-10,rtol=1.e-6,verbose=i_am_main(ranks))
-ns = numerical_setup(symbolic_setup(solver,A),A)
+  solver = CGSolver(gmg;maxiter=100,atol=1e-10,rtol=1.e-6,verbose=i_am_main(ranks))
+  ns = numerical_setup(symbolic_setup(solver,A),A)
 
-x = pfill(0.0,partition(axes(A,2)))
-solve!(x,ns,b)
-@time begin
-  fill!(x,0.0)
+  x = pfill(0.0,partition(axes(A,2)))
   solve!(x,ns,b)
+  @time begin
+    fill!(x,0.0)
+    solve!(x,ns,b)
+  end
+  println("n_dofs = ", length(x))
 end
-println("n_dofs = ", length(x))
 
-# Results: 
+# Result set 1: 
+#   > Coarsest solver -> BackslashSolver
+#   > Patch solver    -> LUSolver()
+#
 # Problem - np - order - ndofs - niter - time(s)
 # ----------------------------------------------
 #   H1       1     1     65025     3      0.57
@@ -106,3 +128,35 @@ println("n_dofs = ", length(x))
 #   H1       2     2    261121     2      1.28
 #   HDiv     2     0    130560     3      5.40
 #   HDiv     2     1    523264     3     26.92
+
+# Result set 2: 
+#   > Coarsest solver -> MUMPS
+#   > Patch solver    -> CG solver, rtol=1.e-6
+#
+# Problem - np - order - ndofs - niter - time(s)
+# ----------------------------------------------
+#   H1       1     1     65025     3     
+#   H1       1     2    261121     2     
+#   HDiv     1     0    130560     3     
+#   HDiv     1     1    523264     3     
+# ----------------------------------------------
+#   H1       2     1     65025     3     
+#   H1       2     2    261121     2     
+#   HDiv     2     0    130560     5      9.03
+#   HDiv     2     1    523264     4    153.85
+
+# Result set 3: 
+#   > Coarsest solver -> MUMPS
+#   > Patch solver    -> MUMPS
+#
+# Problem - np - order - ndofs - niter - time(s)
+# ----------------------------------------------
+#   H1       1     1     65025     3     
+#   H1       1     2    261121     2     
+#   HDiv     1     0    130560     3     
+#   HDiv     1     1    523264     3     
+# ----------------------------------------------
+#   H1       2     1     65025     3     
+#   H1       2     2    261121     2     
+#   HDiv     2     0    130560     3      9.68
+#   HDiv     2     1    523264     3     41.29
