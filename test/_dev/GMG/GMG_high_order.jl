@@ -28,12 +28,12 @@ end
 biform_h1(u,v,dΩ)  = ∫(v⋅u)dΩ + ∫(α*∇(v)⋅∇(u))dΩ
 biform_hdiv(u,v,dΩ)  = ∫(v⋅u)dΩ + ∫(α*divergence(v)⋅divergence(u))dΩ
 
-np       = 1    # Number of processors
+np       = 2    # Number of processors
 D        = 2    # Problem dimension
 n_refs_c = 6    # Number of refinements for the coarse model
 n_levels = 2    # Number of refinement levels
-order    = 1    # FE order
-conf     = :HDiv  # Conformity ∈ [:H1,:HDiv]
+order    = 2    # FE order
+conf     = :H1  # Conformity ∈ [:H1,:HDiv]
 
 ranks = with_mpi() do distribute
   distribute(LinearIndices((np,)))
@@ -83,7 +83,7 @@ gmg = GMGLinearSolver(mh,
                       verbose=false,
                       mode=:preconditioner)
 
-solver = CGSolver(gmg;maxiter=100,atol=1e-10,rtol=1.e-6,verbose=true)
+solver = CGSolver(gmg;maxiter=100,atol=1e-10,rtol=1.e-6,verbose=i_am_main(ranks))
 ns = numerical_setup(symbolic_setup(solver,A),A)
 
 x = pfill(0.0,partition(axes(A,2)))
@@ -92,12 +92,17 @@ solve!(x,ns,b)
   fill!(x,0.0)
   solve!(x,ns,b)
 end
-
+println("n_dofs = ", length(x))
 
 # Results: 
-# Problem - order - ndofs - niter - time(s)
-# -------------------------------------
-#   H1        1     65025     3      0.57
-#   H1        2    261121     2      1.51
-#   HDiv      0    130560     3      7.95
-#   HDiv      1    523264     3     40.78
+# Problem - np - order - ndofs - niter - time(s)
+# ----------------------------------------------
+#   H1       1     1     65025     3      0.57
+#   H1       1     2    261121     2      1.51
+#   HDiv     1     0    130560     3      7.95
+#   HDiv     1     1    523264     3     40.78
+# ----------------------------------------------
+#   H1       2     1     65025     3      0.43
+#   H1       2     2    261121     2      1.28
+#   HDiv     2     0    130560     3      5.40
+#   HDiv     2     1    523264     3     26.92
