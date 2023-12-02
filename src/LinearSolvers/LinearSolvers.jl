@@ -45,6 +45,9 @@ include("Krylov/GMRESSolvers.jl")
 include("Krylov/FGMRESSolvers.jl")
 include("Krylov/MINRESSolvers.jl")
 
+include("PETSc/ElasticitySolvers.jl")
+include("PETSc/HipmairXuSolvers.jl")
+
 include("IdentityLinearSolvers.jl")
 include("JacobiLinearSolvers.jl")
 include("RichardsonSmoothers.jl")

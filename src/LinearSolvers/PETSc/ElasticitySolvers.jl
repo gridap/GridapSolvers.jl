@@ -1,5 +1,7 @@
 """
   GMRES + AMG solver, specifically designed for linear elasticity problems.
+  Follows PETSc's documentation for [PCAMG](https://petsc.org/release/manualpages/PC/PCGAMG.html) 
+  and [MatNullSpaceCreateRigidBody](https://petsc.org/release/manualpages/Mat/MatNullSpaceCreateRigidBody.html).
 """
 struct ElasticitySolver{A,B} <: Gridap.Algebra.LinearSolver
   trian ::A
