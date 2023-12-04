@@ -33,8 +33,8 @@ mutable struct RichardsonSmootherNumericalSetup{A,B,C,D} <: Gridap.Algebra.Numer
 end
 
 function Gridap.Algebra.numerical_setup(ss::RichardsonSmootherSymbolicSetup, A::AbstractMatrix)
-  Adx = allocate_row_vector(A)
-  dx  = allocate_col_vector(A)
+  Adx = allocate_in_range(A)
+  dx  = allocate_in_domain(A)
   Mns = numerical_setup(ss.Mss,A)
   return RichardsonSmootherNumericalSetup(ss.smoother,A,Adx,dx,Mns)
 end

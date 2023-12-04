@@ -32,10 +32,10 @@ end
 function get_solver_caches(solver::MINRESSolver,A)
   Pl, Pr = solver.Pl, solver.Pr
 
-  V  = [allocate_col_vector(A) for i in 1:3]
-  W  = [allocate_col_vector(A) for i in 1:3]
-  zr = !isa(Pr,Nothing) ? allocate_col_vector(A) : nothing
-  zl = !isa(Pl,Nothing) ? allocate_col_vector(A) : nothing
+  V  = [allocate_in_domain(A) for i in 1:3]
+  W  = [allocate_in_domain(A) for i in 1:3]
+  zr = !isa(Pr,Nothing) ? allocate_in_domain(A) : nothing
+  zl = !isa(Pl,Nothing) ? allocate_in_domain(A) : nothing
 
   H = zeros(4) # Hessenberg matrix
   g = zeros(2) # Residual vector
