@@ -37,9 +37,9 @@ end
 function get_solver_caches(solver::FGMRESSolver,A)
   m = solver.m
 
-  V  = [allocate_col_vector(A) for i in 1:m+1]
-  Z  = [allocate_col_vector(A) for i in 1:m]
-  zl = allocate_col_vector(A)
+  V  = [allocate_in_domain(A) for i in 1:m+1]
+  Z  = [allocate_in_domain(A) for i in 1:m]
+  zl = allocate_in_domain(A)
 
   H = zeros(m+1,m)  # Hessenberg matrix
   g = zeros(m+1)    # Residual vector

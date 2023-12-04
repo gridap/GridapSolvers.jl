@@ -16,7 +16,7 @@ function test_solver(solver,op,Uh,dΩ)
   A, b = get_matrix(op), get_vector(op);
   ns = numerical_setup(symbolic_setup(solver,A),A)
 
-  x = allocate_col_vector(A)
+  x = allocate_in_domain(A)
   solve!(x,ns,b)
 
   u  = interpolate(sol,Uh)
@@ -64,7 +64,12 @@ function main(distribute,np)
   P = JacobiLinearSolver()
   verbose = i_am_main(parts)
 
+  # GMRES with left and right preconditioner
   gmres = LinearSolvers.GMRESSolver(40;Pr=P,Pl=P,rtol=1.e-8,verbose=verbose)
+  test_solver(gmres,op,Uh,dΩ)
+
+  # GMRES without preconditioner
+  gmres = LinearSolvers.GMRESSolver(40;rtol=1.e-8,verbose=verbose)
   test_solver(gmres,op,Uh,dΩ)
 
   fgmres = LinearSolvers.FGMRESSolver(40,P;rtol=1.e-8,verbose=verbose)
