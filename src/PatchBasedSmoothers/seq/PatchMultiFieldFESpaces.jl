@@ -5,6 +5,8 @@ struct PatchDistributedMultiFieldFESpace{A,B}
   gids   :: B
 end
 
+GridapDistributed.local_views(a::PatchDistributedMultiFieldFESpace) = a.spaces
+
 ## PatchFESpace from MultiFieldFESpace
 
 function PatchFESpace(space::Gridap.MultiField.MultiFieldFESpace,

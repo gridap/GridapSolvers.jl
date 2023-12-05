@@ -161,11 +161,19 @@ end
 
 # Computing system matrices
 
-function compute_hierarchy_matrices(trials::FESpaceHierarchy,a::Function,l::Function,qdegree::Integer)
-  return compute_hierarchy_matrices(trials,a,l,Fill(qdegree,num_levels(trials)))
+function compute_hierarchy_matrices(trials::FESpaceHierarchy,
+                                    tests::FESpaceHierarchy,
+                                    a::Function,
+                                    l::Function,
+                                    qdegree::Integer)
+  return compute_hierarchy_matrices(trials,tests,a,l,Fill(qdegree,num_levels(trials)))
 end
 
-function compute_hierarchy_matrices(trials::FESpaceHierarchy,a::Function,l::Function,qdegree::AbstractArray{<:Integer})
+function compute_hierarchy_matrices(trials::FESpaceHierarchy,
+                                    tests::FESpaceHierarchy,
+                                    a::Function,
+                                    l::Function,
+                                    qdegree::AbstractArray{<:Integer})
   nlevs = num_levels(trials)
   mh    = trials.mh
 
@@ -179,7 +187,7 @@ function compute_hierarchy_matrices(trials::FESpaceHierarchy,a::Function,l::Func
     if i_am_in(parts)
       model = get_model(mh,lev)
       U = get_fe_space(trials,lev)
-      V = get_test_space(U)
+      V = get_fe_space(tests,lev)
       Ω = Triangulation(model)
       dΩ = Measure(Ω,qdegree[lev])
       ai(u,v) = a(u,v,dΩ)
@@ -194,15 +202,4 @@ function compute_hierarchy_matrices(trials::FESpaceHierarchy,a::Function,l::Func
     end
   end
   return mats, A, b
-end
-
-function get_test_space(U::GridapDistributed.DistributedSingleFieldFESpace)
-  spaces = map(local_views(U)) do U
-    if isa(U,Gridap.FESpaces.UnconstrainedFESpace)
-      U
-    else
-      U.space
-    end
-  end
-  return GridapDistributed.DistributedSingleFieldFESpace(spaces,U.gids,U.vector_type)
 end

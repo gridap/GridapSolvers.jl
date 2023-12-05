@@ -88,7 +88,7 @@ function _get_projection_cache(lev::Int,sh::FESpaceHierarchy,qdegree::Int,mode::
 
     model_H = get_model(mh,lev+1)
     UH   = get_fe_space(sh,lev+1)
-    VH   = get_test_space(UH)
+    VH   = get_fe_space(sh,lev+1)
     ΩH   = Triangulation(model_H)
     dΩH  = Measure(ΩH,qdegree)
     dΩhH = Measure(ΩH,Ωh,qdegree)
@@ -106,7 +106,7 @@ function _get_projection_cache(lev::Int,sh::FESpaceHierarchy,qdegree::Int,mode::
     u,v    = get_trial_fe_basis(UH), get_fe_basis(VH)
     data   = collect_cell_matrix_and_vector(UH,VH,aH(u,v),lH(v,u00),u_dir)
     AH,bH0 = assemble_matrix_and_vector(assem,data)
-    xH     = pfill(0.0,partition(axes(AH,2)))
+    xH     = allocate_in_domain(AH)
     bH     = copy(bH0)
 
     cache_refine = model_h, Uh, fv_h, dv_h, VH, AH, lH, xH, bH, bH0, assem

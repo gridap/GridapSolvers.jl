@@ -48,10 +48,7 @@ function compute_matrices(trials,tests,a::Function,l::Function,qdegree)
   return mats, A, b
 end
 
-function get_patch_smoothers(tests,patch_spaces,patch_decompositions,biform,qdegree)
-  tests_u, tests_j = tests
-  patch_spaces_u, patch_spaces_j = patch_spaces
-  
+function get_patch_smoothers(tests,patch_spaces,patch_decompositions,biform,qdegree)  
   mh = tests.mh
   nlevs = num_levels(mh)
   smoothers = Vector{RichardsonSmoother}(undef,nlevs-1)
@@ -63,9 +60,8 @@ function get_patch_smoothers(tests,patch_spaces,patch_decompositions,biform,qdeg
       Vh = get_fe_space(tests,lev)
       Ω  = Triangulation(PD)
       dΩ = Measure(Ω,qdegree)
-      a(u,v) = biform(u,v,dΩ)
-      local_solver = PETScLinearSolver(set_ksp_options) # IS_ConjugateGradientSolver(;reltol=1.e-6)
-      patch_smoother = PatchBasedLinearSolver(a,Ph,Vh,local_solver)
+      local_solver = LUSolver() # IS_ConjugateGradientSolver(;reltol=1.e-6)
+      patch_smoother = PatchBasedLinearSolver(biform,Ph,Vh,dΩ,local_solver)
       smoothers[lev] = RichardsonSmoother(patch_smoother,10,0.2)
     end
   end
@@ -74,7 +70,7 @@ end
 
 np       = 1    # Number of processors
 D        = 3    # Problem dimension
-n_refs_c = 2    # Number of refinements for the coarse model
+n_refs_c = 1    # Number of refinements for the coarse model
 n_levels = 2    # Number of refinement levels
 order    = 1    # FE order
 
@@ -116,32 +112,34 @@ smatrices, A, b = compute_matrices(trials,tests,biform,liform,qdegree);
 pbs = GridapSolvers.PatchBasedSmoothers.PatchBoundaryExclude()
 patch_decompositions = PatchDecomposition(mh;patch_boundary_style=pbs)
 patch_spaces = PatchFESpace(tests,patch_decompositions);
-
 smoothers = get_patch_smoothers(tests,patch_spaces,patch_decompositions,biform,qdegree)
+
+smoother_ns = numerical_setup(symbolic_setup(smoothers[1],A),A)
 
 restrictions, prolongations = setup_transfer_operators(trials,qdegree;mode=:residual);
 
-GridapPETSc.with() do
-  gmg = GMGLinearSolver(mh,
-                        smatrices,
-                        prolongations,
-                        restrictions,
-                        pre_smoothers=smoothers,
-                        post_smoothers=smoothers,
-                        coarsest_solver=PETScLinearSolver(set_ksp_options),
-                        maxiter=1,
-                        rtol=1.0e-10,
-                        verbose=false,
-                        mode=:preconditioner)
 
-  solver = CGSolver(gmg;maxiter=100,atol=1e-10,rtol=1.e-6,verbose=i_am_main(ranks))
-  ns = numerical_setup(symbolic_setup(solver,A),A)
-
-  x = pfill(0.0,partition(axes(A,2)))
-  solve!(x,ns,b)
-  @time begin
-    fill!(x,0.0)
-    solve!(x,ns,b)
-  end
-  println("n_dofs = ", length(x))
-end
+#GridapPETSc.with() do
+#  gmg = GMGLinearSolver(mh,
+#                        smatrices,
+#                        prolongations,
+#                        restrictions,
+#                        pre_smoothers=smoothers,
+#                        post_smoothers=smoothers,
+#                        coarsest_solver=PETScLinearSolver(set_ksp_options),
+#                        maxiter=1,
+#                        rtol=1.0e-10,
+#                        verbose=false,
+#                        mode=:preconditioner)
+#
+#  solver = CGSolver(gmg;maxiter=100,atol=1e-10,rtol=1.e-6,verbose=i_am_main(ranks))
+#  ns = numerical_setup(symbolic_setup(solver,A),A)
+#
+#  x = pfill(0.0,partition(axes(A,2)))
+#  solve!(x,ns,b)
+#  @time begin
+#    fill!(x,0.0)
+#    solve!(x,ns,b)
+#  end
+#  println("n_dofs = ", length(x))
+#end
