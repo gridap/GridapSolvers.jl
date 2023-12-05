@@ -7,7 +7,7 @@ using IterativeSolvers
 using FillArrays
 
 using Gridap
-using Gridap.ReferenceFEs
+using Gridap.ReferenceFEs, Gridap.Algebra
 using PartitionedArrays
 using GridapDistributed
 using GridapP4est

@@ -3,7 +3,7 @@ module SchurComplementSolversTests
 using Test
 using BlockArrays
 using Gridap
-using Gridap.MultiField
+using Gridap.MultiField, Gridap.Algebra
 using Gridap.Algebra
 using Gridap.Geometry
 using Gridap.FESpaces

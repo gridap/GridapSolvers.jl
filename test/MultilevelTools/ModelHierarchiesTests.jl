@@ -2,7 +2,7 @@ module ModelHierarchiesTests
 
 using MPI
 using Gridap
-using Gridap.FESpaces
+using Gridap.FESpaces, Gridap.Algebra
 using GridapDistributed
 using PartitionedArrays
 using GridapP4est

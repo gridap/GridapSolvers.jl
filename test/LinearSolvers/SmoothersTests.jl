@@ -2,7 +2,7 @@ module SmoothersTests
 
 using Test
 using MPI
-using Gridap
+using Gridap, Gridap.Algebra
 using GridapDistributed
 using PartitionedArrays
 using IterativeSolvers

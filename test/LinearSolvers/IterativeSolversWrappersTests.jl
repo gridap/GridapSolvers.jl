@@ -1,7 +1,7 @@
 module IterativeSolversWrappersTests
 
 using Test
-using Gridap
+using Gridap, Gridap.Algebra
 using IterativeSolvers
 using LinearAlgebra
 using SparseArrays
