@@ -120,8 +120,8 @@ struct SymGaussSeidelNumericalSetup{A,B,C,D} <: Gridap.Algebra.NumericalSetup
 end
 
 function _gs_get_caches(A::AbstractMatrix)
-  dx  = allocate_col_vector(A)
-  Adx = allocate_row_vector(A)
+  dx  = allocate_in_domain(A)
+  Adx = allocate_in_range(A)
   return dx, Adx
 end
 

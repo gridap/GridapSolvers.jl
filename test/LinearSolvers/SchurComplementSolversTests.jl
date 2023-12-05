@@ -3,7 +3,7 @@ module SchurComplementSolversTests
 using Test
 using BlockArrays
 using Gridap
-using Gridap.MultiField
+using Gridap.MultiField, Gridap.Algebra
 using Gridap.Algebra
 using Gridap.Geometry
 using Gridap.FESpaces
@@ -110,7 +110,7 @@ function main(distribute,np)
   gmres = GMRESSolver(20;Pr=psc_solver,rtol=1.e-10,verbose=i_am_main(parts))
   gmres_ns = numerical_setup(symbolic_setup(gmres,sysmat),sysmat)
 
-  x = allocate_col_vector(sysmat)
+  x = allocate_in_domain(sysmat)
   solve!(x,gmres_ns,sysvec)
 
   xh = FEFunction(X,x)

@@ -1,7 +1,7 @@
 module DistributedGridTransferOperatorsTests
 using MPI
 using PartitionedArrays
-using Gridap
+using Gridap, Gridap.Algebra
 using GridapDistributed
 using GridapP4est
 using Test

@@ -2,7 +2,7 @@ module BlockDiagonalSmoothersTests
 
 using Test
 using Gridap
-using Gridap.MultiField
+using Gridap.MultiField, Gridap.Algebra
 using BlockArrays
 using LinearAlgebra
 using FillArrays
@@ -118,7 +118,7 @@ function main_driver(D,model,solvers)
   BDSss = symbolic_setup(BDS,A)
   BDSns = numerical_setup(BDSss,A)
 
-  x = allocate_col_vector(A)
+  x = allocate_in_domain(A)
   x = cg!(x,A,b;verbose=true,Pl=BDSns,reltol=1.0e-12)
   @test is_same_vector(x,x_star,Xb,X)
 
@@ -127,7 +127,7 @@ function main_driver(D,model,solvers)
   BDSss = symbolic_setup(BDS,A)
   BDSns = numerical_setup(BDSss,A)
 
-  x = allocate_col_vector(A)
+  x = allocate_in_domain(A)
   x = cg!(x,A,b;verbose=true,Pl=BDSns,reltol=1.0e-12)
   @test is_same_vector(x,x_star,Xb,X)
 end

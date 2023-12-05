@@ -1,7 +1,7 @@
 module KrylovSolversTests
 
 using Test
-using Gridap
+using Gridap, Gridap.Algebra
 using GridapDistributed
 using PartitionedArrays
 using IterativeSolvers
@@ -16,7 +16,7 @@ function test_solver(solver,op,Uh,dΩ)
   A, b = get_matrix(op), get_vector(op);
   ns = numerical_setup(symbolic_setup(solver,A),A)
 
-  x = allocate_col_vector(A)
+  x = allocate_in_domain(A)
   solve!(x,ns,b)
 
   u  = interpolate(sol,Uh)

@@ -139,7 +139,7 @@ function _get_dual_projection_cache(lev::Int,sh::FESpaceHierarchy,qdegree::Int,s
     Mh_ns = numerical_setup(symbolic_setup(solver,Mh),Mh)
 
     assem = SparseMatrixAssembler(UH,UH)
-    rh = allocate_col_vector(Mh)
+    rh = allocate_in_domain(Mh)
     cache_refine = model_h, Uh, UH, Mh_ns, rh, uh, assem, dΩhH
   else
     model_h = get_model_before_redist(mh,lev)

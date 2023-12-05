@@ -30,8 +30,8 @@ function Gridap.Algebra.numerical_setup(ss::PatchBasedSymbolicSetup,A::AbstractM
   Ap_ns     = numerical_setup(symbolic_setup(solver.local_solver,Ap),Ap)
 
   # Caches
-  rp        = allocate_row_vector(Ap)
-  dxp       = allocate_col_vector(Ap)
+  rp        = allocate_in_range(Ap)
+  dxp       = allocate_in_domain(Ap)
   caches    = (rp,dxp)
   
   return PatchBasedSmootherNumericalSetup(solver,Ap_ns,weights,caches)

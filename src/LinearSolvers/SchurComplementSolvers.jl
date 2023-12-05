@@ -39,9 +39,9 @@ struct SchurComplementNumericalSetup{A,B,C} <: Gridap.Algebra.NumericalSetup
 end 
 
 function get_shur_complement_caches(B::AbstractMatrix,C::AbstractMatrix)
-  du = allocate_col_vector(C)
-  bu = allocate_col_vector(C)
-  bp = allocate_col_vector(B)
+  du = allocate_in_domain(C)
+  bu = allocate_in_domain(C)
+  bp = allocate_in_domain(B)
   return du,bu,bp
 end
 
