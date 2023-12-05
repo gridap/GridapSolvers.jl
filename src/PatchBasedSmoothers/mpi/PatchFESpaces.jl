@@ -1,18 +1,25 @@
 
-function PatchFESpace(model::GridapDistributed.DistributedDiscreteModel,
-                      reffe::Tuple{<:Gridap.FESpaces.ReferenceFEName,Any,Any},
-                      conformity::Gridap.FESpaces.Conformity,
+function PatchFESpace(space::GridapDistributed.DistributedSingleFieldFESpace,
                       patch_decomposition::DistributedPatchDecomposition,
-                      Vh::GridapDistributed.DistributedSingleFieldFESpace)
+                      reffe::Union{ReferenceFE,Tuple{<:Gridap.ReferenceFEs.ReferenceFEName,Any,Any}};
+                      conformity=nothing)
+  cell_conformity = _cell_conformity(patch_decomposition.model,reffe;conformity=conformity)
+  return PatchFESpace(space,patch_decomposition,cell_conformity)
+end
+
+function PatchFESpace(space::GridapDistributed.DistributedSingleFieldFESpace,
+                      patch_decomposition::DistributedPatchDecomposition,
+                      cell_conformity::AbstractArray{<:CellConformity})
+  model = patch_decomposition.model                    
   root_gids = get_face_gids(model,get_patch_root_dim(patch_decomposition))
 
-  spaces = map(local_views(model),
+  spaces = map(local_views(space),
                local_views(patch_decomposition),
-               local_views(Vh),
-               partition(root_gids)) do model, patch_decomposition, Vh, partition
+               cell_conformity,
+               partition(root_gids)) do space, patch_decomposition, cell_conformity, partition
     patches_mask = fill(false,local_length(partition))
     patches_mask[ghost_to_local(partition)] .= true # Mask ghost patch roots
-    PatchFESpace(model,reffe,conformity,patch_decomposition,Vh;patches_mask=patches_mask)
+    PatchFESpace(space,patch_decomposition,cell_conformity;patches_mask=patches_mask)
   end
   
   # This PRange has no ghost dofs
@@ -20,24 +27,22 @@ function PatchFESpace(model::GridapDistributed.DistributedDiscreteModel,
   global_ndofs = sum(local_ndofs)
   patch_partition = variable_partition(local_ndofs,global_ndofs,false)
   gids = PRange(patch_partition)
-  return GridapDistributed.DistributedSingleFieldFESpace(spaces,gids,get_vector_type(Vh))
+  return GridapDistributed.DistributedSingleFieldFESpace(spaces,gids,get_vector_type(space))
 end
 
-function PatchFESpace(mh::ModelHierarchy,
-                      reffe::Tuple{<:Gridap.FESpaces.ReferenceFEName,Any,Any},
-                      conformity::Gridap.FESpaces.Conformity,
-                      patch_decompositions::AbstractArray{<:DistributedPatchDecomposition},
-                      sh::FESpaceHierarchy)
-  nlevs = num_levels(mh)
+function PatchFESpace(sh::FESpaceHierarchy,
+                      patch_decompositions::AbstractArray{<:DistributedPatchDecomposition})
+  mh = sh.mh
+  nlevs  = num_levels(mh)
   levels = Vector{MultilevelTools.FESpaceHierarchyLevel}(undef,nlevs)
   for lev in 1:nlevs-1
     parts = get_level_parts(mh,lev)
     if i_am_in(parts)
-      model  = get_model(mh,lev)
       space  = MultilevelTools.get_fe_space(sh,lev)
       decomp = patch_decompositions[lev]
-      patch_space = PatchFESpace(model,reffe,conformity,decomp,space)
-      levels[lev] = MultilevelTools.FESpaceHierarchyLevel(lev,nothing,patch_space)
+      cell_conformity = sh.levels[lev].cell_conformity
+      patch_space = PatchFESpace(space,decomp,cell_conformity)
+      levels[lev] = MultilevelTools.FESpaceHierarchyLevel(lev,nothing,patch_space,cell_conformity)
     end
   end
   return FESpaceHierarchy(mh,levels)

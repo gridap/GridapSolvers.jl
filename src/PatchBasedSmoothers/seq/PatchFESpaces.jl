@@ -1,11 +1,3 @@
-struct PatchFESpace  <: Gridap.FESpaces.SingleFieldFESpace
-  num_dofs            :: Int
-  patch_cell_dofs_ids :: Gridap.Arrays.Table
-  Vh                  :: Gridap.FESpaces.SingleFieldFESpace
-  patch_decomposition :: PatchDecomposition
-  dof_to_pdof         :: Gridap.Arrays.Table
-end
-
 # INPUT
 # [[1, 2]]
 # [[1, 2], [2, 3]]
@@ -39,32 +31,42 @@ end
 # [[6, 7], [7, -2]]
 # [[8, -2]]
 
+struct PatchFESpace  <: Gridap.FESpaces.SingleFieldFESpace
+  Vh                  :: Gridap.FESpaces.SingleFieldFESpace
+  patch_decomposition :: PatchDecomposition
+  num_dofs            :: Int
+  patch_cell_dofs_ids :: Gridap.Arrays.Table
+  dof_to_pdof         :: Gridap.Arrays.Table
+end
 
 # Issue: I have to pass model, reffe, and conformity, so that I can
 #        build the cell_conformity instance. I would have liked to
 #        avoid that, given that these were already used in order to
 #        build Vh. However, I cannot extract this info out of Vh!!! :-(
-function PatchFESpace(model::DiscreteModel,
-                      reffe::Tuple{<:Gridap.FESpaces.ReferenceFEName,Any,Any},
-                      conformity::Gridap.FESpaces.Conformity,
+function PatchFESpace(Vh::Gridap.FESpaces.SingleFieldFESpace,
                       patch_decomposition::PatchDecomposition,
-                      Vh::Gridap.FESpaces.SingleFieldFESpace;
+                      reffe::Union{ReferenceFE,Tuple{<:Gridap.ReferenceFEs.ReferenceFEName,Any,Any}};
+                      conformity=nothing,
                       patches_mask=Fill(false,num_patches(patch_decomposition)))
+  cell_conformity = _cell_conformity(patch_decomposition.model,reffe;conformity=conformity)
+  return PatchFESpace(Vh,patch_decomposition,cell_conformity;patches_mask=patches_mask)
+end
 
-  cell_reffe = setup_cell_reffe(model,reffe)
-  cell_conformity = CellConformity(cell_reffe,conformity)
+function PatchFESpace(Vh::Gridap.FESpaces.SingleFieldFESpace,
+                      patch_decomposition::PatchDecomposition,
+                      cell_conformity::CellConformity;
+                      patches_mask=Fill(false,num_patches(patch_decomposition)))
 
   cell_dofs_ids = get_cell_dof_ids(Vh)
   patch_cell_dofs_ids, num_dofs = 
-    generate_patch_cell_dofs_ids(get_grid_topology(model),
+    generate_patch_cell_dofs_ids(get_grid_topology(patch_decomposition.model),
                                  patch_decomposition.patch_cells,
                                  patch_decomposition.patch_cells_overlapped,
                                  patch_decomposition.patch_cells_faces_on_boundary,
                                  cell_dofs_ids,cell_conformity,patches_mask)
 
   dof_to_pdof = generate_dof_to_pdof(Vh,patch_decomposition,patch_cell_dofs_ids)
-
-  return PatchFESpace(num_dofs,patch_cell_dofs_ids,Vh,patch_decomposition,dof_to_pdof)
+  return PatchFESpace(Vh,patch_decomposition,num_dofs,patch_cell_dofs_ids,dof_to_pdof)
 end
 
 Gridap.FESpaces.get_dof_value_type(a::PatchFESpace) = Gridap.FESpaces.get_dof_value_type(a.Vh)
@@ -117,12 +119,6 @@ function Gridap.FESpaces.scatter_free_and_dirichlet_values(f::PatchFESpace,free_
 end
 
 # Construction of the patch cell dofs ids
-
-function setup_cell_reffe(model::DiscreteModel,reffe::Tuple{<:Gridap.FESpaces.ReferenceFEName,Any,Any}; kwargs...)
-  basis, reffe_args,reffe_kwargs = reffe
-  cell_reffe = ReferenceFE(model,basis,reffe_args...;reffe_kwargs...)
-  return cell_reffe
-end
 
 function generate_patch_cell_dofs_ids(topology,
                                       patch_cells,
