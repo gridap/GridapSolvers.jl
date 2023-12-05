@@ -137,6 +137,28 @@ function Gridap.FESpaces.TrialFESpace(a::FESpaceHierarchy)
   FESpaceHierarchy(a.mh,trial_spaces)
 end
 
+# MultiField support
+
+function Gridap.MultiField.MultiFieldFESpace(spaces::Vector{<:FESpaceHierarchyLevel};kwargs...)
+  level  = spaces[1].level
+  Uh     = all(map(s -> !isa(s.fe_space,Nothing),spaces)) ? MultiFieldFESpace(map(s -> s.fe_space, spaces); kwargs...) : nothing
+  Uh_red = all(map(s -> !isa(s.fe_space_red,Nothing),spaces)) ? MultiFieldFESpace(map(s -> s.fe_space_red, spaces); kwargs...) : nothing
+  cell_conformity = map(s -> s.cell_conformity, spaces)
+  return FESpaceHierarchyLevel(level,Uh,Uh_red,cell_conformity)
+end
+
+function Gridap.MultiField.MultiFieldFESpace(spaces::Vector{<:FESpaceHierarchy};kwargs...)
+  mh = spaces[1].mh
+  levels = Vector{FESpaceHierarchyLevel}(undef,num_levels(mh))
+  for i = 1:num_levels(mh)
+    parts = get_level_parts(mh,i)
+    if i_am_in(parts)
+      levels[i] = MultiFieldFESpace(map(sh -> sh[i], spaces);kwargs...)
+    end
+  end
+  FESpaceHierarchy(mh,levels)
+end
+
 # Computing system matrices
 
 function compute_hierarchy_matrices(trials::FESpaceHierarchy,a::Function,l::Function,qdegree::Integer)
