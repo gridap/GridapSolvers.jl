@@ -1,7 +1,8 @@
-struct FESpaceHierarchyLevel{A,B}
-  level        :: Int
-  fe_space     :: A
-  fe_space_red :: B
+struct FESpaceHierarchyLevel{A,B,C}
+  level           :: Int
+  fe_space        :: A
+  fe_space_red    :: B
+  cell_conformity :: C
 end
 
 struct FESpaceHierarchy
@@ -44,23 +45,41 @@ end
 
 # Test/Trial FESpaces for ModelHierarchyLevels
 
+function _cell_conformity(model::DiscreteModel,
+                          reffe::Tuple{<:Gridap.FESpaces.ReferenceFEName,Any,Any}; 
+                          conformity=nothing, kwargs...)
+  basis, reffe_args, reffe_kwargs = reffe
+  cell_reffe = ReferenceFE(model,basis,reffe_args...;reffe_kwargs...)
+  conformity = Conformity(Gridap.Arrays.testitem(cell_reffe),conformity)
+  return CellConformity(cell_reffe,conformity)
+end
+
+function _cell_conformity(model::GridapDistributed.DistributedDiscreteModel,args...;kwargs...)
+  cell_conformities = map(local_views(model)) do model
+    _cell_conformity(model,args...;kwargs...)
+  end
+  return cell_conformities
+end
+
 function Gridap.FESpaces.FESpace(
       mh::ModelHierarchyLevel{A,B,C,Nothing},args...;kwargs...) where {A,B,C}
   Vh = FESpace(get_model(mh),args...;kwargs...)
-  FESpaceHierarchyLevel(mh.level,Vh,nothing)
+  cell_conformity = _cell_conformity(get_model(mh),args...;kwargs...)
+  return FESpaceHierarchyLevel(mh.level,Vh,nothing,cell_conformity)
 end
 
 function Gridap.FESpaces.FESpace(mh::ModelHierarchyLevel{A,B,C,D},args...;kwargs...) where {A,B,C,D}
   cparts, _ = get_old_and_new_parts(mh.red_glue,Val(false))
   Vh     = i_am_in(cparts) ? FESpace(get_model_before_redist(mh),args...;kwargs...) : nothing
   Vh_red = FESpace(get_model(mh),args...;kwargs...)
-  FESpaceHierarchyLevel(mh.level,Vh,Vh_red)
+  cell_conformity = _cell_conformity(get_model(mh),args...;kwargs...)
+  return FESpaceHierarchyLevel(mh.level,Vh,Vh_red,cell_conformity)
 end
 
 function Gridap.FESpaces.TrialFESpace(a::FESpaceHierarchyLevel,args...;kwargs...)
   Uh     = !isa(a.fe_space,Nothing) ? TrialFESpace(a.fe_space,args...;kwargs...) : nothing
   Uh_red = !isa(a.fe_space_red,Nothing) ? TrialFESpace(a.fe_space_red,args...;kwargs...) : nothing
-  FESpaceHierarchyLevel(a.level,Uh,Uh_red)
+  return FESpaceHierarchyLevel(a.level,Uh,Uh_red,a.cell_conformity)
 end
 
 # Test/Trial FESpaces for ModelHierarchies/FESpaceHierarchy
