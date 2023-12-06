@@ -41,58 +41,65 @@ function PatchFESpace(space::GridapDistributed.DistributedMultiFieldFESpace,
   return PatchDistributedMultiFieldFESpace(spaces,gids)
 end
 
+# Inject/Prolongate for MultiField (only for ConsecutiveMultiFieldStyle)
 
-## MultiFieldFESpace from PatchFESpaces
-#
-#function Gridap.MultiField.MultiFieldFESpace(spaces::Vector{<:PatchFESpace})
-#  return PatchMultiFieldFESpace(spaces)
-#end
-#
-#function Gridap.MultiField.MultiFieldFESpace(spaces::Vector{<:GridapDistributed.DistributedSingleFieldFESpace{<:AbstractArray{T}}}) where T <: PatchFESpace
-#  return PatchMultiFieldFESpace(spaces)
-#end
-#
-## MultiField API
-#
-#function Gridap.FESpaces.get_cell_dof_ids(f::PatchMultiFieldFESpace,trian::Triangulation)
-#  offsets = Gridap.MultiField._compute_field_offsets(f)
-#  nfields = length(f.spaces)
-#  active_block_data = Any[]
-#  for i in 1:nfields
-#    cell_dofs_i = get_cell_dof_ids(f.spaces[i],trian)
-#    if i == 1
-#      push!(active_block_data,cell_dofs_i)
-#    else
-#      offset = Int32(offsets[i])
-#      o = Fill(offset,length(cell_dofs_i))
-#      cell_dofs_i_b = lazy_map(Broadcasting(Gridap.MultiField._sum_if_first_positive),cell_dofs_i,o)
-#      push!(active_block_data,cell_dofs_i_b)
-#    end
-#  end
-#  return lazy_map(BlockMap(nfields,active_block_ids),active_block_data...)
-#end
-#
-#function Gridap.FESpaces.get_fe_basis(f::PatchMultiFieldFESpace)
-#  nfields = length(f.spaces)
-#  all_febases = MultiFieldFEBasisComponent[]
-#  for field_i in 1:nfields
-#    dv_i = get_fe_basis(f.spaces[field_i])
-#    @assert BasisStyle(dv_i) == TestBasis()
-#    dv_i_b = MultiFieldFEBasisComponent(dv_i,field_i,nfields)
-#    push!(all_febases,dv_i_b)
-#  end
-#  MultiFieldCellField(all_febases)
-#end
-#
-#function Gridap.FESpaces.get_trial_fe_basis(f::PatchMultiFieldFESpace)
-#  nfields = length(f.spaces)
-#  all_febases = MultiFieldFEBasisComponent[]
-#  for field_i in 1:nfields
-#    du_i = get_trial_fe_basis(f.spaces[field_i])
-#    @assert BasisStyle(du_i) == TrialBasis()
-#    du_i_b = MultiFieldFEBasisComponent(du_i,field_i,nfields)
-#    push!(all_febases,du_i_b)
-#  end
-#  MultiFieldCellField(all_febases)
-#end
-#
+# x \in  PatchFESpace
+# y \in  SingleFESpace
+function prolongate!(x,Ph::MultiFieldFESpace,y)
+  Ph_spaces = Ph.spaces
+  Vh_spaces = map(Phi -> Phi.Vh, Ph_spaces)
+  Ph_offsets = Gridap.MultiField._compute_field_offsets(Ph_spaces)
+  Vh_offsets = Gridap.MultiField._compute_field_offsets(Vh_spaces)
+  Ph_ndofs = map(num_free_dofs,Ph_spaces)
+  Vh_ndofs = map(num_free_dofs,Vh_spaces)
+  for (i,Ph_i) in enumerate(Ph_spaces)
+    x_i = SubVector(x, Ph_offsets[i]+1, Ph_offsets[i] + Ph_ndofs[i])
+    y_i = SubVector(y, Vh_offsets[i]+1, Vh_offsets[i] + Vh_ndofs[i])
+    prolongate!(x_i,Ph_i,y_i)
+  end
+end
+
+# x \in  SingleFESpace
+# y \in  PatchFESpace
+function inject!(x,Ph::MultiFieldFESpace,y)
+  Ph_spaces = Ph.spaces
+  Vh_spaces = map(Phi -> Phi.Vh, Ph_spaces)
+  Ph_offsets = Gridap.MultiField._compute_field_offsets(Ph_spaces)
+  Vh_offsets = Gridap.MultiField._compute_field_offsets(Vh_spaces)
+  Ph_ndofs = map(num_free_dofs,Ph_spaces)
+  Vh_ndofs = map(num_free_dofs,Vh_spaces)
+  for (i,Ph_i) in enumerate(Ph_spaces)
+    y_i = SubVector(y, Ph_offsets[i]+1, Ph_offsets[i] + Ph_ndofs[i])
+    x_i = SubVector(x, Vh_offsets[i]+1, Vh_offsets[i] + Vh_ndofs[i])
+    inject!(x_i,Ph_i,y_i)
+  end
+end
+
+# Copied from PatchFESpaces, could be made redundant if DistributedSingleFieldFESpace was abstract
+
+function prolongate!(x::PVector,
+                     Ph::PatchDistributedMultiFieldFESpace,
+                     y::PVector;
+                     is_consistent::Bool=false)
+  if !is_consistent
+    consistent!(y) |> fetch
+  end
+  map(prolongate!,partition(x),local_views(Ph),partition(y))
+end
+
+function inject!(x::PVector,
+                 Ph::PatchDistributedMultiFieldFESpace,
+                 y::PVector;
+                 make_consistent::Bool=true)
+
+  map(partition(x),local_views(Ph),partition(y)) do x,Ph,y
+    inject!(x,Ph,y)
+  end
+
+  # Exchange local contributions 
+  assemble!(x) |> fetch
+  if make_consistent
+    consistent!(x) |> fetch
+  end
+  return x
+end
