@@ -19,35 +19,6 @@ function set_ksp_options(ksp)
   @check_error_code GridapPETSc.PETSC.MatMumpsSetCntl(mumpsmat[], 3, 1.0e-6)
 end
 
-function compute_matrices(trials,tests,a::Function,l::Function,qdegree)
-  nlevs = num_levels(trials)
-  mh    = trials.mh
-
-  A = nothing
-  b = nothing
-  mats = Vector{PSparseMatrix}(undef,nlevs)
-  for lev in 1:nlevs
-    parts = get_level_parts(mh,lev)
-    if i_am_in(parts)
-      model = GridapSolvers.get_model(mh,lev)
-      U = get_fe_space(trials,lev)
-      V = get_fe_space(tests,lev)
-      Ω = Triangulation(model)
-      dΩ = Measure(Ω,qdegree)
-      ai(u,v) = a(u,v,dΩ)
-      if lev == 1
-        li(v) = l(v,dΩ)
-        op    = AffineFEOperator(ai,li,U,V)
-        A, b  = get_matrix(op), get_vector(op)
-        mats[lev] = A
-      else
-        mats[lev] = assemble_matrix(ai,U,V)
-      end
-    end
-  end
-  return mats, A, b
-end
-
 function get_patch_smoothers(tests,patch_spaces,patch_decompositions,biform,qdegree)  
   mh = tests.mh
   nlevs = num_levels(mh)
@@ -68,11 +39,11 @@ function get_patch_smoothers(tests,patch_spaces,patch_decompositions,biform,qdeg
   return smoothers
 end
 
-np       = 1    # Number of processors
-D        = 3    # Problem dimension
-n_refs_c = 1    # Number of refinements for the coarse model
-n_levels = 2    # Number of refinement levels
-order    = 1    # FE order
+np       = 1 # Number of processors
+D        = 3 # Problem dimension
+n_refs_c = 1 # Number of refinements for the coarse model
+n_levels = 2 # Number of refinement levels
+order    = 1 # FE order
 
 ranks = with_mpi() do distribute
   distribute(LinearIndices((np,)))
@@ -107,7 +78,7 @@ f = VectorValue(fill(1.0,D)...)
 qdegree = order*2+1
 biform((u,j),(v_u,v_j),dΩ) = ∫(β*∇(u)⊙∇(v_u) -γ*(j×B)⋅v_u + j⋅v_j - (u×B)⋅v_j)dΩ
 liform((v_u,v_j),dΩ) = ∫(v_u⋅f)dΩ
-smatrices, A, b = compute_matrices(trials,tests,biform,liform,qdegree);
+smatrices, A, b = compute_hierarchy_matrices(trials,tests,biform,liform,qdegree);
 
 pbs = GridapSolvers.PatchBasedSmoothers.PatchBoundaryExclude()
 patch_decompositions = PatchDecomposition(mh;patch_boundary_style=pbs)

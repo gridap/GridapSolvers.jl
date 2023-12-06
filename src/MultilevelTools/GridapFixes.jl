@@ -21,6 +21,8 @@ function Gridap.Geometry.get_glue(trian::BodyFittedTriangulation{Dt},::Val{Dt}) 
   FaceToFaceGlue(tface_to_mface,tface_to_mface_map,mface_to_tface)
 end
 
+# MultiField/DistributedMultiField missing API
+
 function Gridap.FESpaces.zero_dirichlet_values(f::MultiFieldFESpace)
   map(zero_dirichlet_values,f.spaces)
 end

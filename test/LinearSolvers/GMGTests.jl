@@ -30,9 +30,8 @@ function get_patch_smoothers(tests,patch_spaces,patch_decompositions,biform,qdeg
       Vh = get_fe_space(tests,lev)
       Ω  = Triangulation(PD)
       dΩ = Measure(Ω,qdegree)
-      a(u,v) = biform(u,v,dΩ)
-      local_solver = IS_ConjugateGradientSolver(;reltol=1.e-6)
-      patch_smoother = PatchBasedLinearSolver(a,Ph,Vh,local_solver)
+      local_solver = LUSolver() # IS_ConjugateGradientSolver(;reltol=1.e-6)
+      patch_smoother = PatchBasedLinearSolver(biform,Ph,Vh,dΩ,local_solver)
       smoothers[lev] = RichardsonSmoother(patch_smoother,10,0.2)
     end
   end
@@ -44,15 +43,13 @@ function gmg_driver(t,parts,mh,spaces,qdegree,smoothers,biform,liform,u)
 
   tic!(t;barrier=true)
   # Integration
-  smatrices, A, b = compute_hierarchy_matrices(trials,biform,liform,qdegree)
+  smatrices, A, b = compute_hierarchy_matrices(trials,tests,biform,liform,qdegree)
 
   # Preconditioner
   coarse_solver = LUSolver()
   restrictions, prolongations = setup_transfer_operators(trials,
                                                          qdegree;
-                                                         mode=:residual,
-                                                         restriction_method=:projection,
-                                                         solver=IS_ConjugateGradientSolver(;reltol=1.e-6))
+                                                         mode=:residual)
   gmg = GMGLinearSolver(mh,
                         smatrices,
                         prolongations,
@@ -64,18 +61,15 @@ function gmg_driver(t,parts,mh,spaces,qdegree,smoothers,biform,liform,u)
                         rtol=1.0e-8,
                         verbose=false,
                         mode=:preconditioner)
-  ss = symbolic_setup(gmg,A)
-  ns = numerical_setup(ss,A)
+  
+  solver = CGSolver(gmg;maxiter=100,atol=1e-10,rtol=1.e-6,verbose=i_am_main(parts))
+  ns = numerical_setup(symbolic_setup(solver,A),A)
   toc!(t,"GMG setup")
 
   # Solve
   tic!(t;barrier=true)
   x = pfill(0.0,partition(axes(A,2)))
-  x, history = IterativeSolvers.cg!(x,A,b;
-                                    verbose=i_am_main(parts),
-                                    reltol=1.0e-8,
-                                    Pl=ns,
-                                    log=true)
+  solve!(x,ns,b)
   toc!(t,"Solver")
 
   # Error
@@ -167,7 +161,7 @@ function gmg_hdiv_driver(t,parts,mh,order)
 
   tic!(t;barrier=true)
   patch_decompositions = PatchDecomposition(mh)
-  patch_spaces = PatchFESpace(mh,reffe,DivConformity(),patch_decompositions,tests)
+  patch_spaces = PatchFESpace(tests,patch_decompositions)
   smoothers = get_patch_smoothers(tests,patch_spaces,patch_decompositions,biform,qdegree)
   toc!(t,"Patch Decomposition")
 
