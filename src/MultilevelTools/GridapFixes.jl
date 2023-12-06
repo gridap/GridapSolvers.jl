@@ -40,6 +40,20 @@ function Gridap.FESpaces.interpolate_everywhere!(objects,free_values::AbstractVe
   Gridap.MultiField.MultiFieldFEFunction(free_values,fe,blocks)
 end
 
+function Gridap.FESpaces.interpolate!(objects::GridapDistributed.DistributedMultiFieldFEFunction,free_values::AbstractVector,fe::GridapDistributed.DistributedMultiFieldFESpace)
+  part_fe_fun = map(local_views(objects),partition(free_values),local_views(fe)) do objects,x,f
+    interpolate!(objects,x,f)
+  end
+  field_fe_fun = GridapDistributed.DistributedSingleFieldFEFunction[]
+  for i in 1:num_fields(fe)
+    free_values_i = Gridap.MultiField.restrict_to_field(fe,free_values,i)
+    fe_space_i = fe.field_fe_space[i]
+    fe_fun_i = FEFunction(fe_space_i,free_values_i)
+    push!(field_fe_fun,fe_fun_i)
+  end
+  GridapDistributed.DistributedMultiFieldFEFunction(field_fe_fun,part_fe_fun,free_values)
+end
+
 function Gridap.FESpaces.FEFunction(
   f::GridapDistributed.DistributedMultiFieldFESpace,x::AbstractVector,
   dirichlet_values::AbstractArray{<:AbstractVector},isconsistent=false

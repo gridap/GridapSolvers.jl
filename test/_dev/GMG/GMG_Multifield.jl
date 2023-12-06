@@ -116,27 +116,16 @@ smoothers = get_patch_smoothers(tests,patch_spaces,patch_decompositions,biform,q
 
 smoother_ns = numerical_setup(symbolic_setup(smoothers[1],A),A)
 
-
-using GridapSolvers.PatchBasedSmoothers: prolongate!, inject!
-patch_ns = smoother_ns.Mns
-rp, xp, r, x = patch_ns.caches;
-Ph = patch_ns.solver.patch_space;
-
-fill!(r,1.0)
-prolongate!(rp,Ph,r)
-copy!(xp,rp)
-inject!(x,Ph,xp)
-
 restrictions, prolongations = setup_transfer_operators(trials,qdegree;mode=:residual);
 
-GridapPETSc.with() do
+#GridapPETSc.with() do
   gmg = GMGLinearSolver(mh,
                         smatrices,
                         prolongations,
                         restrictions,
                         pre_smoothers=smoothers,
                         post_smoothers=smoothers,
-                        coarsest_solver=PETScLinearSolver(set_ksp_options),
+                        coarsest_solver=LUSolver(),#PETScLinearSolver(set_ksp_options),
                         maxiter=1,
                         rtol=1.0e-10,
                         verbose=false,
@@ -152,4 +141,4 @@ GridapPETSc.with() do
     solve!(x,ns,b)
   end
   println("n_dofs = ", length(x))
-end
+#end

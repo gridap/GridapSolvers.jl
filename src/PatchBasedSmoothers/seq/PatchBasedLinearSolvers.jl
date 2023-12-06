@@ -71,7 +71,7 @@ function Gridap.Algebra.solve!(x::AbstractVector,ns::PatchBasedSmootherNumerical
   Ap_ns, weights, caches = ns.local_ns, ns.weights, ns.caches
   
   Ph = ns.solver.Ph
-  w, w_sums = weights
+  #w, w_sums = weights
   rp, dxp = caches
 
   prolongate!(rp,Ph,r)
@@ -85,7 +85,7 @@ function Gridap.Algebra.solve!(x_mat::PVector,ns::PatchBasedSmootherNumericalSet
   Ap_ns, weights, caches = ns.local_ns, ns.weights, ns.caches
   
   Ph = ns.solver.patch_space
-  w, w_sums = weights
+  #w, w_sums = weights
   rp, dxp, r, x = caches
 
   copy!(r,r_mat)
