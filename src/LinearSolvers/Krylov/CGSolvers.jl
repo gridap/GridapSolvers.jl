@@ -28,7 +28,7 @@ mutable struct CGNumericalSetup <: Gridap.Algebra.NumericalSetup
   caches
 end
 
-function get_solver_caches(solver::CGSolver,A)
+function get_solver_caches(solver::CGSolver,A::AbstractMatrix)
   w = allocate_in_domain(A)
   p = allocate_in_domain(A)
   z = allocate_in_domain(A)

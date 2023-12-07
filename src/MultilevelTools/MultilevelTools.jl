@@ -12,6 +12,7 @@ using Gridap.Algebra
 using Gridap.Geometry
 using Gridap.FESpaces
 using Gridap.Adaptivity
+using Gridap.ReferenceFEs
 using PartitionedArrays
 
 using GridapDistributed

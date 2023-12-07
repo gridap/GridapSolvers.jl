@@ -30,9 +30,8 @@ function get_patch_smoothers(tests,patch_spaces,patch_decompositions,biform,qdeg
       Vh = get_fe_space(tests,lev)
       Ω  = Triangulation(PD)
       dΩ = Measure(Ω,qdegree)
-      a(u,v) = biform(u,v,dΩ)
-      local_solver = IS_ConjugateGradientSolver(;reltol=1.e-6)
-      patch_smoother = PatchBasedLinearSolver(a,Ph,Vh,local_solver)
+      local_solver = LUSolver()
+      patch_smoother = PatchBasedLinearSolver(biform,Ph,Vh,dΩ,local_solver)
       smoothers[lev] = RichardsonSmoother(patch_smoother,10,0.2)
     end
   end
@@ -44,14 +43,13 @@ function gmg_driver(t,parts,mh,spaces,qdegree,smoothers,biform,liform,u)
 
   tic!(t;barrier=true)
   # Integration
-  smatrices, A, b = compute_hierarchy_matrices(trials,biform,liform,qdegree)
+  smatrices, A, b = compute_hierarchy_matrices(trials,tests,biform,liform,qdegree)
 
   # Preconditioner
   coarse_solver = LUSolver()
   restrictions, prolongations = setup_transfer_operators(trials,
                                                          qdegree;
                                                          mode=:residual,
-                                                         restriction_method=:projection,
                                                          solver=IS_ConjugateGradientSolver(;reltol=1.e-6))
   gmg = GMGLinearSolver(mh,
                         smatrices,
@@ -64,32 +62,30 @@ function gmg_driver(t,parts,mh,spaces,qdegree,smoothers,biform,liform,u)
                         rtol=1.0e-8,
                         verbose=false,
                         mode=:preconditioner)
-  ss = symbolic_setup(gmg,A)
-  ns = numerical_setup(ss,A)
+  
+  solver = CGSolver(gmg;maxiter=100,atol=1e-10,rtol=1.e-6,verbose=i_am_main(parts))
+  ns = numerical_setup(symbolic_setup(solver,A),A)
   toc!(t,"GMG setup")
 
   # Solve
   tic!(t;barrier=true)
   x = pfill(0.0,partition(axes(A,2)))
-  x, history = IterativeSolvers.cg!(x,A,b;
-                                    verbose=i_am_main(parts),
-                                    reltol=1.0e-8,
-                                    Pl=ns,
-                                    log=true)
+  solve!(x,ns,b)
   toc!(t,"Solver")
 
   # Error
-  model = get_model(mh,1)
-  Uh    = get_fe_space(trials,1)
-  Ω     = Triangulation(model)
-  dΩ    = Measure(Ω,qdegree)
-  uh    = FEFunction(Uh,x)
-  eh    = u-uh
-  e_l2  = sum(∫(eh⋅eh)dΩ)
-  if i_am_main(parts)
-    println("L2 error = ", e_l2)
+  if !isa(u,Nothing)
+    model = get_model(mh,1)
+    Uh    = get_fe_space(trials,1)
+    Ω     = Triangulation(model)
+    dΩ    = Measure(Ω,qdegree)
+    uh    = FEFunction(Uh,x)
+    eh    = u-uh
+    e_l2  = sum(∫(eh⋅eh)dΩ)
+    if i_am_main(parts)
+      println("L2 error = ", e_l2)
+    end
   end
-  return e_l2
 end
 
 function gmg_poisson_driver(t,parts,mh,order)
@@ -167,11 +163,46 @@ function gmg_hdiv_driver(t,parts,mh,order)
 
   tic!(t;barrier=true)
   patch_decompositions = PatchDecomposition(mh)
-  patch_spaces = PatchFESpace(mh,reffe,DivConformity(),patch_decompositions,tests)
+  patch_spaces = PatchFESpace(tests,patch_decompositions)
   smoothers = get_patch_smoothers(tests,patch_spaces,patch_decompositions,biform,qdegree)
   toc!(t,"Patch Decomposition")
 
   return gmg_driver(t,parts,mh,spaces,qdegree,smoothers,biform,liform,u)
+end
+
+function gmg_multifield_driver(t,parts,mh,order)
+  tic!(t;barrier=true)
+  Dc = num_cell_dims(get_model(mh,1))
+  @assert Dc == 3
+
+  β = 1.0
+  γ = 1.0
+  B = VectorValue(0.0,0.0,1.0)
+  f = VectorValue(fill(1.0,Dc)...)
+  biform((u,j),(v_u,v_j),dΩ) = ∫(β*∇(u)⊙∇(v_u) -γ*(j×B)⋅v_u + j⋅v_j - (u×B)⋅v_j)dΩ
+  liform((v_u,v_j),dΩ) = ∫(v_u⋅f)dΩ
+
+  reffe_u  = ReferenceFE(lagrangian,VectorValue{Dc,Float64},order)
+  tests_u  = FESpace(mh,reffe_u;dirichlet_tags="boundary");
+  trials_u = TrialFESpace(tests_u);
+
+  reffe_j  = ReferenceFE(raviart_thomas,Float64,order-1)
+  tests_j  = FESpace(mh,reffe_j;dirichlet_tags="boundary");
+  trials_j = TrialFESpace(tests_j);
+
+  trials = MultiFieldFESpace([trials_u,trials_j]);
+  tests  = MultiFieldFESpace([tests_u,tests_j]);
+  spaces = tests, trials
+  toc!(t,"FESpaces")
+
+  tic!(t;barrier=true)
+  qdegree = 2*(order+1)
+  patch_decompositions = PatchDecomposition(mh)
+  patch_spaces = PatchFESpace(tests,patch_decompositions)
+  smoothers = get_patch_smoothers(tests,patch_spaces,patch_decompositions,biform,qdegree)
+  toc!(t,"Patch Decomposition")
+
+  return gmg_driver(t,parts,mh,spaces,qdegree,smoothers,biform,liform,nothing)
 end
 
 function main_gmg_driver(parts,mh,order,pde)
@@ -184,6 +215,10 @@ function main_gmg_driver(parts,mh,order,pde)
     gmg_vector_laplace_driver(t,parts,mh,order)
   elseif pde == :hdiv
     gmg_hdiv_driver(t,parts,mh,order)
+  elseif pde == :multifield
+    gmg_multifield_driver(t,parts,mh,order)
+  else
+    error("Unknown PDE")
   end
 end
 
@@ -203,14 +238,17 @@ end
 function main(distribute,np::Integer,nc::Tuple,np_per_level::Vector)
   parts = distribute(LinearIndices((np,)))
   mh = get_mesh_hierarchy(parts,nc,np_per_level)
+  Dc = length(nc)
 
-  for pde in [:poisson,:laplace,:vector_laplace,:hdiv]
-    if i_am_main(parts)
-      println(repeat("=",80))
-      println("Testing GMG with Dc=$(length(nc)), PDE=$pde")
+  for pde in [:poisson,:laplace,:vector_laplace,:hdiv,:multifield]
+    if (pde != :multifield) || (Dc == 3)
+      if i_am_main(parts)
+        println(repeat("=",80))
+        println("Testing GMG with Dc=$(length(nc)), PDE=$pde")
+      end
+      order = (pde !== :hdiv) ? 1 : 0
+      main_gmg_driver(parts,mh,order,pde)
     end
-    order = (pde !== :hdiv) ? 1 : 0
-    main_gmg_driver(parts,mh,order,pde)
   end
 end
 
