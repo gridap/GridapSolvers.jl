@@ -70,7 +70,7 @@ end
 function Gridap.Algebra.solve!(x::AbstractVector,ns::PatchBasedSmootherNumericalSetup,r::AbstractVector)
   Ap_ns, weights, caches = ns.local_ns, ns.weights, ns.caches
   
-  Ph = ns.solver.Ph
+  Ph = ns.solver.patch_space
   #w, w_sums = weights
   rp, dxp = caches
 
