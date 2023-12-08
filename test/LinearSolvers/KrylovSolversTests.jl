@@ -1,7 +1,7 @@
 module KrylovSolversTests
 
 using Test
-using Gridap
+using Gridap, Gridap.Algebra
 using GridapDistributed
 using PartitionedArrays
 using IterativeSolvers

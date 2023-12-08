@@ -2,7 +2,7 @@ module BlockDiagonalSmoothersTests
 
 using Test
 using Gridap
-using Gridap.MultiField
+using Gridap.MultiField, Gridap.Algebra
 using BlockArrays
 using LinearAlgebra
 using FillArrays

@@ -1,6 +1,6 @@
 module PatchBasedSmoothers
 
-using FillArrays
+using FillArrays, BlockArrays
 using LinearAlgebra
 using Gridap
 using Gridap.Helpers
@@ -18,12 +18,17 @@ export PatchDecomposition
 export PatchFESpace
 export PatchBasedLinearSolver
 
+# Geometry
 include("seq/PatchDecompositions.jl")
-include("seq/PatchTriangulations.jl")
-include("seq/PatchFESpaces.jl")
-include("seq/PatchBasedLinearSolvers.jl")
-
 include("mpi/PatchDecompositions.jl")
+include("seq/PatchTriangulations.jl")
+
+# FESpaces
+include("seq/PatchFESpaces.jl")
 include("mpi/PatchFESpaces.jl")
+include("seq/PatchMultiFieldFESpaces.jl")
+
+# Solvers
+include("seq/PatchBasedLinearSolvers.jl")
 
 end
