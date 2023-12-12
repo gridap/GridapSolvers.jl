@@ -10,7 +10,7 @@ function get_solver_info(solver::Gridap.Algebra.LinearSolver)
   return SolverInfo(string(typeof(solver)))
 end
 
-function merge_info!(a::SolverInfo,b::SolverInfo;prefix="")
+function merge_info!(a::SolverInfo,b::SolverInfo;prefix=b.name)
   for (key,val) in b.data
     a.data[Symbol(prefix,key)] = val
   end

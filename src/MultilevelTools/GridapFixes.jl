@@ -27,10 +27,6 @@ function Gridap.FESpaces.zero_dirichlet_values(f::MultiFieldFESpace)
   map(zero_dirichlet_values,f.spaces)
 end
 
-function Gridap.FESpaces.zero_dirichlet_values(f::GridapDistributed.DistributedMultiFieldFESpace)
-  map(zero_dirichlet_values,f.field_fe_space)
-end
-
 function Gridap.FESpaces.interpolate_everywhere!(objects,free_values::AbstractVector,dirichlet_values::Vector,fe::MultiFieldFESpace)
   blocks = SingleFieldFEFunction[]
   for (field, (U,object)) in enumerate(zip(fe.spaces,objects))

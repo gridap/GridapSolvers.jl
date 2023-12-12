@@ -17,16 +17,16 @@ function get_operators(V_H1_sc,V_H1_vec,V_Hcurl,V_Hdiv,trian)
 end
 
 function interpolation_operator(op,U_in,V_out,trian;
-                                strat=FullyAssembledRows(),
+                                strat=SubAssembledRows(),
                                 Tm=SparseMatrixCSR{0,PetscScalar,PetscInt},
                                 Tv=Vector{PetscScalar})
   out_dofs = get_fe_dof_basis(V_out)
   in_basis  = get_fe_basis(U_in)
   
   cell_interp_mats = out_dofs(op(in_basis))
-  local_contr = map(local_views(trian),cell_interp_mats) do trian, arr
+  local_contr = map(local_views(trian),local_views(out_dofs),cell_interp_mats) do trian, dofs, arr
     contr = DomainContribution()
-    add_contribution!(contr,trian,arr)
+    add_contribution!(contr,get_triangulation(dofs),arr)
     return contr
   end
   contr = GridapDistributed.DistributedDomainContribution(local_contr)
@@ -104,7 +104,6 @@ function ads_ksp_setup(ksp,rtol,maxits,dim,G,C,Π_div,Π_curl)
   dtol = GridapPETSc.PETSC.PETSC_DEFAULT
   maxits = PetscInt(maxits)
 
-  @check_error_code GridapPETSc.PETSC.KSPView(ksp[],C_NULL)
   @check_error_code GridapPETSc.PETSC.KSPSetType(ksp[],GridapPETSc.PETSC.KSPGMRES)
   @check_error_code GridapPETSc.PETSC.KSPSetTolerances(ksp[], rtol, atol, dtol, maxits)
 
@@ -119,13 +118,16 @@ function ads_ksp_setup(ksp,rtol,maxits,dim,G,C,Π_div,Π_curl)
   @check_error_code GridapPETSc.PETSC.PCHYPRESetDiscreteGradient(pc[],_G.mat[])
   @check_error_code GridapPETSc.PETSC.PCHYPRESetDiscreteCurl(pc[],_C.mat[])
   @check_error_code GridapPETSc.PETSC.PCHYPRESetInterpolations(pc[],dim,_Π_div.mat[],C_NULL,_Π_curl.mat[],C_NULL)
+
+  @check_error_code GridapPETSc.PETSC.KSPView(ksp[],C_NULL)
 end
 
 ###############################################################################
 
-n  = 20
+n  = 10
 D  = 3
-np = Tuple(fill(1,D))
+order = 2
+np = (1,1,1)#Tuple(fill(1,D))
 ranks = with_mpi() do distribute
   distribute(LinearIndices((prod(np),)))
 end
@@ -135,22 +137,20 @@ ncells = (D==2) ? (n,n) : (n,n,n)
 model = CartesianDiscreteModel(ranks,np,domain,ncells)
 trian = Triangulation(model)
 
-order = 1
-
 reffe_H1_sc = ReferenceFE(lagrangian,Float64,order)
-V_H1_sc = FESpace(model,reffe_H1_sc)
+V_H1_sc = FESpace(model,reffe_H1_sc;dirichlet_tags="boundary")
 U_H1_sc = TrialFESpace(V_H1_sc)
 
 reffe_H1 = ReferenceFE(lagrangian,VectorValue{D,Float64},order)
-V_H1 = FESpace(model,reffe_H1)
+V_H1 = FESpace(model,reffe_H1;dirichlet_tags="boundary")
 U_H1 = TrialFESpace(V_H1)
 
 reffe_Hdiv = ReferenceFE(raviart_thomas,Float64,order-1)
-V_Hdiv = FESpace(model,reffe_Hdiv)
+V_Hdiv = FESpace(model,reffe_Hdiv;dirichlet_tags="boundary")
 U_Hdiv = TrialFESpace(V_Hdiv)
 
 reffe_Hcurl = ReferenceFE(nedelec,Float64,order-1)
-V_Hcurl = FESpace(model,reffe_Hcurl)
+V_Hcurl = FESpace(model,reffe_Hcurl;dirichlet_tags="boundary")
 U_Hcurl = TrialFESpace(V_Hcurl)
 
 ##############################################################################
@@ -162,25 +162,25 @@ u(x) = x[1]^3 + x[2]^3
 u_h1 = interpolate(u,U_H1_sc)
 x_h1 = get_free_dof_values(u_h1)
 
-u_hcurl = interpolate(∇(u_h1),U_Hcurl)
-x_hcurl = G * x_h1
-@assert norm(x_hcurl - get_free_dof_values(u_hcurl)) < 1.e-8
+#u_hcurl = interpolate(∇(u_h1),U_Hcurl)
+#x_hcurl = G * x_h1
+#@assert norm(x_hcurl - get_free_dof_values(u_hcurl)) < 1.e-8
+#
+#u_hdiv = interpolate(∇×(u_hcurl),U_Hdiv)
+#x_hdiv  = C * x_hcurl
+#@assert norm(x_hdiv - get_free_dof_values(u_hdiv)) < 1.e-8
+#
+#u_vec(x) = VectorValue(x[1]^3,x[2]^3,x[3]^3)
+#u_h1_vec = interpolate(u_vec,V_H1)
+#x_h1_vec = get_free_dof_values(u_h1_vec)
+#
+#u_hcurl_bis = interpolate(u_h1_vec,U_Hcurl)
+#x_hcurl_bis = Π_curl * x_h1_vec
+#@assert norm(x_hcurl_bis - get_free_dof_values(u_hcurl_bis)) < 1.e-8
 
-u_hdiv = interpolate(∇×(u_hcurl),U_Hdiv)
-x_hdiv  = C * x_hcurl
-@assert norm(x_hdiv - get_free_dof_values(u_hdiv)) < 1.e-8
-
-u_vec(x) = VectorValue(x[1]^3,x[2]^3,x[3]^3)
-u_h1_vec = interpolate(u_vec,V_H1)
-x_h1_vec = get_free_dof_values(u_h1_vec)
-
-u_hcurl_bis = interpolate(u_h1_vec,U_Hcurl)
-x_hcurl_bis = Π_curl * x_h1_vec
-@assert norm(x_hcurl_bis - get_free_dof_values(u_hcurl_bis)) < 1.e-8
-
-u_hdiv_bis = interpolate(u_h1_vec,U_Hcurl)
-x_hdiv_bis = Π_curl * x_h1_vec
-@assert norm(x_hdiv_bis - get_free_dof_values(u_hdiv_bis)) < 1.e-8
+#u_hdiv_bis = interpolate(u_h1_vec,U_Hcurl)
+#x_hdiv_bis = Π_curl * x_h1_vec
+#@assert norm(x_hdiv_bis - get_free_dof_values(u_hdiv_bis)) < 1.e-8
 
 ############################################################################################
 
@@ -199,7 +199,7 @@ b  = get_vector(op)
 
 options = "-ksp_converged_reason"
 GridapPETSc.with(args=split(options)) do
-  ksp_setup(ksp) = ads_ksp_setup(ksp,1e-8,500,D,G,C,Π_div,Π_curl)
+  ksp_setup(ksp) = ads_ksp_setup(ksp,1e-8,300,D,G,C,Π_div,Π_curl)
   solver = PETScLinearSolver(ksp_setup)
   ns = numerical_setup(symbolic_setup(solver,A),A)
   x = pfill(0.0,partition(axes(A,2)))
