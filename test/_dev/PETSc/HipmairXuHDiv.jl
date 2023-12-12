@@ -8,15 +8,15 @@ using LinearAlgebra
 
 using Gridap.Geometry, Gridap.FESpaces, Gridap.CellData, Gridap.Arrays
 
-function get_operators(V_H1_sc,V_H1_vec,V_Hcurl,V_Hdiv,trian)
-  G = interpolation_operator(u->∇(u),V_H1_sc,V_Hcurl,trian)
-  C = interpolation_operator(u->cross(∇,u),V_Hcurl,V_Hdiv,trian)
-  Π_div  = interpolation_operator(u->u,V_H1_vec,V_Hdiv,trian)
-  Π_curl = interpolation_operator(u->u,V_H1_vec,V_Hcurl,trian)
+function get_operators(V_H1_sc,V_H1_vec,V_Hcurl,V_Hdiv)
+  G = interpolation_operator(u->∇(u),V_H1_sc,V_Hcurl)
+  C = interpolation_operator(u->cross(∇,u),V_Hcurl,V_Hdiv)
+  Π_div  = interpolation_operator(u->u,V_H1_vec,V_Hdiv)
+  Π_curl = interpolation_operator(u->u,V_H1_vec,V_Hcurl)
   return G, C, Π_div, Π_curl
 end
 
-function interpolation_operator(op,U_in,V_out,trian;
+function interpolation_operator(op,U_in,V_out;
                                 strat=SubAssembledRows(),
                                 Tm=SparseMatrixCSR{0,PetscScalar,PetscInt},
                                 Tv=Vector{PetscScalar})
@@ -24,7 +24,7 @@ function interpolation_operator(op,U_in,V_out,trian;
   in_basis  = get_fe_basis(U_in)
   
   cell_interp_mats = out_dofs(op(in_basis))
-  local_contr = map(local_views(trian),local_views(out_dofs),cell_interp_mats) do trian, dofs, arr
+  local_contr = map(local_views(out_dofs),cell_interp_mats) do dofs, arr
     contr = DomainContribution()
     add_contribution!(contr,get_triangulation(dofs),arr)
     return contr
@@ -126,7 +126,7 @@ end
 
 n  = 10
 D  = 3
-order = 2
+order = 1
 np = (1,1,1)#Tuple(fill(1,D))
 ranks = with_mpi() do distribute
   distribute(LinearIndices((prod(np),)))
@@ -138,25 +138,25 @@ model = CartesianDiscreteModel(ranks,np,domain,ncells)
 trian = Triangulation(model)
 
 reffe_H1_sc = ReferenceFE(lagrangian,Float64,order)
-V_H1_sc = FESpace(model,reffe_H1_sc;dirichlet_tags="boundary")
+V_H1_sc = FESpace(model,reffe_H1_sc)#;dirichlet_tags="boundary")
 U_H1_sc = TrialFESpace(V_H1_sc)
 
 reffe_H1 = ReferenceFE(lagrangian,VectorValue{D,Float64},order)
-V_H1 = FESpace(model,reffe_H1;dirichlet_tags="boundary")
+V_H1 = FESpace(model,reffe_H1)#;dirichlet_tags="boundary")
 U_H1 = TrialFESpace(V_H1)
 
 reffe_Hdiv = ReferenceFE(raviart_thomas,Float64,order-1)
-V_Hdiv = FESpace(model,reffe_Hdiv;dirichlet_tags="boundary")
+V_Hdiv = FESpace(model,reffe_Hdiv)#;dirichlet_tags="boundary")
 U_Hdiv = TrialFESpace(V_Hdiv)
 
 reffe_Hcurl = ReferenceFE(nedelec,Float64,order-1)
-V_Hcurl = FESpace(model,reffe_Hcurl;dirichlet_tags="boundary")
+V_Hcurl = FESpace(model,reffe_Hcurl)#;dirichlet_tags="boundary")
 U_Hcurl = TrialFESpace(V_Hcurl)
 
 ##############################################################################
 dΩ = Measure(trian,(order+1)*2)
 
-G, C, Π_div, Π_curl = get_operators(V_H1_sc,V_H1,V_Hcurl,V_Hdiv,trian);
+G, C, Π_div, Π_curl = get_operators(V_H1_sc,V_H1,V_Hcurl,V_Hdiv);
 
 u(x) = x[1]^3 + x[2]^3
 u_h1 = interpolate(u,U_H1_sc)
@@ -191,7 +191,7 @@ f(x)   = (D==2) ? VectorValue(x[1],x[2]) : VectorValue(x[1],x[2],x[3])
 a(u,v) = ∫(u⋅v + α⋅(∇⋅u)⋅(∇⋅v)) * dΩ
 l(v)   = ∫(f⋅v) * dΩ
 
-V = FESpace(model,reffe_Hdiv;dirichlet_tags="boundary")
+V = FESpace(model,reffe_Hdiv)#;dirichlet_tags="boundary")
 U = TrialFESpace(V,sol)
 op = AffineFEOperator(a,l,V,U)
 A  = get_matrix(op)

@@ -9,10 +9,7 @@ using BlockArrays
 using IterativeSolvers
 
 using Gridap
-using Gridap.Helpers
-using Gridap.Algebra
-using Gridap.FESpaces
-using Gridap.MultiField
+using Gridap.Helpers, Gridap.Algebra, Gridap.CellData, Gridap.Arrays, Gridap.FESpaces, Gridap.MultiField
 using PartitionedArrays
 using GridapPETSc
 
@@ -45,6 +42,7 @@ include("Krylov/GMRESSolvers.jl")
 include("Krylov/FGMRESSolvers.jl")
 include("Krylov/MINRESSolvers.jl")
 
+include("PETSc/PETScUtils.jl")
 include("PETSc/ElasticitySolvers.jl")
 include("PETSc/HipmairXuSolvers.jl")
 
