@@ -69,6 +69,10 @@ function Gridap.Algebra.solve!(x::AbstractVector,ns::FGMRESNumericalSetup,b::Abs
   log, ilog = solver.outer_log, solver.inner_log
   V, Z, zl, H, g, c, s = caches
 
+  fill!(V[1],zero(eltype(V[1])))
+  fill!(zr,zero(eltype(zr)))
+  fill!(zl,zero(eltype(zl)))
+
   # Initial residual
   krylov_residual!(V[1],x,A,b,Pl,zl)
   β    = norm(V[1])
@@ -82,6 +86,8 @@ function Gridap.Algebra.solve!(x::AbstractVector,ns::FGMRESNumericalSetup,b::Abs
     idone = init!(ilog,β)
     while !idone
       # Arnoldi orthogonalization by Modified Gram-Schmidt
+      fill!(V[j+1],zero(eltype(V[j+1])))
+      fill!(Z[j],zero(eltype(Z[j])))
       krylov_mul!(V[j+1],A,V[j],Pr,Pl,Z[j],zl)
       for i in 1:j
         H[i,j] = dot(V[j+1],V[i])
