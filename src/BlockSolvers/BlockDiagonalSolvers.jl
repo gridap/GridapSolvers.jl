@@ -1,7 +1,7 @@
 
 struct BlockDiagonalSolver{N,A,B} <: Gridap.Algebra.LinearSolver
-  blocks  :: B
-  solvers :: C
+  blocks  :: A
+  solvers :: B
   function BlockDiagonalSolver(
     blocks  :: AbstractVector{<:SolverBlock},
     solvers :: AbstractVector{<:Gridap.Algebra.LinearSolver}

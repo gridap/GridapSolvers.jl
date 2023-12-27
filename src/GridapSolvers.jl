@@ -2,11 +2,13 @@ module GridapSolvers
 
   include("SolverInterfaces/SolverInterfaces.jl")
   include("MultilevelTools/MultilevelTools.jl")
+  include("BlockSolvers/BlockSolvers.jl")
   include("LinearSolvers/LinearSolvers.jl")
   include("PatchBasedSmoothers/PatchBasedSmoothers.jl")
 
   using GridapSolvers.SolverInterfaces
   using GridapSolvers.MultilevelTools
+  using GridapSolvers.BlockSolvers
   using GridapSolvers.LinearSolvers
   using GridapSolvers.PatchBasedSmoothers
 
@@ -25,6 +27,9 @@ module GridapSolvers
   export RestrictionOperator, ProlongationOperator
   export setup_transfer_operators
 
+  # BlockSolvers
+  export BlockDiagonalSolver
+
   # LinearSolvers
   export JacobiLinearSolver
   export RichardsonSmoother
@@ -37,7 +42,10 @@ module GridapSolvers
   export IS_MINRESSolver
   export IS_SSORSolver
 
+  export CGSolver
+  export MINRESSolver
   export GMRESSolver
+  export FGMRESSolver
 
   # PatchBasedSmoothers
   export PatchDecomposition

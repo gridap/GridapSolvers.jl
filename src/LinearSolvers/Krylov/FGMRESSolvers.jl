@@ -70,7 +70,6 @@ function Gridap.Algebra.solve!(x::AbstractVector,ns::FGMRESNumericalSetup,b::Abs
   V, Z, zl, H, g, c, s = caches
 
   fill!(V[1],zero(eltype(V[1])))
-  fill!(zr,zero(eltype(zr)))
   fill!(zl,zero(eltype(zl)))
 
   # Initial residual
