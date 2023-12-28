@@ -5,12 +5,14 @@ module GridapSolvers
   include("BlockSolvers/BlockSolvers.jl")
   include("LinearSolvers/LinearSolvers.jl")
   include("PatchBasedSmoothers/PatchBasedSmoothers.jl")
+  include("NonlinearSolvers/NonlinearSolvers.jl")
 
   using GridapSolvers.SolverInterfaces
   using GridapSolvers.MultilevelTools
   using GridapSolvers.BlockSolvers
   using GridapSolvers.LinearSolvers
   using GridapSolvers.PatchBasedSmoothers
+  using GridapSolvers.NonlinearSolvers
 
   # MultilevelTools
   export get_parts, generate_level_parts, generate_subparts
