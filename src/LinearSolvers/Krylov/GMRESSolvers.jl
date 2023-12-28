@@ -63,6 +63,18 @@ function Gridap.Algebra.numerical_setup!(ns::GMRESNumericalSetup, A::AbstractMat
     numerical_setup!(ns.Pl_ns,A)
   end
   ns.A = A
+  return ns
+end
+
+function Gridap.Algebra.numerical_setup!(ns::GMRESNumericalSetup, A::AbstractMatrix, x::AbstractVector)
+  if !isa(ns.Pr_ns,Nothing)
+    numerical_setup!(ns.Pr_ns,A,x)
+  end
+  if !isa(ns.Pl_ns,Nothing)
+    numerical_setup!(ns.Pl_ns,A,x)
+  end
+  ns.A = A
+  return ns
 end
 
 function Gridap.Algebra.solve!(x::AbstractVector,ns::GMRESNumericalSetup,b::AbstractVector)

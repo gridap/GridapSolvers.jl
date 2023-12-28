@@ -91,7 +91,11 @@ function Gridap.Algebra.numerical_setup!(ns::BlockTriangularSolverNS,mat::Abstra
   solver       = ns.solver
   mat_blocks   = blocks(mat)
   block_caches = map(update_block_cache!,ns.block_caches,solver.blocks,mat_blocks)
-  map(numerical_setup!,ns.block_ns,diag(block_caches))
+  map(diag(solver.blocks),ns.block_ns,diag(block_caches)) do bi, nsi, ci
+    if is_nonlinear(bi)
+      numerical_setup!(nsi,ci)
+    end
+  end
   return ns
 end
 
@@ -102,7 +106,11 @@ function Gridap.Algebra.numerical_setup!(ns::BlockTriangularSolverNS,mat::Abstra
   block_caches = map(CartesianIndices(solver.blocks)) do I
     update_block_cache!(ns.block_caches[I],mat_blocks[I],vec_blocks[I[2]])
   end
-  map(numerical_setup!,ns.block_ns,diag(block_caches),vec_blocks)
+  map(diag(solver.blocks),ns.block_ns,diag(block_caches),vec_blocks) do bi, nsi, ci, xi
+    if is_nonlinear(bi)
+      numerical_setup!(nsi,ci,xi)
+    end
+  end
   return ns
 end
 

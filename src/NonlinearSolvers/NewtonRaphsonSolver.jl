@@ -60,7 +60,7 @@ function _solve_nr!(x,A,b,dx,ns,nls,op)
     if !done
       # Update jacobian and solver
       jacobian!(A, op, x)
-      numerical_setup!(ns,A)
+      numerical_setup!(ns,A,x)
     end
 
   end

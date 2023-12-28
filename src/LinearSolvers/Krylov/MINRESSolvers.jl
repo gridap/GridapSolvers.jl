@@ -62,6 +62,17 @@ function Gridap.Algebra.numerical_setup!(ns::MINRESNumericalSetup, A::AbstractMa
   ns.A = A
 end
 
+function Gridap.Algebra.numerical_setup!(ns::MINRESNumericalSetup, A::AbstractMatrix, x::AbstractVector)
+  if !isa(ns.Pr_ns,Nothing)
+    numerical_setup!(ns.Pr_ns,A,x)
+  end
+  if !isa(ns.Pl_ns,Nothing)
+    numerical_setup!(ns.Pl_ns,A,x)
+  end
+  ns.A = A
+  return ns
+end
+
 function Gridap.Algebra.solve!(x::AbstractVector,ns::MINRESNumericalSetup,b::AbstractVector)
   solver, A, Pl, Pr, caches = ns.solver, ns.A, ns.Pl_ns, ns.Pr_ns, ns.caches
   V, W, zr, zl, H, g, c, s = caches

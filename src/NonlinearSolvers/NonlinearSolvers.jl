@@ -10,6 +10,7 @@ module NonlinearSolvers
   using PartitionedArrays
   using GridapDistributed
 
+  using GridapSolvers.SolverInterfaces
   using GridapSolvers.MultilevelTools
   using GridapSolvers.SolverInterfaces
 
