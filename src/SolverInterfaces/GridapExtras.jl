@@ -5,10 +5,10 @@ function Gridap.Algebra.symbolic_setup(ns::Gridap.Algebra.LinearSolver,A::Abstra
   symbolic_setup(ns,A)
 end
 
-function Gridap.Algebra.numerical_setup(ns::Gridap.Algebra.LinearSolver,A::AbstractMatrix,x::AbstractVector)
+function Gridap.Algebra.numerical_setup(ns::Gridap.Algebra.SymbolicSetup,A::AbstractMatrix,x::AbstractVector)
   numerical_setup(ns,A)
 end
 
-function Gridap.Algebra.numerical_setup!(ns::Gridap.Algebra.LinearSolver,A::AbstractMatrix,x::AbstractVector)
+function Gridap.Algebra.numerical_setup!(ns::Gridap.Algebra.NumericalSetup,A::AbstractMatrix,x::AbstractVector)
   numerical_setup!(ns,A)
 end
