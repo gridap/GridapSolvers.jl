@@ -23,7 +23,7 @@ function Algebra.solve!(x::AbstractVector,nls::NewtonSolver,op::NonlinearOperato
   A  = jacobian(op, x)
   dx = similar(b)
   ss = symbolic_setup(nls.ls, A)
-  ns = numerical_setup(ss,A)
+  ns = numerical_setup(ss,A,x)
   _solve_nr!(x,A,b,dx,ns,nls,op)
   return NewtonCache(A,b,dx,ns)
 end
@@ -32,7 +32,7 @@ function Algebra.solve!(x::AbstractVector,nls::NewtonSolver,op::NonlinearOperato
   A,b,dx,ns = cache.A, cache.b, cache.dx, cache.ns
   residual!(b, op, x)
   jacobian!(A, op, x)
-  numerical_setup!(ns,A)
+  numerical_setup!(ns,A,x)
   _solve_nr!(x,A,b,dx,ns,nls,op)
   return cache
 end

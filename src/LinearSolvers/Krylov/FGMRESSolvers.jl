@@ -56,6 +56,14 @@ function Gridap.Algebra.numerical_setup(ss::FGMRESSymbolicSetup, A::AbstractMatr
   return FGMRESNumericalSetup(solver,A,Pr_ns,Pl_ns,caches)
 end
 
+function Gridap.Algebra.numerical_setup(ss::FGMRESSymbolicSetup, A::AbstractMatrix, x::AbstractVector)
+  solver = ss.solver
+  Pr_ns  = numerical_setup(symbolic_setup(solver.Pr,A,x),A,x)
+  Pl_ns  = isa(solver.Pl,Nothing) ? nothing : numerical_setup(symbolic_setup(solver.Pl,A,x),A,x)
+  caches = get_solver_caches(solver,A)
+  return FGMRESNumericalSetup(solver,A,Pr_ns,Pl_ns,caches)
+end
+
 function Gridap.Algebra.numerical_setup!(ns::FGMRESNumericalSetup, A::AbstractMatrix)
   numerical_setup!(ns.Pr_ns,A)
   if !isa(ns.Pl_ns,Nothing)
