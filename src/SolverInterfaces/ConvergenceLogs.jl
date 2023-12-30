@@ -82,6 +82,12 @@ function finalize!(log::ConvergenceLog{T},r::T) where T
   return flag
 end
 
+function print_message(log::ConvergenceLog{T},msg::String) where T
+  if log.verbose > SOLVER_VERBOSE_LOW
+    println(get_tabulation(log),msg)
+  end
+end
+
 function Base.show(io::IO,k::MIME"text/plain",log::ConvergenceLog)
   println(io,"ConvergenceLog[$(log.name)]")
   println(io," > tols: $(summary(log.tols))")

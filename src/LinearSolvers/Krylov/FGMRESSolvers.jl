@@ -2,18 +2,25 @@
 # FGMRES Solver
 struct FGMRESSolver <: Gridap.Algebra.LinearSolver
   m         :: Int
+  restart   :: Bool
+  m_add     :: Int
   Pr        :: Gridap.Algebra.LinearSolver
   Pl        :: Union{Gridap.Algebra.LinearSolver,Nothing}
-  outer_log :: ConvergenceLog{Float64}
-  inner_log :: ConvergenceLog{Float64}
+  log :: ConvergenceLog{Float64}
 end
 
-function FGMRESSolver(m,Pr;Pl=nothing,maxiter=100,atol=1e-12,rtol=1.e-6,verbose=false,name="FGMRES")
-  outer_tols = SolverTolerances{Float64}(maxiter=maxiter,atol=atol,rtol=rtol)
-  outer_log  = ConvergenceLog(name,outer_tols,verbose=verbose)
-  inner_tols = SolverTolerances{Float64}(maxiter=m,atol=atol,rtol=rtol)
-  inner_log  = ConvergenceLog("$(name)_inner",inner_tols,verbose=verbose,nested=true)
-  return FGMRESSolver(m,Pr,Pl,outer_log,inner_log)
+function FGMRESSolver(m,Pr;Pl=nothing,restart=false,m_add=1,maxiter=100,atol=1e-12,rtol=1.e-6,verbose=false,name="FGMRES")
+  tols = SolverTolerances{Float64}(maxiter=maxiter,atol=atol,rtol=rtol)
+  log  = ConvergenceLog(name,tols,verbose=verbose)
+  return FGMRESSolver(m,restart,m_add,Pr,Pl,log)
+end
+
+function restart(s::FGMRESSolver,k::Int)
+  if s.restart && (k > s.m)
+    print_message(s.log,"Restarting Krylov basis.")
+    return true
+  end
+  return false
 end
 
 AbstractTrees.children(s::FGMRESSolver) = [s.Pr,s.Pl]
@@ -48,10 +55,34 @@ function get_solver_caches(solver::FGMRESSolver,A)
   return (V,Z,zl,H,g,c,s)
 end
 
+function krylov_cache_length(ns::FGMRESNumericalSetup)
+  V, _, _, _, _, _, _ = ns.caches
+  return length(V) - 1
+end
+
+function expand_krylov_caches!(ns::FGMRESNumericalSetup)
+  V, Z, zl, H, g, c, s = ns.caches
+
+  m = krylov_cache_length(ns)
+  m_add = ns.solver.m_add
+  m_new = m + m_add
+
+  for _ in 1:m_add
+    push!(V,allocate_in_domain(ns.A))
+    push!(Z,allocate_in_domain(ns.A))
+  end
+  H_new = zeros(eltype(H),m_new+1,m_new); H_new[1:m+1,1:m] .= H
+  g_new = zeros(eltype(g),m_new+1); g_new[1:m+1] .= g
+  c_new = zeros(eltype(c),m_new); c_new[1:m] .= c
+  s_new = zeros(eltype(s),m_new); s_new[1:m] .= s
+  ns.caches = (V,Z,zl,H_new,g_new,c_new,s_new)
+  return H_new,g_new,c_new,s_new
+end
+
 function Gridap.Algebra.numerical_setup(ss::FGMRESSymbolicSetup, A::AbstractMatrix)
   solver = ss.solver
   Pr_ns  = numerical_setup(symbolic_setup(solver.Pr,A),A)
-  Pl_ns  = isa(solver.Pl,Nothing) ? nothing : numerical_setup(symbolic_setup(solver.Pl,A),A)
+  Pl_ns  = !isnothing(solver.Pl) ? numerical_setup(symbolic_setup(solver.Pl,A),A) : nothing
   caches = get_solver_caches(solver,A)
   return FGMRESNumericalSetup(solver,A,Pr_ns,Pl_ns,caches)
 end
@@ -59,7 +90,7 @@ end
 function Gridap.Algebra.numerical_setup(ss::FGMRESSymbolicSetup, A::AbstractMatrix, x::AbstractVector)
   solver = ss.solver
   Pr_ns  = numerical_setup(symbolic_setup(solver.Pr,A,x),A,x)
-  Pl_ns  = isa(solver.Pl,Nothing) ? nothing : numerical_setup(symbolic_setup(solver.Pl,A,x),A,x)
+  Pl_ns  = !isnothing(solver.Pl) ? numerical_setup(symbolic_setup(solver.Pl,A,x),A,x) : nothing
   caches = get_solver_caches(solver,A)
   return FGMRESNumericalSetup(solver,A,Pr_ns,Pl_ns,caches)
 end
@@ -84,8 +115,9 @@ end
 
 function Gridap.Algebra.solve!(x::AbstractVector,ns::FGMRESNumericalSetup,b::AbstractVector)
   solver, A, Pl, Pr, caches = ns.solver, ns.A, ns.Pl_ns, ns.Pr_ns, ns.caches
-  log, ilog = solver.outer_log, solver.inner_log
   V, Z, zl, H, g, c, s = caches
+  m   = krylov_cache_length(ns)
+  log = solver.log
 
   fill!(V[1],zero(eltype(V[1])))
   fill!(zl,zero(eltype(zl)))
@@ -100,8 +132,13 @@ function Gridap.Algebra.solve!(x::AbstractVector,ns::FGMRESNumericalSetup,b::Abs
     V[1] ./= β
     fill!(H,0.0)
     fill!(g,0.0); g[1] = β
-    idone = init!(ilog,β)
-    while !idone
+    while !done && !restart(solver,j)
+      # Expand Krylov basis if needed
+      if j > m  
+        H, g, c, s = expand_krylov_caches!(ns)
+        m = krylov_cache_length(ns)
+      end
+
       # Arnoldi orthogonalization by Modified Gram-Schmidt
       fill!(V[j+1],zero(eltype(V[j+1])))
       fill!(Z[j],zero(eltype(Z[j])))
@@ -127,7 +164,7 @@ function Gridap.Algebra.solve!(x::AbstractVector,ns::FGMRESNumericalSetup,b::Abs
 
       β  = abs(g[j+1])
       j += 1
-      idone = update!(ilog,β)
+      done = update!(log,β)
     end
     j = j-1
 
@@ -141,7 +178,6 @@ function Gridap.Algebra.solve!(x::AbstractVector,ns::FGMRESNumericalSetup,b::Abs
       x .+= g[i] .* Z[i]
     end
     krylov_residual!(V[1],x,A,b,Pl,zl)
-    done = update!(log,β)
   end
 
   finalize!(log,β)
