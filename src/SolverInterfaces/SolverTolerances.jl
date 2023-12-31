@@ -28,22 +28,22 @@ function set_solver_tolerances!(a::SolverTolerances{T};
                                 rtol   = T(1.e-5),
                                 dtol   = T(Inf)) where T
   a.maxiter = maxiter
-  a.atol   = atol
-  a.rtol   = rtol
-  a.dtol   = dtol
+  a.atol = atol
+  a.rtol = rtol
+  a.dtol = dtol
   return a
 end
 
 function finished_flag(tols::SolverTolerances,niter,e_a,e_r)
-  if !finished(tols,niter,e_r,e_a)
+  if !finished(tols,niter,e_a,e_r)
     @warn "finished_flag() called with unfinished solver!"
   end
-  if niter > tols.maxiter
-    return SOLVER_DIVERGED_MAXITER
-  elseif e_r < tols.rtol
+  if e_r < tols.rtol
     return SOLVER_CONVERGED_RTOL
   elseif e_a < tols.atol
     return SOLVER_CONVERGED_ATOL
+  elseif niter >= tols.maxiter
+    return SOLVER_DIVERGED_MAXITER
   else
     return SOLVER_DIVERGED_BREAKDOWN
   end

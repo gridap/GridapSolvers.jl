@@ -6,10 +6,8 @@ struct GMGLinearSolver{A,B,C,D,E,F,G} <: Gridap.Algebra.LinearSolver
   pre_smoothers   :: E
   post_smoothers  :: F
   coarsest_solver :: G
-  maxiter         :: Int
-  rtol            :: Float64
-  verbose         :: Bool
   mode            :: Symbol
+  log             :: ConvergenceLog{Float64}
 end
 
 function GMGLinearSolver(
@@ -17,12 +15,12 @@ function GMGLinearSolver(
   pre_smoothers   = Fill(RichardsonSmoother(JacobiLinearSolver(),10),num_levels(mh)-1),
   post_smoothers  = pre_smoothers,
   coarsest_solver = Gridap.Algebra.LUSolver(),
-  maxiter::Int    = 100,
-  rtol::Real      = 1.0e-06,
-  verbose::Bool   = false,
-  mode::Symbol    = :preconditioner
+  mode::Symbol    = :preconditioner,
+  maxiter = 100, atol = 1.0e-14, rtol = 1.0e-08, verbose = false,
 )
-  Gridap.Helpers.@check mode ∈ [:preconditioner,:solver]
+  @check mode ∈ [:preconditioner,:solver]
+  tols = SolverTolerances{Float64}(;maxiter=maxiter,atol=atol,rtol=rtol)
+  log  = ConvergenceLog("GMG",tols;verbose=verbose)
   
   A = typeof(mh)
   B = typeof(smatrices)
@@ -32,7 +30,7 @@ function GMGLinearSolver(
   F = typeof(post_smoothers)
   G = typeof(coarsest_solver)
   return GMGLinearSolver{A,B,C,D,E,F,G}(mh,smatrices,interp,restrict,pre_smoothers,post_smoothers,
-                                        coarsest_solver,maxiter,rtol,verbose,mode)
+                                        coarsest_solver,mode,log)
 end
 
 struct GMGSymbolicSetup <: Gridap.Algebra.SymbolicSetup
@@ -214,7 +212,7 @@ function solve_coarsest_level!(parts::AbstractArray,::PETScLinearSolver,xh::PVec
   end
 end
 
-function apply_GMG_level!(lev::Integer,xh::Union{PVector,Nothing},rh::Union{PVector,Nothing},ns::GMGNumericalSetup;verbose=false)
+function apply_GMG_level!(lev::Integer,xh::Union{PVector,Nothing},rh::Union{PVector,Nothing},ns::GMGNumericalSetup)
   mh = ns.solver.mh
   parts = get_level_parts(mh,lev)
   if i_am_in(parts)
@@ -238,7 +236,7 @@ function apply_GMG_level!(lev::Integer,xh::Union{PVector,Nothing},rh::Union{PVec
 
       # Apply next_level
       !isa(dxH,Nothing) && fill!(dxH,0.0)
-      apply_GMG_level!(lev+1,dxH,rH,ns;verbose=verbose)
+      apply_GMG_level!(lev+1,dxH,rH,ns)
 
       # Interpolate dxH in finer space
       mul!(dxh,interp,dxH)
@@ -255,14 +253,9 @@ function apply_GMG_level!(lev::Integer,xh::Union{PVector,Nothing},rh::Union{PVec
 end
 
 function Gridap.Algebra.solve!(x::AbstractVector,ns::GMGNumericalSetup,b::AbstractVector)
+  mode = ns.solver.mode
+  log  = ns.solver.log
 
-  mh      = ns.solver.mh
-  maxiter = ns.solver.maxiter
-  rtol    = ns.solver.rtol
-  verbose = ns.solver.verbose
-  mode    = ns.solver.mode
-
-  # TODO: When running in preconditioner mode, do we really need to compute the norm? It's a global com....
   rh = ns.finest_level_cache
   if (mode == :preconditioner)
     fill!(x,0.0)
@@ -273,29 +266,16 @@ function Gridap.Algebra.solve!(x::AbstractVector,ns::GMGNumericalSetup,b::Abstra
     rh .= b .- rh
   end
 
-  nrm_r0 = norm(rh)
-  nrm_r  = nrm_r0
-  current_iter = 0
-  rel_res = nrm_r / nrm_r0
-  parts = get_level_parts(mh,1)
-
-  if i_am_main(parts) && verbose
-    @printf "%6s  %12s" "Iter" "Rel res\n"
-    @printf "%6i  %12.4e\n" current_iter rel_res
+  res  = norm(rh)
+  done = init!(log,res)
+  while !done
+    apply_GMG_level!(1,x,rh,ns)
+    res  = norm(rh)
+    done = update!(log,res)
   end
 
-  while (current_iter < maxiter) && (rel_res > rtol)
-    apply_GMG_level!(1,x,rh,ns;verbose=verbose)
-
-    nrm_r   = norm(rh)
-    rel_res = nrm_r / nrm_r0
-    current_iter += 1
-    if i_am_main(parts) && verbose
-      @printf "%6i  %12.4e\n" current_iter rel_res
-    end
-  end
-  converged = (rel_res < rtol)
-  return current_iter, converged
+  finalize!(log,res)
+  return x
 end
 
 function LinearAlgebra.ldiv!(x::AbstractVector,ns::GMGNumericalSetup,b::AbstractVector)
