@@ -1,40 +1,38 @@
-struct GMGLinearSolver{A,B,C,D,E,F,G,H} <: Gridap.Algebra.LinearSolver
-  mh              :: ModelHierarchy
-  smatrices       :: A
-  interp          :: B
-  restrict        :: C
-  pre_smoothers   :: D
-  post_smoothers  :: E
-  coarsest_solver :: F
-  maxiter         :: G
-  rtol            :: H
+struct GMGLinearSolver{A,B,C,D,E,F,G} <: Gridap.Algebra.LinearSolver
+  mh              :: A
+  smatrices       :: B
+  interp          :: C
+  restrict        :: D
+  pre_smoothers   :: E
+  post_smoothers  :: F
+  coarsest_solver :: G
+  maxiter         :: Int
+  rtol            :: Float64
   verbose         :: Bool
   mode            :: Symbol
 end
 
-function GMGLinearSolver(mh,smatrices,interp,restrict;
-      pre_smoothers   = Fill(RichardsonSmoother(JacobiLinearSolver(),10),num_levels(mh)-1),
-      post_smoothers  = pre_smoothers,
-      coarsest_solver = Gridap.Algebra.BackslashSolver(),
-      maxiter         = 100,
-      rtol            = 1.0e-06,
-      verbose::Bool   = false,
-      mode            = :preconditioner)
-
+function GMGLinearSolver(
+  mh,smatrices,interp,restrict;
+  pre_smoothers   = Fill(RichardsonSmoother(JacobiLinearSolver(),10),num_levels(mh)-1),
+  post_smoothers  = pre_smoothers,
+  coarsest_solver = Gridap.Algebra.LUSolver(),
+  maxiter::Int    = 100,
+  rtol::Real      = 1.0e-06,
+  verbose::Bool   = false,
+  mode::Symbol    = :preconditioner
+)
   Gridap.Helpers.@check mode ∈ [:preconditioner,:solver]
-  Gridap.Helpers.@check isa(maxiter,Integer)
-  Gridap.Helpers.@check isa(rtol,Real)
-
-  A=typeof(smatrices)
-  B=typeof(interp)
-  C=typeof(restrict)
-  D=typeof(pre_smoothers)
-  E=typeof(post_smoothers)
-  F=typeof(coarsest_solver)
-  G=typeof(maxiter)
-  H=typeof(rtol)
-  return GMGLinearSolver{A,B,C,D,E,F,G,H}(mh,smatrices,interp,restrict,pre_smoothers,post_smoothers,
-                                          coarsest_solver,maxiter,rtol,verbose,mode)
+  
+  A = typeof(mh)
+  B = typeof(smatrices)
+  C = typeof(interp)
+  D = typeof(restrict)
+  E = typeof(pre_smoothers)
+  F = typeof(post_smoothers)
+  G = typeof(coarsest_solver)
+  return GMGLinearSolver{A,B,C,D,E,F,G}(mh,smatrices,interp,restrict,pre_smoothers,post_smoothers,
+                                        coarsest_solver,maxiter,rtol,verbose,mode)
 end
 
 struct GMGSymbolicSetup <: Gridap.Algebra.SymbolicSetup
@@ -52,36 +50,32 @@ struct GMGNumericalSetup{A,B,C,D,E} <: Gridap.Algebra.NumericalSetup
   post_smoothers_caches  :: C
   coarsest_solver_cache  :: D
   work_vectors           :: E
-
-  function GMGNumericalSetup(ss::GMGSymbolicSetup)
-    mh              = ss.solver.mh
-    pre_smoothers   = ss.solver.pre_smoothers
-    post_smoothers  = ss.solver.post_smoothers
-    smatrices       = ss.solver.smatrices
-    coarsest_solver = ss.solver.coarsest_solver
-
-    finest_level_cache = setup_finest_level_cache(mh,smatrices)
-    work_vectors = allocate_work_vectors(mh,smatrices)
-    pre_smoothers_caches = setup_smoothers_caches(mh,pre_smoothers,smatrices)
-    if (!(pre_smoothers === post_smoothers))
-      post_smoothers_caches = setup_smoothers_caches(mh,post_smoothers,smatrices)
-    else
-      post_smoothers_caches = pre_smoothers_caches
-    end
-    #coarsest_solver_cache = setup_coarsest_solver_cache(mh,coarsest_solver,smatrices)
-    coarsest_solver_cache = coarse_solver_caches(mh,coarsest_solver,smatrices)
-
-    A = typeof(finest_level_cache)
-    B = typeof(pre_smoothers_caches)
-    C = typeof(post_smoothers_caches)
-    D = typeof(coarsest_solver_cache)
-    E = typeof(work_vectors)
-    return new{A,B,C,D,E}(ss.solver,finest_level_cache,pre_smoothers_caches,post_smoothers_caches,coarsest_solver_cache,work_vectors)
-  end
 end
 
 function Gridap.Algebra.numerical_setup(ss::GMGSymbolicSetup,mat::AbstractMatrix)
-  return GMGNumericalSetup(ss)
+  mh              = ss.solver.mh
+  pre_smoothers   = ss.solver.pre_smoothers
+  post_smoothers  = ss.solver.post_smoothers
+  smatrices       = ss.solver.smatrices
+  coarsest_solver = ss.solver.coarsest_solver
+
+  smatrices[1] = mat
+  finest_level_cache = setup_finest_level_cache(mh,smatrices)
+  work_vectors = allocate_work_vectors(mh,smatrices)
+  pre_smoothers_caches = setup_smoothers_caches(mh,pre_smoothers,smatrices)
+  if !(pre_smoothers === post_smoothers)
+    post_smoothers_caches = setup_smoothers_caches(mh,post_smoothers,smatrices)
+  else
+    post_smoothers_caches = pre_smoothers_caches
+  end
+  coarsest_solver_cache = coarse_solver_caches(mh,coarsest_solver,smatrices)
+
+  return GMGNumericalSetup(ss.solver,finest_level_cache,pre_smoothers_caches,post_smoothers_caches,coarsest_solver_cache,work_vectors)
+end
+
+function Gridap.Algebra.numerical_setup!(ss::GMGNumericalSetup,mat::AbstractMatrix)
+  # TODO: This does not modify all matrices... How should we deal with this?
+  ns.solver.smatrices[1] = mat
 end
 
 function setup_finest_level_cache(mh::ModelHierarchy,smatrices::Vector{<:AbstractMatrix})
