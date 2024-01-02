@@ -64,6 +64,7 @@ function gmg_driver(t,parts,mh,spaces,qdegree,smoothers,biform,liform,u)
                         mode=:preconditioner)
   
   solver = CGSolver(gmg;maxiter=20,atol=1e-14,rtol=1.e-6,verbose=i_am_main(parts))
+  #solver = GMRESSolver(5;Pr=gmg,maxiter=20,atol=1e-14,rtol=1.e-6,verbose=i_am_main(parts))
   ns = numerical_setup(symbolic_setup(solver,A),A)
   toc!(t,"GMG setup")
 
