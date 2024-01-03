@@ -43,6 +43,7 @@ include("Krylov/FGMRESSolvers.jl")
 include("Krylov/MINRESSolvers.jl")
 
 include("PETSc/PETScUtils.jl")
+include("PETSc/PETScCaches.jl")
 include("PETSc/ElasticitySolvers.jl")
 include("PETSc/HipmairXuSolvers.jl")
 
