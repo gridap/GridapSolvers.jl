@@ -52,7 +52,6 @@ include("JacobiLinearSolvers.jl")
 include("RichardsonSmoothers.jl")
 include("SymGaussSeidelSmoothers.jl")
 include("GMGLinearSolvers.jl")
-include("BlockDiagonalSmoothers.jl")
 include("IterativeLinearSolvers.jl")
 include("SchurComplementSolvers.jl")
 

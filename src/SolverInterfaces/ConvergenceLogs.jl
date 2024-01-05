@@ -5,6 +5,8 @@
   SOLVER_VERBOSE_HIGH = 2
 end
 
+SolverVerboseLevel(verbose::Bool) = (verbose ? SOLVER_VERBOSE_HIGH : SOLVER_VERBOSE_NONE)
+
 mutable struct ConvergenceLog{T<:Real}
   name      :: String
   tols      :: SolverTolerances{T}
