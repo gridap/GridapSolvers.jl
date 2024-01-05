@@ -24,8 +24,7 @@ function ConvergenceLog(name :: String,
                         depth   = 0
                         ) where T
   residuals = Vector{T}(undef,tols.maxiter+1)
-  verbose = (isa(verbose,Bool) && verbose) ? SOLVER_VERBOSE_HIGH : verbose
-  verbose = isa(verbose,SolverVerboseLevel) ? verbose : SolverVerboseLevel(verbose)
+  verbose = SolverVerboseLevel(verbose)
   if nested
     depth += 1
   end
