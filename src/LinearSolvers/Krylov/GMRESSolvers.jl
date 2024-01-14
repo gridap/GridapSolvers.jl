@@ -1,18 +1,25 @@
 # GMRES Solver
 struct GMRESSolver <: Gridap.Algebra.LinearSolver
-  m         :: Int
-  Pr        :: Union{Gridap.Algebra.LinearSolver,Nothing}
-  Pl        :: Union{Gridap.Algebra.LinearSolver,Nothing}
-  outer_log :: ConvergenceLog{Float64}
-  inner_log :: ConvergenceLog{Float64}
+  m       :: Int
+  restart :: Bool
+  m_add   :: Int
+  Pr      :: Union{Gridap.Algebra.LinearSolver,Nothing}
+  Pl      :: Union{Gridap.Algebra.LinearSolver,Nothing}
+  log     :: ConvergenceLog{Float64}
 end
 
-function GMRESSolver(m;Pr=nothing,Pl=nothing,maxiter=100,atol=1e-12,rtol=1.e-6,verbose=false,name="GMRES")
-  outer_tols = SolverTolerances{Float64}(maxiter=maxiter,atol=atol,rtol=rtol)
-  outer_log  = ConvergenceLog(name,outer_tols,verbose=verbose)
-  inner_tols = SolverTolerances{Float64}(maxiter=m,atol=atol,rtol=rtol)
-  inner_log  = ConvergenceLog("$(name)_inner",inner_tols,verbose=verbose,nested=true)
-  return GMRESSolver(m,Pr,Pl,outer_log,inner_log)
+function GMRESSolver(m;Pr=nothing,Pl=nothing,restart=false,m_add=1,maxiter=100,atol=1e-12,rtol=1.e-6,verbose=false,name="GMRES")
+  tols = SolverTolerances{Float64}(maxiter=maxiter,atol=atol,rtol=rtol)
+  log  = ConvergenceLog(name,tols,verbose=verbose)
+  return GMRESSolver(m,restart,m_add,Pr,Pl,log)
+end
+
+function restart(s::GMRESSolver,k::Int)
+  if s.restart && (k > s.m)
+    print_message(s.log,"Restarting Krylov basis.")
+    return true
+  end
+  return false
 end
 
 AbstractTrees.children(s::GMRESSolver) = [s.Pr,s.Pl]
@@ -37,7 +44,7 @@ function get_solver_caches(solver::GMRESSolver,A)
   m, Pl, Pr = solver.m, solver.Pl, solver.Pr
 
   V  = [allocate_in_domain(A) for i in 1:m+1]
-  zr = !isa(Pr,Nothing) ? allocate_in_domain(A) : nothing
+  zr = !isnothing(Pr) ? allocate_in_domain(A) : nothing
   zl = allocate_in_domain(A)
 
   H = zeros(m+1,m)  # Hessenberg matrix
@@ -47,10 +54,33 @@ function get_solver_caches(solver::GMRESSolver,A)
   return (V,zr,zl,H,g,c,s)
 end
 
+function krylov_cache_length(ns::GMRESNumericalSetup)
+  V, _, _, _, _, _, _ = ns.caches
+  return length(V) - 1
+end
+
+function expand_krylov_caches!(ns::GMRESNumericalSetup)
+  V, zr, zl, H, g, c, s = ns.caches
+
+  m = krylov_cache_length(ns)
+  m_add = ns.solver.m_add
+  m_new = m + m_add
+
+  for _ in 1:m_add
+    push!(V,allocate_in_domain(ns.A))
+  end
+  H_new = zeros(eltype(H),m_new+1,m_new); H_new[1:m+1,1:m] .= H
+  g_new = zeros(eltype(g),m_new+1); g_new[1:m+1] .= g
+  c_new = zeros(eltype(c),m_new); c_new[1:m] .= c
+  s_new = zeros(eltype(s),m_new); s_new[1:m] .= s
+  ns.caches = (V,zr,zl,H_new,g_new,c_new,s_new)
+  return H_new,g_new,c_new,s_new
+end
+
 function Gridap.Algebra.numerical_setup(ss::GMRESSymbolicSetup, A::AbstractMatrix)
   solver = ss.solver
-  Pr_ns  = isa(solver.Pr,Nothing) ? nothing : numerical_setup(symbolic_setup(solver.Pr,A),A)
-  Pl_ns  = isa(solver.Pl,Nothing) ? nothing : numerical_setup(symbolic_setup(solver.Pl,A),A)
+  Pr_ns  = !isnothing(solver.Pr) ? numerical_setup(symbolic_setup(solver.Pr,A),A) : nothing
+  Pl_ns  = !isnothing(solver.Pl) ? numerical_setup(symbolic_setup(solver.Pl,A),A) : nothing
   caches = get_solver_caches(solver,A)
   return GMRESNumericalSetup(solver,A,Pr_ns,Pl_ns,caches)
 end
@@ -63,12 +93,29 @@ function Gridap.Algebra.numerical_setup!(ns::GMRESNumericalSetup, A::AbstractMat
     numerical_setup!(ns.Pl_ns,A)
   end
   ns.A = A
+  return ns
+end
+
+function Gridap.Algebra.numerical_setup!(ns::GMRESNumericalSetup, A::AbstractMatrix, x::AbstractVector)
+  if !isa(ns.Pr_ns,Nothing)
+    numerical_setup!(ns.Pr_ns,A,x)
+  end
+  if !isa(ns.Pl_ns,Nothing)
+    numerical_setup!(ns.Pl_ns,A,x)
+  end
+  ns.A = A
+  return ns
 end
 
 function Gridap.Algebra.solve!(x::AbstractVector,ns::GMRESNumericalSetup,b::AbstractVector)
   solver, A, Pl, Pr, caches = ns.solver, ns.A, ns.Pl_ns, ns.Pr_ns, ns.caches
-  log, ilog = solver.outer_log, solver.inner_log
   V, zr, zl, H, g, c, s = caches
+  m   = krylov_cache_length(ns)
+  log = solver.log
+
+  fill!(V[1],zero(eltype(V[1])))
+  !isnothing(zr) && fill!(zr,zero(eltype(zr)))
+  fill!(zl,zero(eltype(zl)))
 
   # Initial residual
   krylov_residual!(V[1],x,A,b,Pl,zl)
@@ -80,9 +127,15 @@ function Gridap.Algebra.solve!(x::AbstractVector,ns::GMRESNumericalSetup,b::Abst
     V[1] ./= β
     fill!(H,0.0)
     fill!(g,0.0); g[1] = β
-    idone = init!(ilog,β)
-    while !idone
+    while !done && !restart(solver,j)
+      # Expand Krylov basis if needed
+      if j > m  
+        H, g, c, s = expand_krylov_caches!(ns)
+        m = krylov_cache_length(ns)
+      end
+
       # Arnoldi orthogonalization by Modified Gram-Schmidt
+      fill!(V[j+1],zero(eltype(V[j+1])))
       krylov_mul!(V[j+1],A,V[j],Pr,Pl,zr,zl)
       for i in 1:j
         H[i,j] = dot(V[j+1],V[i])
@@ -105,7 +158,7 @@ function Gridap.Algebra.solve!(x::AbstractVector,ns::GMRESNumericalSetup,b::Abst
 
       β  = abs(g[j+1])
       j += 1
-      idone = update!(ilog,β)
+      done = update!(log,β)
     end
     j = j-1
 
@@ -128,8 +181,8 @@ function Gridap.Algebra.solve!(x::AbstractVector,ns::GMRESNumericalSetup,b::Abst
       x .+= zr
     end
     krylov_residual!(V[1],x,A,b,Pl,zl)
-    done = update!(log,β)
   end
+
   finalize!(log,β)
   return x
 end

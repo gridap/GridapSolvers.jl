@@ -46,6 +46,13 @@ end
 function Gridap.Algebra.numerical_setup!(ns::CGNumericalSetup, A::AbstractMatrix)
   numerical_setup!(ns.Pl_ns,A)
   ns.A = A
+  return ns
+end
+
+function Gridap.Algebra.numerical_setup!(ns::CGNumericalSetup, A::AbstractMatrix, x::AbstractVector)
+  numerical_setup!(ns.Pl_ns,A,x)
+  ns.A = A
+  return ns
 end
 
 function Gridap.Algebra.solve!(x::AbstractVector,ns::CGNumericalSetup,b::AbstractVector)
@@ -55,7 +62,9 @@ function Gridap.Algebra.solve!(x::AbstractVector,ns::CGNumericalSetup,b::Abstrac
 
   # Initial residual
   mul!(w,A,x); r .= b .- w
-  fill!(p,0.0); γ = 1.0
+  fill!(p,zero(eltype(p)))
+  fill!(z,zero(eltype(z)))
+  γ = one(eltype(p))
 
   res  = norm(r)
   done = init!(log,res)

@@ -43,6 +43,7 @@ include("Krylov/FGMRESSolvers.jl")
 include("Krylov/MINRESSolvers.jl")
 
 include("PETSc/PETScUtils.jl")
+include("PETSc/PETScCaches.jl")
 include("PETSc/ElasticitySolvers.jl")
 include("PETSc/HipmairXuSolvers.jl")
 
@@ -51,7 +52,6 @@ include("JacobiLinearSolvers.jl")
 include("RichardsonSmoothers.jl")
 include("SymGaussSeidelSmoothers.jl")
 include("GMGLinearSolvers.jl")
-include("BlockDiagonalSmoothers.jl")
 include("IterativeLinearSolvers.jl")
 include("SchurComplementSolvers.jl")
 

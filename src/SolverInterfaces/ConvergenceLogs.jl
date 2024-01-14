@@ -5,6 +5,8 @@
   SOLVER_VERBOSE_HIGH = 2
 end
 
+SolverVerboseLevel(verbose::Bool) = (verbose ? SOLVER_VERBOSE_HIGH : SOLVER_VERBOSE_NONE)
+
 mutable struct ConvergenceLog{T<:Real}
   name      :: String
   tols      :: SolverTolerances{T}
@@ -22,8 +24,7 @@ function ConvergenceLog(name :: String,
                         depth   = 0
                         ) where T
   residuals = Vector{T}(undef,tols.maxiter+1)
-  verbose = (isa(verbose,Bool) && verbose) ? SOLVER_VERBOSE_HIGH : verbose
-  verbose = isa(verbose,SolverVerboseLevel) ? verbose : SolverVerboseLevel(verbose)
+  verbose = SolverVerboseLevel(verbose)
   if nested
     depth += 1
   end
@@ -80,6 +81,12 @@ function finalize!(log::ConvergenceLog{T},r::T) where T
     println(t,rpad(string(repeat('-',15),footer),55,'-'))
   end
   return flag
+end
+
+function print_message(log::ConvergenceLog{T},msg::String) where T
+  if log.verbose > SOLVER_VERBOSE_LOW
+    println(get_tabulation(log),msg)
+  end
 end
 
 function Base.show(io::IO,k::MIME"text/plain",log::ConvergenceLog)

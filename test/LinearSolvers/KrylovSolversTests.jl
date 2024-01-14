@@ -16,7 +16,7 @@ function test_solver(solver,op,Uh,dΩ)
   A, b = get_matrix(op), get_vector(op);
   ns = numerical_setup(symbolic_setup(solver,A),A)
 
-  x = allocate_in_domain(A)
+  x = allocate_in_domain(A); fill!(x,0.0)
   solve!(x,ns,b)
 
   u  = interpolate(sol,Uh)
@@ -69,10 +69,16 @@ function main(distribute,np)
   test_solver(gmres,op,Uh,dΩ)
 
   # GMRES without preconditioner
-  gmres = LinearSolvers.GMRESSolver(40;rtol=1.e-8,verbose=verbose)
+  gmres = LinearSolvers.GMRESSolver(10;rtol=1.e-8,verbose=verbose)
   test_solver(gmres,op,Uh,dΩ)
 
-  fgmres = LinearSolvers.FGMRESSolver(40,P;rtol=1.e-8,verbose=verbose)
+  gmres = LinearSolvers.GMRESSolver(10;restart=true,rtol=1.e-8,verbose=verbose)
+  test_solver(gmres,op,Uh,dΩ)
+
+  fgmres = LinearSolvers.FGMRESSolver(10,P;rtol=1.e-8,verbose=verbose)
+  test_solver(fgmres,op,Uh,dΩ)
+
+  fgmres = LinearSolvers.FGMRESSolver(10,P;restart=true,rtol=1.e-8,verbose=verbose)
   test_solver(fgmres,op,Uh,dΩ)
 
   pcg = LinearSolvers.CGSolver(P;rtol=1.e-8,verbose=verbose)

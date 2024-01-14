@@ -1,11 +1,14 @@
 
 # LinearSolvers that depend on the non-linear solution
-"""
-function Gridap.Algebra.numerical_setup!(ns::Gridap.Algebra.LinearSolver,A::AbstractMatrix,x::AbstractVector)
-  numerical_setup!(ns,A)
+
+function Gridap.Algebra.symbolic_setup(ns::Gridap.Algebra.LinearSolver,A::AbstractMatrix,x::AbstractVector)
+  symbolic_setup(ns,A)
 end
 
-function allocate_solver_caches(ns::Gridap.Algebra.LinearSolver,args...;kwargs...)
-  @abstractmethod
+function Gridap.Algebra.numerical_setup(ns::Gridap.Algebra.SymbolicSetup,A::AbstractMatrix,x::AbstractVector)
+  numerical_setup(ns,A)
 end
-"""
+
+function Gridap.Algebra.numerical_setup!(ns::Gridap.Algebra.NumericalSetup,A::AbstractMatrix,x::AbstractVector)
+  numerical_setup!(ns,A)
+end
