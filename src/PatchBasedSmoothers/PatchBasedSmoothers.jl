@@ -3,11 +3,8 @@ module PatchBasedSmoothers
 using FillArrays, BlockArrays
 using LinearAlgebra
 using Gridap
-using Gridap.Helpers
-using Gridap.Algebra
-using Gridap.Arrays
-using Gridap.Geometry
-using Gridap.FESpaces
+using Gridap.Helpers, Gridap.Algebra, Gridap.Arrays
+using Gridap.Geometry, Gridap.FESpaces, Gridap.Adaptivity
 
 using PartitionedArrays
 using GridapDistributed

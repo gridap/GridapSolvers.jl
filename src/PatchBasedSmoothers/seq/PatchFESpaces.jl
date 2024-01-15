@@ -93,6 +93,10 @@ function Gridap.FESpaces.get_cell_dof_ids(a::PatchFESpace,trian::PatchTriangulat
   return get_cell_dof_ids(trian.trian,a,trian)
 end
 
+function Gridap.FESpaces.get_cell_dof_ids(t::AdaptedTriangulation,a::PatchFESpace,trian::PatchTriangulation)
+  return get_cell_dof_ids(t.trian,a,trian)
+end
+
 function Gridap.FESpaces.get_cell_dof_ids(::Triangulation,a::PatchFESpace,trian::PatchTriangulation)
   return a.patch_cell_dofs_ids
 end
@@ -107,9 +111,12 @@ end
 function Gridap.FESpaces.get_cell_dof_ids(::SkeletonTriangulation,a::PatchFESpace,trian::PatchTriangulation)
   cell_dof_ids     = get_cell_dof_ids(a)
   pfaces_to_pcells = trian.pfaces_to_pcells
+
+  pcells_plus  = isempty(pfaces_to_pcells) ? Int[] : lazy_map(x->x[1],pfaces_to_pcells)
+  pcells_minus = isempty(pfaces_to_pcells) ? Int[] : lazy_map(x->x[2],pfaces_to_pcells)
   
-  plus  = lazy_map(Reindex(cell_dof_ids),lazy_map(x->x[1],pfaces_to_pcells))
-  minus = lazy_map(Reindex(cell_dof_ids),lazy_map(x->x[2],pfaces_to_pcells))
+  plus  = lazy_map(Reindex(cell_dof_ids),pcells_plus)
+  minus = lazy_map(Reindex(cell_dof_ids),pcells_minus)
   return lazy_map(Gridap.Fields.BlockMap(2,[1,2]),plus,minus)
 end
 
