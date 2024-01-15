@@ -23,12 +23,12 @@ domain = (0,1,0,1)
 mesh_partition = (2,4)
 model = CartesianDiscreteModel(domain,mesh_partition)
 
-order = 1; reffe = ReferenceFE(lagrangian,Float64,order;space=:P); conformity = L2Conformity();
-#order = 1; reffe = ReferenceFE(lagrangian,Float64,order); conformity = H1Conformity();
+#order = 1; reffe = ReferenceFE(lagrangian,Float64,order;space=:P); conformity = L2Conformity();
+order = 1; reffe = ReferenceFE(lagrangian,Float64,order); conformity = H1Conformity();
 #order = 0; reffe = ReferenceFE(raviart_thomas,Float64,order); conformity = HDivConformity();
 Vh = TestFESpace(model,reffe,conformity=conformity)
 PD = PBS.PatchDecomposition(model)
-Ph = PBS.PatchFESpace(model,reffe,conformity,PD,Vh)
+Ph = PBS.PatchFESpace(Vh,PD,reffe;conformity)
 
 # ---- Assemble systems ---- #
 
@@ -67,4 +67,3 @@ lp(v)    = ∫(1*v)*dΩₚ
 assembler_P = SparseMatrixAssembler(Ph,Ph)
 Ahp = assemble_matrix(ap,assembler_P,Ph,Ph)
 fhp = assemble_vector(lp,assembler_P,Ph)
-

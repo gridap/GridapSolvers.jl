@@ -211,7 +211,7 @@ function get_patch_cell_faces(PD::PatchDecomposition,Df::Integer)
   return get_patch_cell_faces(PD,Df,faces_mask)
 end
 
-function get_patch_cell_faces(PD::PatchDecomposition{Dc},Df::Integer,faces_mask) where Dc
+function get_patch_cell_faces(PD::PatchDecomposition{Dr,Dc},Df::Integer,faces_mask) where {Dr,Dc}
   model    = PD.model
   topo     = get_grid_topology(model)
 
@@ -276,7 +276,7 @@ end
 #   where face1, face2, ... are the faces of the patch such that 
 #      - they are NOT on the boundary of the patch
 #      - they are flagged `true` in faces_mask
-function get_patch_faces(PD::PatchDecomposition{Dc},Df::Integer,faces_mask) where Dc
+function get_patch_faces(PD::PatchDecomposition{Dr,Dc},Df::Integer,faces_mask) where {Dr,Dc}
   model    = PD.model
   topo     = get_grid_topology(model)
 
@@ -358,7 +358,7 @@ end
 #    pfaces_to_pcells[pface] = [pcell1, pcell2, ...]
 # This would be the Gridap equivalent to `get_faces(patch_topology,Df,Dc)`.
 # The argument `patch_faces` allows to select only some pfaces (i.e boundary/skeleton/etc...).
-function get_pfaces_to_pcells(PD::PatchDecomposition{Dc},Df::Integer,patch_faces) where Dc
+function get_pfaces_to_pcells(PD::PatchDecomposition{Dr,Dc},Df::Integer,patch_faces) where {Dr,Dc}
   model    = PD.model
   topo     = get_grid_topology(model)
 

@@ -44,7 +44,7 @@ function Gridap.Geometry.Triangulation(PD::PatchDecomposition)
   return PatchTriangulation(trian,PD,patch_cells,nothing,nothing)
 end
 
-function Gridap.Geometry.BoundaryTriangulation(PD::PatchDecomposition{Dc};tags="boundary") where Dc
+function Gridap.Geometry.BoundaryTriangulation(PD::PatchDecomposition{Dr,Dc};tags="boundary") where {Dr,Dc}
   Df       = Dc-1 
   model    = PD.model
   labeling = get_face_labeling(model)
@@ -60,8 +60,8 @@ function Gridap.Geometry.BoundaryTriangulation(PD::PatchDecomposition{Dc};tags="
   return PatchTriangulation(trian,PD,patch_faces,pfaces_to_pcells,mface_to_tface)
 end
 
-function Gridap.Geometry.SkeletonTriangulation(PD::PatchDecomposition{Dc}) where Dc
-  Df       = Dc -1 
+function Gridap.Geometry.SkeletonTriangulation(PD::PatchDecomposition{Dr,Dc}) where {Dr,Dc}
+  Df       = Dc-1 
   model    = PD.model
   labeling = get_face_labeling(model)
 

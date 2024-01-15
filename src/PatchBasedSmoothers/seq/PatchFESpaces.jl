@@ -48,7 +48,7 @@ function PatchFESpace(space::Gridap.FESpaces.SingleFieldFESpace,
                       reffe::Union{ReferenceFE,Tuple{<:Gridap.ReferenceFEs.ReferenceFEName,Any,Any}};
                       conformity=nothing,
                       patches_mask=Fill(false,num_patches(patch_decomposition)))
-  cell_conformity = _cell_conformity(patch_decomposition.model,reffe;conformity=conformity)
+  cell_conformity = MultilevelTools._cell_conformity(patch_decomposition.model,reffe;conformity=conformity)
   return PatchFESpace(space,patch_decomposition,cell_conformity;patches_mask=patches_mask)
 end
 
