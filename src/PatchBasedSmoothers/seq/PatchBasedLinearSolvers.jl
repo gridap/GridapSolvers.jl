@@ -24,7 +24,7 @@ end
 
 function Gridap.Algebra.numerical_setup(ss::PatchBasedSymbolicSetup,A::AbstractMatrix)
   solver = ss.solver
-  Ph, Vh, dΩ, solver = solver.patch_space, solver.space, solver.measure
+  Ph, Vh, dΩ = solver.patch_space, solver.space, solver.measure
   weights = compute_weight_operators(Ph,Vh)
 
   assembler = SparseMatrixAssembler(Ph,Ph)

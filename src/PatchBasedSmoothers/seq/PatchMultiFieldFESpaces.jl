@@ -20,25 +20,18 @@ end
 function PatchFESpace(space::GridapDistributed.DistributedMultiFieldFESpace,
                       patch_decomposition::DistributedPatchDecomposition,
                       cell_conformity::Vector{<:AbstractArray{<:CellConformity}})
-  model = patch_decomposition.model                    
-  root_gids = get_face_gids(model,get_patch_root_dim(patch_decomposition))
 
-  cell_conformity = GridapDistributed.to_parray_of_arrays(cell_conformity)
-  spaces = map(local_views(space),
-               local_views(patch_decomposition),
-               cell_conformity,
-               partition(root_gids)) do space, patch_decomposition, cell_conformity, partition
-    patches_mask = fill(false,local_length(partition))
-    patches_mask[ghost_to_local(partition)] .= true # Mask ghost patch roots
-    PatchFESpace(space,patch_decomposition,cell_conformity;patches_mask=patches_mask)
-  end
+  field_spaces = map((s,c) -> PatchFESpace(s,patch_decomposition,c),space,cell_conformity)
+  part_spaces = map(MultiFieldFESpace,GridapDistributed.to_parray_of_arrays(map(local_views,field_spaces)))
   
   # This PRange has no ghost dofs
-  local_ndofs  = map(num_free_dofs,spaces)
+  local_ndofs  = map(num_free_dofs,part_spaces)
   global_ndofs = sum(local_ndofs)
   patch_partition = variable_partition(local_ndofs,global_ndofs,false)
   gids = PRange(patch_partition)
-  return PatchDistributedMultiFieldFESpace(spaces,gids)
+
+  vector_type = get_vector_type(space)
+  return GridapDistributed.DistributedMultiFieldFESpace(field_spaces,part_spaces,gids,vector_type)
 end
 
 # Inject/Prolongate for MultiField (only for ConsecutiveMultiFieldStyle)
@@ -75,10 +68,8 @@ function inject!(x,Ph::MultiFieldFESpace,y)
   end
 end
 
-# Copied from PatchFESpaces, could be made redundant if DistributedSingleFieldFESpace was abstract
-
 function prolongate!(x::PVector,
-                     Ph::PatchDistributedMultiFieldFESpace,
+                     Ph::GridapDistributed.DistributedMultiFieldFESpace,
                      y::PVector;
                      is_consistent::Bool=false)
   if !is_consistent
@@ -88,7 +79,7 @@ function prolongate!(x::PVector,
 end
 
 function inject!(x::PVector,
-                 Ph::PatchDistributedMultiFieldFESpace,
+                 Ph::GridapDistributed.DistributedMultiFieldFESpace,
                  y::PVector;
                  make_consistent::Bool=true)
 
