@@ -41,6 +41,13 @@ function Gridap.Geometry.Triangulation(a::DistributedPatchDecomposition)
   return GridapDistributed.DistributedTriangulation(trians,a.model)
 end
 
+function Gridap.Geometry.BoundaryTriangulation(a::DistributedPatchDecomposition,args...;kwargs...)
+  trians = map(a.patch_decompositions) do a
+    BoundaryTriangulation(a,args...;kwargs...)
+  end
+  return GridapDistributed.DistributedTriangulation(trians,a.model)
+end
+
 get_patch_root_dim(::DistributedPatchDecomposition{Dr}) where Dr = Dr
 
 function mark_interface_facets!(model::GridapDistributed.DistributedDiscreteModel{Dc,Dp}) where {Dc,Dp}
