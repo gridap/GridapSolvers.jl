@@ -3,7 +3,7 @@ function PatchFESpace(space::GridapDistributed.DistributedSingleFieldFESpace,
                       patch_decomposition::DistributedPatchDecomposition,
                       reffe::Union{ReferenceFE,Tuple{<:Gridap.ReferenceFEs.ReferenceFEName,Any,Any}};
                       conformity=nothing)
-  cell_conformity = _cell_conformity(patch_decomposition.model,reffe;conformity=conformity)
+  cell_conformity = MultilevelTools._cell_conformity(patch_decomposition.model,reffe;conformity=conformity)
   return PatchFESpace(space,patch_decomposition,cell_conformity)
 end
 

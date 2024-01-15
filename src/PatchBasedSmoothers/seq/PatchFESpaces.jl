@@ -100,7 +100,8 @@ end
 function Gridap.FESpaces.get_cell_dof_ids(::BoundaryTriangulation,a::PatchFESpace,trian::PatchTriangulation)
   cell_dof_ids     = get_cell_dof_ids(a)
   pfaces_to_pcells = trian.pfaces_to_pcells
-  return lazy_map(Reindex(cell_dof_ids),lazy_map(x->x[1],pfaces_to_pcells))
+  pcells = isempty(pfaces_to_pcells) ? Int[] : lazy_map(x->x[1],pfaces_to_pcells)
+  return lazy_map(Reindex(cell_dof_ids),pcells)
 end
 
 function Gridap.FESpaces.get_cell_dof_ids(::SkeletonTriangulation,a::PatchFESpace,trian::PatchTriangulation)

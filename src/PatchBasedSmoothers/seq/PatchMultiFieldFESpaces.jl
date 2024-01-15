@@ -1,12 +1,4 @@
 
-# This could be a DistributedSingleFieldFESpace if it accepted all kinds of FESpaces
-struct PatchDistributedMultiFieldFESpace{A,B}
-  spaces :: A
-  gids   :: B
-end
-
-GridapDistributed.local_views(a::PatchDistributedMultiFieldFESpace) = a.spaces
-
 ## PatchFESpace from MultiFieldFESpace
 
 function PatchFESpace(space::Gridap.MultiField.MultiFieldFESpace,

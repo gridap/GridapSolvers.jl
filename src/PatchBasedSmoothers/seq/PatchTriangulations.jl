@@ -53,7 +53,7 @@ function Gridap.Geometry.BoundaryTriangulation(PD::PatchDecomposition{Dr,Dc};tag
   patch_faces = get_patch_faces(PD,Df,is_boundary)
   pfaces_to_pcells = get_pfaces_to_pcells(PD,Df,patch_faces)
 
-  trian = BoundaryTriangulation(model)
+  trian = BoundaryTriangulation(model;tags)
   glue  = get_glue(trian,Val(Df))
   mface_to_tface = Gridap.Arrays.find_inverse_index_map(glue.tface_to_mface,num_faces(model,Df))
   
