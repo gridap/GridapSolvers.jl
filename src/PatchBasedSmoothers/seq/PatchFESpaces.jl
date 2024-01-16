@@ -93,7 +93,7 @@ function Gridap.FESpaces.get_cell_dof_ids(a::PatchFESpace,trian::PatchTriangulat
   return get_cell_dof_ids(trian.trian,a,trian)
 end
 
-function Gridap.FESpaces.get_cell_dof_ids(t::AdaptedTriangulation,a::PatchFESpace,trian::PatchTriangulation)
+function Gridap.FESpaces.get_cell_dof_ids(t::Gridap.Adaptivity.AdaptedTriangulation,a::PatchFESpace,trian::PatchTriangulation)
   return get_cell_dof_ids(t.trian,a,trian)
 end
 

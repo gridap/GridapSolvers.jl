@@ -4,7 +4,7 @@ using FillArrays, BlockArrays
 using LinearAlgebra
 using Gridap
 using Gridap.Helpers, Gridap.Algebra, Gridap.Arrays
-using Gridap.Geometry, Gridap.FESpaces, Gridap.Adaptivity
+using Gridap.Geometry, Gridap.FESpaces
 
 using PartitionedArrays
 using GridapDistributed
