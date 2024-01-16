@@ -82,6 +82,12 @@ function Gridap.Geometry.move_contributions(scell_to_val::AbstractArray,strian::
   return move_contributions(strian.trian,scell_to_val,strian)
 end
 
+function Gridap.Geometry.move_contributions(t::Gridap.Adaptivity.AdaptedTriangulation,
+                                            scell_to_val::AbstractArray,
+                                            strian::PatchTriangulation)
+  return move_contributions(t.trian,scell_to_val,strian)
+end
+
 function Gridap.Geometry.move_contributions(::Triangulation,
                                             scell_to_val::AbstractArray,
                                             strian::PatchTriangulation)
