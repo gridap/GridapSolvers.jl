@@ -1,5 +1,12 @@
 """
+    struct ElasticitySolver <: LinearSolver
+      ...
+    end
+
+    ElasticitySolver(space::FESpace; maxiter=500, atol=1.e-12, rtol=1.e-8)
+
   GMRES + AMG solver, specifically designed for linear elasticity problems.
+
   Follows PETSc's documentation for [PCAMG](https://petsc.org/release/manualpages/PC/PCGAMG.html) 
   and [MatNullSpaceCreateRigidBody](https://petsc.org/release/manualpages/Mat/MatNullSpaceCreateRigidBody.html).
 """

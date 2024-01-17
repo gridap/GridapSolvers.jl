@@ -1,13 +1,15 @@
 
 """
- Notes on this structure: 
+    struct CachedPETScNS <: NumericalSetup
 
- When converting julia vectors/PVectors to PETSc vectors, we purposely create aliasing 
- of the vector values. This means we can avoid copying data from one to another before solving, 
- but we need to be careful about it. 
+  Wrapper around a PETSc NumericalSetup, providing highly efficiend reusable caches:
 
- This structure takes care of this, and makes sure you do not attempt to solve the system 
- with julia vectors that are not the ones you used to create the solver cache.
+  When converting julia vectors/PVectors to PETSc vectors, we purposely create aliasing 
+  of the vector values. This means we can avoid copying data from one to another before solving, 
+  but we need to be careful about it. 
+  
+  This structure takes care of this, and makes sure you do not attempt to solve the system 
+  with julia vectors that are not the ones you used to create the solver cache.
 """
 struct CachedPETScNS{TM,A}
   ns     :: GridapPETSc.PETScLinearSolverNS{TM}

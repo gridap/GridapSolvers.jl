@@ -2,6 +2,8 @@
 # DoF coordinates
 
 """
+    get_dof_coordinates(space::FESpace)
+
   Given a lagrangian FESpace, returns the physical coordinates of the DoFs, as required 
   by some PETSc solvers. See [PETSc documentation](https://petsc.org/release/manualpages/PC/PCSetCoordinates.html).
 """

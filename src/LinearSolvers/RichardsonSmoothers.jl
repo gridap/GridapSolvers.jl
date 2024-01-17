@@ -1,22 +1,32 @@
+"""
+    struct RichardsonSmoother <: LinearSolver
+      ...
+    end
 
+    RichardsonSmoother(M::LinearSolver,niter::Int=1,ω::Float64=1.0)
 
-struct RichardsonSmoother{A,B} <: Gridap.Algebra.LinearSolver
-  M                :: Gridap.Algebra.LinearSolver
-  num_smooth_steps :: A
-  damping_factor   :: B
+  Performs `niter` Richardson iterations with relaxation parameter `ω` 
+  using the linear solver `M`.
+  
+  Updates both the solution `x` and the residual `r` in place.
+"""
+struct RichardsonSmoother{A} <: Gridap.Algebra.LinearSolver
+  M     :: A
+  niter :: Int64
+  ω     :: Float64
+  function RichardsonSmoother(
+    M::Gridap.Algebra.LinearSolver,
+    niter::Integer=1,
+    ω::Real=1.0
+  )
+    A = typeof(M)
+    return RichardsonSmoother{A}(M,niter,ω)
+  end
 end
 
-function RichardsonSmoother(M::Gridap.Algebra.LinearSolver,
-                            num_smooth_steps::Integer=1,
-                            damping_factor::Real=1.0)
-  A = typeof(num_smooth_steps)
-  B = typeof(damping_factor)
-  return RichardsonSmoother{A,B}(M,num_smooth_steps,damping_factor)
-end
-
-struct RichardsonSmootherSymbolicSetup{A} <: Gridap.Algebra.SymbolicSetup
-  smoother :: RichardsonSmoother
-  Mss      :: A
+struct RichardsonSmootherSymbolicSetup{A,B} <: Gridap.Algebra.SymbolicSetup
+  smoother :: RichardsonSmoother{A}
+  Mss      :: B
 end
 
 function Gridap.Algebra.symbolic_setup(smoother::RichardsonSmoother,mat::AbstractMatrix)
@@ -24,12 +34,12 @@ function Gridap.Algebra.symbolic_setup(smoother::RichardsonSmoother,mat::Abstrac
   return RichardsonSmootherSymbolicSetup(smoother,Mss)
 end
 
-mutable struct RichardsonSmootherNumericalSetup{A,B,C,D} <: Gridap.Algebra.NumericalSetup
-  smoother :: RichardsonSmoother
-  A        :: A
-  Adx      :: B
-  dx       :: C
-  Mns      :: D
+mutable struct RichardsonSmootherNumericalSetup{A,B,C,D,E} <: Gridap.Algebra.NumericalSetup
+  smoother :: RichardsonSmoother{A}
+  A        :: B
+  Adx      :: C
+  dx       :: D
+  Mns      :: E
 end
 
 function Gridap.Algebra.numerical_setup(ss::RichardsonSmootherSymbolicSetup, A::AbstractMatrix)
@@ -45,11 +55,12 @@ end
 
 function Gridap.Algebra.solve!(x::AbstractVector,ns::RichardsonSmootherNumericalSetup,r::AbstractVector)
   Adx,dx,Mns = ns.Adx,ns.dx,ns.Mns
+  niter, ω = ns.smoother.niter, ns.smoother.ω
 
   iter = 1
-  while iter <= ns.smoother.num_smooth_steps
+  while iter <= niter
     solve!(dx,Mns,r)
-    dx .= ns.smoother.damping_factor .* dx
+    dx .= ω .* dx
     x  .= x .+ dx
     mul!(Adx, ns.A, dx)
     r  .= r .- Adx

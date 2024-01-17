@@ -1,4 +1,12 @@
-# MINRES Solver
+"""
+    struct MINRESSolver <: LinearSolver 
+      ...
+    end
+
+    MINRESSolver(m;Pr=nothing,Pl=nothing,maxiter=100,atol=1e-12,rtol=1.e-6,verbose=false,name="MINRES")
+
+  MINRES solver, with optional right and left preconditioners `Pr` and `Pl`.
+"""
 struct MINRESSolver <: Gridap.Algebra.LinearSolver
   Pr  :: Union{Gridap.Algebra.LinearSolver,Nothing}
   Pl  :: Union{Gridap.Algebra.LinearSolver,Nothing}
