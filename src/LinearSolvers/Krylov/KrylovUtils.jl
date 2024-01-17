@@ -1,10 +1,16 @@
 
 """
-  Computes the Krylov matrix-vector product y = Pl⁻¹⋅A⋅Pr⁻¹⋅x
-  by solving: 
+  Computes the Krylov matrix-vector product 
+  
+  `y = Pl⁻¹⋅A⋅Pr⁻¹⋅x`
+
+  by solving
+
+  ```
     Pr⋅wr = x
     wl = A⋅wr
     Pl⋅y = wl
+  ```
 """
 function krylov_mul!(y,A,x,Pr,Pl,wr,wl)
   solve!(wr,Pr,x)
@@ -24,10 +30,16 @@ function krylov_mul!(y,A,x,Pr::Nothing,Pl::Nothing,wr,wl)
 end
 
 """
-  Computes the Krylov residual r = Pl⁻¹(A⋅x - b).
-  by solving: 
+  Computes the Krylov residual 
+
+  `r = Pl⁻¹(A⋅x - b)`
+
+  by solving
+
+  ```
     w = A⋅x - b
     Pl⋅r = w
+  ```
 """
 function krylov_residual!(r,x,A,b,Pl,w)
   mul!(w,A,x)

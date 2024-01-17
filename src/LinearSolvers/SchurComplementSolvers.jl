@@ -7,6 +7,7 @@
 
   where S = D - C A^-1 B
 """
+
 struct SchurComplementSolver{T1,T2,T3,T4} <: Gridap.Algebra.LinearSolver
   A :: T1
   B :: T2

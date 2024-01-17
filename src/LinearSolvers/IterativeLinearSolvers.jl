@@ -8,13 +8,21 @@ struct SSORIterativeSolverType   <: IterativeLinearSolverType end
 # Constructors
 
 """
+    struct IterativeLinearSolver <: LinearSolver
+      ...
+    end
+
   Wrappers for [IterativeSolvers.jl](https://github.com/JuliaLinearAlgebra/IterativeSolvers.jl)
   krylov-like iterative solvers.
 
-  Currently supported: 
-  - ConjugateGradientSolver
-  - GMRESSolver
-  - MINRESSolver
+  All wrappers take the same kwargs as the corresponding solver in IterativeSolvers.jl.
+
+  The following solvers are available:
+
+  - [`IS_ConjugateGradientSolver`](@ref)
+  - [`IS_GMRESSolver`](@ref)
+  - [`IS_MINRESSolver`](@ref)
+  - [`IS_SSORSolver`](@ref)
 """
 struct IterativeLinearSolver{A} <: Gridap.Algebra.LinearSolver
   args
@@ -28,24 +36,44 @@ end
 
 SolverType(::IterativeLinearSolver{T}) where T = T()
 
+"""
+    IS_ConjugateGradientSolver(;kwargs...)
+
+  Wrapper for the [Conjugate Gradient solver](https://iterativesolvers.julialinearalgebra.org/dev/linear_systems/cg/).
+"""
 function IS_ConjugateGradientSolver(;kwargs...)
   options = [:statevars,:initially_zero,:Pl,:abstol,:reltol,:maxiter,:verbose,:log]
   @check all(map(opt -> opt ∈ options,keys(kwargs)))
   return IterativeLinearSolver(CGIterativeSolverType(),nothing,kwargs)
 end
 
+"""
+    IS_GMRESSolver(;kwargs...)
+
+  Wrapper for the [GMRES solver](https://iterativesolvers.julialinearalgebra.org/dev/linear_systems/gmres/).
+"""
 function IS_GMRESSolver(;kwargs...)
   options = [:initially_zero,:abstol,:reltol,:restart,:maxiter,:Pl,:Pr,:log,:verbose,:orth_meth]
   @check all(map(opt -> opt ∈ options,keys(kwargs)))
   return IterativeLinearSolver(GMRESIterativeSolverType(),nothing,kwargs)
 end
 
+"""
+    IS_MINRESSolver(;kwargs...)
+
+  Wrapper for the [MINRES solver](https://iterativesolvers.julialinearalgebra.org/dev/linear_systems/minres/).
+"""
 function IS_MINRESSolver(;kwargs...)
   options = [:initially_zero,:skew_hermitian,:abstol,:reltol,:maxiter,:log,:verbose]
   @check all(map(opt -> opt ∈ options,keys(kwargs)))
   return IterativeLinearSolver(MINRESIterativeSolverType(),nothing,kwargs)
 end
 
+"""
+    IS_SSORSolver(ω;kwargs...)
+
+  Wrapper for the [SSOR solver](https://iterativesolvers.julialinearalgebra.org/dev/linear_systems/stationary/#SSOR).
+"""
 function IS_SSORSolver(ω::Real;kwargs...)
   options = [:maxiter]
   @check all(map(opt -> opt ∈ options,keys(kwargs)))
