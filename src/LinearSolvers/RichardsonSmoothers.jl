@@ -20,7 +20,7 @@ struct RichardsonSmoother{A} <: Gridap.Algebra.LinearSolver
     ω::Real=1.0
   )
     A = typeof(M)
-    return RichardsonSmoother{A}(M,niter,ω)
+    return new{A}(M,niter,ω)
   end
 end
 
