@@ -155,7 +155,7 @@ function gmg_hdiv_driver(t,parts,mh,order)
   biform(u,v,dΩ)  = ∫(v⋅u)dΩ + ∫(α*divergence(v)⋅divergence(u))dΩ
   liform(v,dΩ)    = ∫(v⋅f)dΩ
   qdegree   = 2*(order+1)
-  reffe     = ReferenceFE(raviart_thomas,Float64,order)
+  reffe     = ReferenceFE(raviart_thomas,Float64,order-1)
 
   tests     = TestFESpace(mh,reffe,dirichlet_tags="boundary")
   trials    = TrialFESpace(tests,u)
@@ -247,7 +247,7 @@ function main(distribute,np::Integer,nc::Tuple,np_per_level::Vector)
         println(repeat("=",80))
         println("Testing GMG with Dc=$(length(nc)), PDE=$pde")
       end
-      order = (pde !== :hdiv) ? 1 : 0
+      order = 1
       main_gmg_driver(parts,mh,order,pde)
     end
   end

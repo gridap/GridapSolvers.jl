@@ -1,25 +1,66 @@
-using Gridap, Gridap.Adaptivity, Gridap.ReferenceFEs
-using GridapDistributed, PartitionedArrays
-using GridapP4est, GridapPETSc
-using GridapSolvers, GridapSolvers.MultilevelTools, GridapSolvers.LinearSolvers
 
-function set_ksp_options(ksp)
-  pc       = Ref{GridapPETSc.PETSC.PC}()
-  mumpsmat = Ref{GridapPETSc.PETSC.Mat}()
-  @check_error_code GridapPETSc.PETSC.KSPView(ksp[],C_NULL)
-  @check_error_code GridapPETSc.PETSC.KSPSetType(ksp[],GridapPETSc.PETSC.KSPPREONLY)
-  @check_error_code GridapPETSc.PETSC.KSPGetPC(ksp[],pc)
-  @check_error_code GridapPETSc.PETSC.PCSetType(pc[],GridapPETSc.PETSC.PCLU)
-  @check_error_code GridapPETSc.PETSC.PCFactorSetMatSolverType(pc[],GridapPETSc.PETSC.MATSOLVERMUMPS)
-  @check_error_code GridapPETSc.PETSC.PCFactorSetUpMatSolverType(pc[])
-  @check_error_code GridapPETSc.PETSC.PCFactorGetMatrix(pc[],mumpsmat)
-  @check_error_code GridapPETSc.PETSC.MatMumpsSetIcntl(mumpsmat[],  4, 1)
-  @check_error_code GridapPETSc.PETSC.MatMumpsSetIcntl(mumpsmat[], 28, 2)
-  @check_error_code GridapPETSc.PETSC.MatMumpsSetIcntl(mumpsmat[], 29, 2)
-  @check_error_code GridapPETSc.PETSC.MatMumpsSetCntl(mumpsmat[], 3, 1.0e-6)
+using MPI
+using Test
+using LinearAlgebra
+using IterativeSolvers
+using FillArrays
+
+using Gridap
+using Gridap.ReferenceFEs, Gridap.Algebra
+using PartitionedArrays
+using GridapDistributed
+using GridapP4est
+
+using GridapSolvers
+using GridapSolvers.LinearSolvers
+using GridapSolvers.MultilevelTools
+using GridapSolvers.PatchBasedSmoothers
+
+function get_mesh_hierarchy(parts,cmodel,num_refs_coarse,np_per_level)
+  num_levels   = length(np_per_level)
+  cparts       = generate_subparts(parts,np_per_level[num_levels])
+  coarse_model = OctreeDistributedDiscreteModel(cparts,cmodel,num_refs_coarse)
+  mh = ModelHierarchy(parts,coarse_model,np_per_level)
+  return mh
 end
 
-function get_patch_smoothers(tests,patch_spaces,patch_decompositions,biform,qdegree)  
+function get_hierarchy_matrices(
+  trials::FESpaceHierarchy,
+  tests::FESpaceHierarchy,
+  a::Function,
+  l::Function,
+  qdegree::Integer;
+  is_nonlinear::Bool=false
+)
+  nlevs = num_levels(trials)
+  mh    = trials.mh
+
+  A = nothing
+  b = nothing
+  mats = Vector{PSparseMatrix}(undef,nlevs)
+  for lev in 1:nlevs
+    parts = get_level_parts(mh,lev)
+    if i_am_in(parts)
+      model = get_model(mh,lev)
+      U = get_fe_space(trials,lev)
+      V = get_fe_space(tests,lev)
+      Ω = Triangulation(model)
+      dΩ = Measure(Ω,qdegree)
+      ai(u,v) = is_nonlinear ? a(zero(U),u,v,dΩ) : a(u,v,dΩ)
+      if lev == 1
+        li(v) = l(v,dΩ)
+        op    = AffineFEOperator(ai,li,U,V)
+        A, b  = get_matrix(op), get_vector(op)
+        mats[lev] = A
+      else
+        mats[lev] = assemble_matrix(ai,U,V)
+      end
+    end
+  end
+  return mats, A, b
+end
+
+function get_patch_smoothers(tests,patch_spaces,patch_decompositions,biform,qdegree)
   mh = tests.mh
   nlevs = num_levels(mh)
   smoothers = Vector{RichardsonSmoother}(undef,nlevs-1)
@@ -31,85 +72,114 @@ function get_patch_smoothers(tests,patch_spaces,patch_decompositions,biform,qdeg
       Vh = get_fe_space(tests,lev)
       Ω  = Triangulation(PD)
       dΩ = Measure(Ω,qdegree)
-      local_solver = LUSolver() # IS_ConjugateGradientSolver(;reltol=1.e-6)
-      patch_smoother = PatchBasedLinearSolver(biform,Ph,Vh,dΩ,local_solver)
+      ap(u,du,v) = biform(u,du,v,dΩ)
+      patch_smoother = PatchBasedLinearSolver(ap,Ph,Vh;is_nonlinear=true)
       smoothers[lev] = RichardsonSmoother(patch_smoother,10,0.2)
     end
   end
   return smoothers
 end
 
-np       = 1 # Number of processors
-D        = 3 # Problem dimension
-n_refs_c = 1 # Number of refinements for the coarse model
-n_levels = 2 # Number of refinement levels
-order    = 1 # FE order
-
-ranks = with_mpi() do distribute
-  distribute(LinearIndices((np,)))
+function add_hunt_tags!(model)
+  labels = get_face_labeling(model)
+  tags_u = append!(collect(1:20),[23,24,25,26])
+  tags_j = append!(collect(1:20),[25,26])
+  add_tag_from_tags!(labels,"noslip",tags_u)
+  add_tag_from_tags!(labels,"insulating",tags_j)
 end
 
-domain = (D==2) ? (0,1,0,1) : (0,1,0,1,0,1)
-nc = Tuple(fill(2,D))
-cmodel = CartesianDiscreteModel(domain,nc)
+##########################
 
-mh = GridapP4est.with(ranks) do
-  num_parts_x_level = fill(np,n_levels)
-  coarse_model = OctreeDistributedDiscreteModel(ranks,cmodel,n_refs_c)
-  return ModelHierarchy(ranks,coarse_model,num_parts_x_level)
-end;
-n_cells = num_cells(GridapSolvers.get_model(mh,1))
+Dc = 3
+np = 1
+nc = (4,4,3)
+parts = with_mpi() do distribute
+  distribute(LinearIndices((np,)))
+end
+domain = (0.0,1.0,0.0,1.0,0.0,1.0)
+cmodel = CartesianDiscreteModel(domain,nc;isperiodic=(false,false,true))
+add_hunt_tags!(cmodel)
+mh = get_mesh_hierarchy(parts,cmodel,0,[1,1]);
 
-reffe_u = ReferenceFE(lagrangian,VectorValue{D,Float64},order)
-reffe_j = ReferenceFE(raviart_thomas,Float64,order-1)
-
-tests_u  = FESpace(mh,reffe_u;dirichlet_tags="boundary");
+order = 2
+reffe_u  = ReferenceFE(lagrangian,VectorValue{Dc,Float64},order)
+tests_u  = FESpace(mh,reffe_u;dirichlet_tags="noslip");
 trials_u = TrialFESpace(tests_u);
-tests_j  = FESpace(mh,reffe_j;dirichlet_tags="boundary");
+
+reffe_j  = ReferenceFE(raviart_thomas,Float64,order-1)
+tests_j  = FESpace(mh,reffe_j;dirichlet_tags="insulating");
 trials_j = TrialFESpace(tests_j);
 
 trials = MultiFieldFESpace([trials_u,trials_j]);
 tests  = MultiFieldFESpace([tests_u,tests_j]);
+spaces = tests, trials
 
+α = 1.0
 β = 1.0
-γ = 1.0
-B = VectorValue(0.0,0.0,1.0)
-f = VectorValue(fill(1.0,D)...)
-qdegree = order*2+1
-biform((u,j),(v_u,v_j),dΩ) = ∫(β*∇(u)⊙∇(v_u) -γ*(j×B)⋅v_u + j⋅v_j - (u×B)⋅v_j)dΩ
-liform((v_u,v_j),dΩ) = ∫(v_u⋅f)dΩ
-smatrices, A, b = compute_hierarchy_matrices(trials,tests,biform,liform,qdegree);
+γ = 10000.0
+B = VectorValue(0.0,1.0,0.0)
+f = VectorValue(0.0,0.0,1.0)
+η_u, η_j = 10.0,10.0
 
-pbs = GridapSolvers.PatchBasedSmoothers.PatchBoundaryExclude()
-patch_decompositions = PatchDecomposition(mh;patch_boundary_style=pbs)
+conv(u,∇u) = (∇u')⋅u
+a_al((u,j),(v_u,v_j),dΩ) = ∫(η_u*(∇⋅u)⋅(∇⋅v_u))*dΩ + ∫(η_j*(∇⋅j)⋅(∇⋅v_j))*dΩ
+a_mhd((u,j),(v_u,v_j),dΩ) = ∫(β*∇(u)⊙∇(v_u) -γ*(j×B)⋅v_u + j⋅v_j - (u×B)⋅v_j)dΩ
+dc_mhd((u,j),(du,dj),(v_u,v_j),dΩ) = ∫(α*v_u⋅( (conv∘(u,∇(du))) + (conv∘(du,∇(u)))))dΩ
+
+biform(x0,x,y,dΩ) = a_mhd(x,y,dΩ) + a_al(x,y,dΩ) + dc_mhd(x0,x,y,dΩ)
+liform((v_u,v_j),dΩ) = ∫(v_u⋅f)dΩ
+
+qdegree = 2*(order+1)
+patch_decompositions = PatchDecomposition(mh)
 patch_spaces = PatchFESpace(tests,patch_decompositions);
 smoothers = get_patch_smoothers(tests,patch_spaces,patch_decompositions,biform,qdegree)
 
-smoother_ns = numerical_setup(symbolic_setup(smoothers[1],A),A)
+smatrices, A, b = get_hierarchy_matrices(trials,tests,biform,liform,qdegree;is_nonlinear=true);
 
-restrictions, prolongations = setup_transfer_operators(trials,qdegree;mode=:residual);
+coarse_solver = LUSolver()
+restrictions, prolongations = setup_transfer_operators(trials,
+                                                        qdegree;
+                                                        mode=:residual,
+                                                        solver=LUSolver());
 
-#GridapPETSc.with() do
-  gmg = GMGLinearSolver(mh,
-                        smatrices,
-                        prolongations,
-                        restrictions,
-                        pre_smoothers=smoothers,
-                        post_smoothers=smoothers,
-                        coarsest_solver=LUSolver(),#PETScLinearSolver(set_ksp_options),
-                        maxiter=1,
-                        rtol=1.0e-10,
-                        verbose=false,
-                        mode=:preconditioner)
 
-  solver = CGSolver(gmg;maxiter=100,atol=1e-10,rtol=1.e-6,verbose=i_am_main(ranks))
-  ns = numerical_setup(symbolic_setup(solver,A),A)
+# GMG as solver 
 
-  x = pfill(0.0,partition(axes(A,2)))
-  solve!(x,ns,b)
-  @time begin
-    fill!(x,0.0)
-    solve!(x,ns,b)
-  end
-  println("n_dofs = ", length(x))
-#end
+gmg_solver = GMGLinearSolver(mh,
+                      smatrices,
+                      prolongations,
+                      restrictions,
+                      pre_smoothers=smoothers,
+                      post_smoothers=smoothers,
+                      coarsest_solver=LUSolver(),
+                      maxiter=20,
+                      rtol=1.0e-8,
+                      verbose=true,
+                      mode=:preconditioner)
+gmg_solver.log.depth += 1
+gmg_ns = numerical_setup(symbolic_setup(gmg_solver,A),A)
+
+x = pfill(0.0,partition(axes(A,2)))
+r = b - A*x
+solve!(x,gmg_ns,r)
+
+# GMG as preconditioner for GMRES
+
+gmg = GMGLinearSolver(mh,
+                      smatrices,
+                      prolongations,
+                      restrictions,
+                      pre_smoothers=smoothers,
+                      post_smoothers=smoothers,
+                      coarsest_solver=LUSolver(),
+                      maxiter=3,
+                      rtol=1.0e-8,
+                      verbose=true,
+                      mode=:preconditioner)
+gmg.log.depth += 1
+
+gmres_solver = FGMRESSolver(10,gmg;m_add=5,maxiter=30,rtol=1.0e-6,verbose=i_am_main(parts))
+gmres_ns = numerical_setup(symbolic_setup(gmres_solver,A),A)
+
+x = pfill(0.0,partition(axes(A,2)))
+solve!(x,gmres_ns,b)
