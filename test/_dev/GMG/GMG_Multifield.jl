@@ -24,7 +24,7 @@ function get_mesh_hierarchy(parts,cmodel,num_refs_coarse,np_per_level)
   return mh
 end
 
-function get_hierarchy_matrices(
+function get_hierarchy_matrices_old(
   trials::FESpaceHierarchy,
   tests::FESpaceHierarchy,
   a::Function,
@@ -58,6 +58,32 @@ function get_hierarchy_matrices(
     end
   end
   return mats, A, b
+end
+
+function get_hierarchy_matrices(
+  trials::FESpaceHierarchy,
+  tests::FESpaceHierarchy,
+  a::Function,
+  qdegree::Integer;
+  is_nonlinear::Bool=false
+)
+  nlevs = num_levels(trials)
+  mh    = trials.mh
+
+  mats = Vector{PSparseMatrix}(undef,nlevs)
+  for lev in 1:nlevs
+    parts = get_level_parts(mh,lev)
+    if i_am_in(parts)
+      model = get_model(mh,lev)
+      U = get_fe_space(trials,lev)
+      V = get_fe_space(tests,lev)
+      Ω = Triangulation(model)
+      dΩ = Measure(Ω,qdegree)
+      ai(u,v) = is_nonlinear ? a(zero(U),u,v,dΩ) : a(u,v,dΩ)
+      mats[lev] = assemble_matrix(ai,U,V)
+    end
+  end
+  return mats
 end
 
 function get_patch_smoothers(tests,patch_spaces,patch_decompositions,biform,qdegree)
@@ -124,17 +150,25 @@ f = VectorValue(0.0,0.0,1.0)
 conv(u,∇u) = (∇u')⋅u
 a_al((u,j),(v_u,v_j),dΩ) = ∫(η_u*(∇⋅u)⋅(∇⋅v_u))*dΩ + ∫(η_j*(∇⋅j)⋅(∇⋅v_j))*dΩ
 a_mhd((u,j),(v_u,v_j),dΩ) = ∫(β*∇(u)⊙∇(v_u) -γ*(j×B)⋅v_u + j⋅v_j - (u×B)⋅v_j)dΩ
+c_mhd((u,j),(v_u,v_j),dΩ) = ∫( α*v_u⋅(conv∘(u,∇(u))) ) * dΩ
 dc_mhd((u,j),(du,dj),(v_u,v_j),dΩ) = ∫(α*v_u⋅( (conv∘(u,∇(du))) + (conv∘(du,∇(u)))))dΩ
+rhs((u,j),(v_u,v_j),dΩ) = ∫(f⋅v_u)dΩ
 
-biform(x0,x,y,dΩ) = a_mhd(x,y,dΩ) + a_al(x,y,dΩ) + dc_mhd(x0,x,y,dΩ)
-liform((v_u,v_j),dΩ) = ∫(v_u⋅f)dΩ
+jac(x0,x,y,dΩ) = a_mhd(x,y,dΩ) + a_al(x,y,dΩ) + dc_mhd(x0,x,y,dΩ)
+res(x0,y,dΩ) = a_mhd(x0,y,dΩ) + a_al(x0,y,dΩ) + c_mhd(x0,y,dΩ) - rhs(x0,y,dΩ)
+
 
 qdegree = 2*(order+1)
 patch_decompositions = PatchDecomposition(mh)
 patch_spaces = PatchFESpace(tests,patch_decompositions);
-smoothers = get_patch_smoothers(tests,patch_spaces,patch_decompositions,biform,qdegree)
+smoothers = get_patch_smoothers(tests,patch_spaces,patch_decompositions,jac,qdegree)
 
-smatrices, A, b = get_hierarchy_matrices(trials,tests,biform,liform,qdegree;is_nonlinear=true);
+smatrices = get_hierarchy_matrices(trials,tests,jac,qdegree;is_nonlinear=true);
+A = smatrices[1]
+
+dΩ = Measure(Triangulation(get_model(mh,1)),qdegree)
+x0 = zero(get_fe_space(trials,1))
+b = assemble_vector(v -> res(x0,v,dΩ),get_fe_space(tests,1))
 
 coarse_solver = LUSolver()
 restrictions, prolongations = setup_transfer_operators(trials,
