@@ -35,15 +35,22 @@ function PatchDecomposition(mh::ModelHierarchy;kwargs...)
 end
 
 function Gridap.Geometry.Triangulation(a::DistributedPatchDecomposition)
-  trians = map(a.patch_decompositions) do a
+  trians = map(local_views(a)) do a
     Triangulation(a)
   end
   return GridapDistributed.DistributedTriangulation(trians,a.model)
 end
 
 function Gridap.Geometry.BoundaryTriangulation(a::DistributedPatchDecomposition,args...;kwargs...)
-  trians = map(a.patch_decompositions) do a
+  trians = map(local_views(a)) do a
     BoundaryTriangulation(a,args...;kwargs...)
+  end
+  return GridapDistributed.DistributedTriangulation(trians,a.model)
+end
+
+function Gridap.Geometry.SkeletonTriangulation(a::DistributedPatchDecomposition,args...;kwargs...)
+  trians = map(local_views(a)) do a
+    SkeletonTriangulation(a,args...;kwargs...)
   end
   return GridapDistributed.DistributedTriangulation(trians,a.model)
 end

@@ -24,42 +24,6 @@ function get_mesh_hierarchy(parts,cmodel,num_refs_coarse,np_per_level)
   return mh
 end
 
-function get_hierarchy_matrices_old(
-  trials::FESpaceHierarchy,
-  tests::FESpaceHierarchy,
-  a::Function,
-  l::Function,
-  qdegree::Integer;
-  is_nonlinear::Bool=false
-)
-  nlevs = num_levels(trials)
-  mh    = trials.mh
-
-  A = nothing
-  b = nothing
-  mats = Vector{PSparseMatrix}(undef,nlevs)
-  for lev in 1:nlevs
-    parts = get_level_parts(mh,lev)
-    if i_am_in(parts)
-      model = get_model(mh,lev)
-      U = get_fe_space(trials,lev)
-      V = get_fe_space(tests,lev)
-      Ω = Triangulation(model)
-      dΩ = Measure(Ω,qdegree)
-      ai(u,v) = is_nonlinear ? a(zero(U),u,v,dΩ) : a(u,v,dΩ)
-      if lev == 1
-        li(v) = l(v,dΩ)
-        op    = AffineFEOperator(ai,li,U,V)
-        A, b  = get_matrix(op), get_vector(op)
-        mats[lev] = A
-      else
-        mats[lev] = assemble_matrix(ai,U,V)
-      end
-    end
-  end
-  return mats, A, b
-end
-
 function get_hierarchy_matrices(
   trials::FESpaceHierarchy,
   tests::FESpaceHierarchy,
