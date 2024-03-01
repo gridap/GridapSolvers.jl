@@ -50,8 +50,9 @@ function get_hierarchy_matrices(
   return mats
 end
 
-function get_patch_smoothers(tests,patch_spaces,patch_decompositions,biform,qdegree)
+function get_patch_smoothers(tests,patch_decompositions,biform,qdegree)
   mh = tests.mh
+  patch_spaces = PatchFESpace(tests,patch_decompositions);
   nlevs = num_levels(mh)
   smoothers = Vector{RichardsonSmoother}(undef,nlevs-1)
   for lev in 1:nlevs-1
@@ -102,11 +103,10 @@ trials_j = TrialFESpace(tests_j);
 
 trials = MultiFieldFESpace([trials_u,trials_j]);
 tests  = MultiFieldFESpace([tests_u,tests_j]);
-spaces = tests, trials
 
 α = 1.0
 β = 1.0
-γ = 10000.0
+γ = 100.0
 B = VectorValue(0.0,1.0,0.0)
 f = VectorValue(0.0,0.0,1.0)
 η_u, η_j = 10.0,10.0
@@ -124,8 +124,8 @@ res(x0,y,dΩ) = a_mhd(x0,y,dΩ) + a_al(x0,y,dΩ) + c_mhd(x0,y,dΩ) - rhs(x0,y,d�
 
 qdegree = 2*(order+1)
 patch_decompositions = PatchDecomposition(mh)
-patch_spaces = PatchFESpace(tests,patch_decompositions);
-smoothers = get_patch_smoothers(tests,patch_spaces,patch_decompositions,jac,qdegree)
+
+smoothers = get_patch_smoothers(tests,patch_decompositions,jac,qdegree)
 
 smatrices = get_hierarchy_matrices(trials,tests,jac,qdegree;is_nonlinear=true);
 A = smatrices[1]
@@ -135,7 +135,7 @@ x0 = zero(get_fe_space(trials,1))
 b = assemble_vector(v -> res(x0,v,dΩ),get_fe_space(tests,1))
 
 coarse_solver = LUSolver()
-restrictions, prolongations = setup_transfer_operators(trials,
+restrictions, prolongations = setup_transfer_operators(tests,
                                                         qdegree;
                                                         mode=:residual,
                                                         solver=LUSolver());
@@ -159,6 +159,7 @@ gmg_ns = numerical_setup(symbolic_setup(gmg_solver,A),A)
 
 x = pfill(0.0,partition(axes(A,2)))
 r = b - A*x
+r = prandn(partition(axes(A,2)))
 solve!(x,gmg_ns,r)
 
 # GMG as preconditioner for GMRES

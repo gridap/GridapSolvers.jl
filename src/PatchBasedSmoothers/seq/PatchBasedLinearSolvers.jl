@@ -40,13 +40,8 @@ function Gridap.Algebra.numerical_setup(ss::PatchBasedSymbolicSetup,A::AbstractM
   solver = ss.solver
   Ph, Vh = solver.patch_space, solver.space
   weights = solver.weighted ? compute_weight_operators(Ph,Vh) : nothing
-
-  if solver.is_nonlinear
-    u0 = zero(Vh)
-    ap(u,v) = solver.biform(u0,u,v) 
-  else
-    ap(u,v) = solver.biform(u,v)
-  end
+  
+  ap(u,v) = solver.is_nonlinear ? solver.biform(zero(Vh),u,v) : solver.biform(u,v)
 
   assem = SparseMatrixAssembler(Ph,Ph)
   Ap    = assemble_matrix(ap,assem,Ph,Ph)
