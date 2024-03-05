@@ -53,6 +53,30 @@ function Arrays.evaluate!(cache,k::LocalProjectionMap,f::AbstractMatrix{<:Field}
   return transpose(ff)
 end
 
+function Arrays.return_cache(k::LocalProjectionMap,f::ArrayBlock{A,N}) where {A,N}
+  fi = testitem(f)
+  ci = return_cache(k,fi)
+  fix = evaluate!(ci,k,fi)
+  c = Array{typeof(ci),N}(undef,size(f.array))
+  g = Array{typeof(fix),N}(undef,size(f.array))
+  for i in eachindex(f.array)
+    if f.touched[i]
+      c[i] = return_cache(k,f.array[i])
+    end
+  end
+  ArrayBlock(g,f.touched),c
+end
+function Arrays.evaluate!(cache,k::LocalProjectionMap,f::ArrayBlock{A,N}) where {A,N}
+  g, c = cache
+  @check g.touched == f.touched
+  for i in eachindex(f.array)
+    if f.touched[i]
+      g.array[i] = evaluate!(c[i],k,f.array[i])
+    end
+  end
+  return g
+end
+
 function _return_cache(k::LocalProjectionMap,f)
   q = get_shapefuns(k.reffe)
   pq = get_coordinates(k.quad)
@@ -89,4 +113,11 @@ end
 function Arrays.evaluate!(cache,k::LocalProjectionMap,f::GridapDistributed.DistributedCellField)
   fields = map(k,local_views(f))
   return GridapDistributed.DistributedCellField(fields)
+end
+
+# Optimization for MultiField
+function Arrays.lazy_map(k::LocalProjectionMap,a::LazyArray{<:Fill{<:BlockMap}})
+  args = map(i->lazy_map(k,i),a.args)
+  bm = a.maps.value
+  lazy_map(bm,args...)
 end
