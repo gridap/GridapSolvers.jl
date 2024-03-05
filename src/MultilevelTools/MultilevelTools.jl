@@ -4,15 +4,11 @@ using MPI
 using LinearAlgebra
 using FillArrays
 using BlockArrays
-using IterativeSolvers
 
 using Gridap
-using Gridap.Helpers
-using Gridap.Algebra
-using Gridap.Geometry
-using Gridap.FESpaces
-using Gridap.Adaptivity
-using Gridap.ReferenceFEs
+using Gridap.Helpers, Gridap.Algebra, Gridap.Arrays, Gridap.Fields
+using Gridap.ReferenceFEs, Gridap.Geometry, Gridap.FESpaces, Gridap.Adaptivity
+
 using PartitionedArrays
 
 using GridapDistributed
@@ -33,6 +29,8 @@ export FESpaceHierarchy
 export get_fe_space, get_fe_space_before_redist
 export compute_hierarchy_matrices
 
+export LocalProjectionMap
+
 export DistributedGridTransferOperator
 export RestrictionOperator, ProlongationOperator
 export setup_transfer_operators
@@ -43,6 +41,7 @@ include("GridapFixes.jl")
 include("RefinementTools.jl")
 include("ModelHierarchies.jl")
 include("FESpaceHierarchies.jl")
+include("LocalProjectionMaps.jl")
 include("DistributedGridTransferOperators.jl")
 
 end
