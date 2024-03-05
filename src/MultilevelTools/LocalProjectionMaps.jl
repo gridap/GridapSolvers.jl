@@ -5,7 +5,7 @@ struct LocalProjectionMap{A,B,C} <: Map
   Mq    :: C
 end
 
-# Constructors 
+# Constructors
 
 function LocalProjectionMap(reffe::ReferenceFE,quad::Quadrature)
   q = get_shapefuns(reffe)
@@ -33,24 +33,27 @@ end
 
 # Action on Field / Array{<:Field}
 
+Arrays.return_cache(k::LocalProjectionMap,f::Field) = _return_cache(k,f)
+Arrays.evaluate!(cache,k::LocalProjectionMap,f::Field) = _evaluate!(cache,k,f)
+
 function Arrays.return_cache(k::LocalProjectionMap,f::AbstractVector{<:Field})
-  return_cache(k,transpose(f))
+  _return_cache(k,transpose(f))
 end
 function Arrays.evaluate!(cache,k::LocalProjectionMap,f::AbstractVector{<:Field})
-  evaluate!(cache,k,transpose(f))
+  _evaluate!(cache,k,transpose(f))
 end
 
 function Arrays.return_cache(k::LocalProjectionMap,f::AbstractMatrix{<:Field})
   @check size(f,1) == 1
-  return_cache(k,f)
+  _return_cache(k,f)
 end
 function Arrays.evaluate!(cache,k::LocalProjectionMap,f::AbstractMatrix{<:Field})
   @check size(f,1) == 1
-  ff = evaluate!(cache,k,f)
+  ff = _evaluate!(cache,k,f)
   return transpose(ff)
 end
 
-function Arrays.return_cache(k::LocalProjectionMap,f)
+function _return_cache(k::LocalProjectionMap,f)
   q = get_shapefuns(k.reffe)
   pq = get_coordinates(k.quad)
   wq = get_weights(k.quad)
@@ -62,7 +65,7 @@ function Arrays.return_cache(k::LocalProjectionMap,f)
   return eval_cache, integration_cache
 end
 
-function Arrays.evaluate!(cache,k::LocalProjectionMap,f)
+function _evaluate!(cache,k::LocalProjectionMap,f)
   eval_cache, integration_cache = cache
   q = get_shapefuns(k.reffe)
 
@@ -76,14 +79,14 @@ end
 
 # Action on CellField / DistributedCellField
 
-function (k::LocalProjectionMap)(f::CellField)
+function Arrays.evaluate!(cache,k::LocalProjectionMap,f::CellField)
   @assert isa(DomainStyle(f),ReferenceDomain)
   f_data = CellData.get_data(f)
   fk_data = lazy_map(k,f_data)
   return GenericCellField(fk_data,get_triangulation(f),ReferenceDomain())
 end
 
-function (k::LocalProjectionMap)(f::GridapDistributed.DistributedCellField)
+function Arrays.evaluate!(cache,k::LocalProjectionMap,f::GridapDistributed.DistributedCellField)
   fields = map(k,local_views(f))
   return GridapDistributed.DistributedCellField(fields)
 end
