@@ -6,7 +6,7 @@ using FillArrays
 using BlockArrays
 
 using Gridap
-using Gridap.Helpers, Gridap.Algebra, Gridap.Arrays, Gridap.Fields
+using Gridap.Helpers, Gridap.Algebra, Gridap.Arrays, Gridap.Fields, Gridap.CellData
 using Gridap.ReferenceFEs, Gridap.Geometry, Gridap.FESpaces, Gridap.Adaptivity
 
 using PartitionedArrays
