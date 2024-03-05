@@ -33,12 +33,29 @@ end
 
 # Action on Field / Array{<:Field}
 
+function Arrays.return_cache(k::LocalProjectionMap,f::AbstractVector{<:Field})
+  return_cache(k,transpose(f))
+end
+function Arrays.evaluate!(cache,k::LocalProjectionMap,f::AbstractVector{<:Field})
+  evaluate!(cache,k,transpose(f))
+end
+
+function Arrays.return_cache(k::LocalProjectionMap,f::AbstractMatrix{<:Field})
+  @check size(f,1) == 1
+  return_cache(k,f)
+end
+function Arrays.evaluate!(cache,k::LocalProjectionMap,f::AbstractMatrix{<:Field})
+  @check size(f,1) == 1
+  ff = evaluate!(cache,k,f)
+  return transpose(ff)
+end
+
 function Arrays.return_cache(k::LocalProjectionMap,f)
   q = get_shapefuns(k.reffe)
   pq = get_coordinates(k.quad)
   wq = get_weights(k.quad)
 
-  lq = Fields.BroadcastOpFieldArray(⋅,q,transpose(f))
+  lq = Fields.BroadcastOpFieldArray(⋅,q,f)
   eval_cache = return_cache(lq,pq)
   lqx = evaluate!(eval_cache,lq,pq)
   integration_cache = return_cache(IntegrationMap(),lqx,wq)
@@ -49,7 +66,7 @@ function Arrays.evaluate!(cache,k::LocalProjectionMap,f)
   eval_cache, integration_cache = cache
   q = get_shapefuns(k.reffe)
 
-  lq = Fields.BroadcastOpFieldArray(⋅,q,transpose(f))
+  lq = Fields.BroadcastOpFieldArray(⋅,q,f)
   lqx = evaluate!(eval_cache,lq,get_coordinates(k.quad))
   bq = evaluate!(integration_cache,IntegrationMap(),lqx,get_weights(k.quad))
 
