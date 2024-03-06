@@ -7,19 +7,17 @@ function PatchFESpace(space::GridapDistributed.DistributedSingleFieldFESpace,
   return PatchFESpace(space,patch_decomposition,cell_conformity)
 end
 
-function PatchFESpace(space::GridapDistributed.DistributedSingleFieldFESpace,
-                      patch_decomposition::DistributedPatchDecomposition,
-                      cell_conformity::AbstractArray{<:CellConformity})
-  model = patch_decomposition.model                    
-  root_gids = get_face_gids(model,get_patch_root_dim(patch_decomposition))
-
+function PatchFESpace(
+  space::GridapDistributed.DistributedSingleFieldFESpace,
+  patch_decomposition::DistributedPatchDecomposition,
+  cell_conformity::AbstractArray{<:CellConformity};
+  patches_mask = default_patches_mask(patch_decomposition)
+)
   spaces = map(local_views(space),
                local_views(patch_decomposition),
                cell_conformity,
-               partition(root_gids)) do space, patch_decomposition, cell_conformity, partition
-    patches_mask = fill(false,local_length(partition))
-    patches_mask[ghost_to_local(partition)] .= true # Mask ghost patch roots
-    PatchFESpace(space,patch_decomposition,cell_conformity;patches_mask=patches_mask)
+               patches_mask) do space, patch_decomposition, cell_conformity, patches_mask
+    PatchFESpace(space,patch_decomposition,cell_conformity;patches_mask)
   end
   
   # This PRange has no ghost dofs
@@ -28,6 +26,17 @@ function PatchFESpace(space::GridapDistributed.DistributedSingleFieldFESpace,
   patch_partition = variable_partition(local_ndofs,global_ndofs,false)
   gids = PRange(patch_partition)
   return GridapDistributed.DistributedSingleFieldFESpace(spaces,gids,get_vector_type(space))
+end
+
+function default_patches_mask(patch_decomposition::DistributedPatchDecomposition)
+  model = patch_decomposition.model
+  root_gids = get_face_gids(model,get_patch_root_dim(patch_decomposition))
+  patches_mask = map(partition(root_gids)) do partition
+    patches_mask = fill(false,local_length(partition))
+    patches_mask[ghost_to_local(partition)] .= true # Mask ghost patch roots
+    return patches_mask
+  end
+  return patches_mask
 end
 
 function PatchFESpace(sh::FESpaceHierarchy,

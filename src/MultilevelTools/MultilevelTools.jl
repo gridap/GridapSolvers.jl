@@ -33,7 +33,7 @@ export LocalProjectionMap
 
 export DistributedGridTransferOperator
 export RestrictionOperator, ProlongationOperator
-export setup_transfer_operators
+export setup_transfer_operators, setup_prolongation_operators, setup_restriction_operators
 export mul!
 
 include("SubpartitioningTools.jl")

@@ -181,25 +181,49 @@ function _get_redistribution_cache(lev::Int,sh::FESpaceHierarchy,mode::Symbol,op
   return cache_redist
 end
 
-function setup_transfer_operators(sh::FESpaceHierarchy,qdegree::Integer;kwargs...)
-  qdegrees = Fill(qdegree,num_levels(sh))
-  return setup_transfer_operators(sh,qdegrees;kwargs...)
+# TODO: Please replace this type of functions by a map functionality over hierarchies
+function setup_transfer_operators(sh::FESpaceHierarchy,qdegree;kwargs...)
+  prolongations = setup_prolongation_operators(sh,qdegree;kwargs...)
+  restrictions  = setup_restriction_operators(sh,qdegree;kwargs...)
+  return restrictions, prolongations
 end
 
-function setup_transfer_operators(sh::FESpaceHierarchy,qdegrees::AbstractArray{<:Integer};kwargs...)
+function setup_prolongation_operators(sh::FESpaceHierarchy,qdegree::Integer;kwargs...)
+  qdegrees = Fill(qdegree,num_levels(sh))
+  return setup_prolongation_operators(sh,qdegrees;kwargs...)
+end
+
+function setup_prolongation_operators(sh::FESpaceHierarchy,qdegrees::AbstractArray{<:Integer};kwargs...)
   @check length(qdegrees) == num_levels(sh)
   mh = sh.mh
-  restrictions  = Vector{DistributedGridTransferOperator}(undef,num_levels(sh)-1)
   prolongations = Vector{DistributedGridTransferOperator}(undef,num_levels(sh)-1)
   for lev in 1:num_levels(sh)-1
     parts = get_level_parts(mh,lev)
     if i_am_in(parts)
       qdegree = qdegrees[lev]
-      restrictions[lev]  = RestrictionOperator(lev,sh,qdegree;kwargs...)
       prolongations[lev] = ProlongationOperator(lev,sh,qdegree;kwargs...)
     end
   end
-  return restrictions, prolongations
+  return prolongations
+end
+
+function setup_restriction_operators(sh::FESpaceHierarchy,qdegree::Integer;kwargs...)
+  qdegrees = Fill(qdegree,num_levels(sh))
+  return setup_restriction_operators(sh,qdegrees;kwargs...)
+end
+
+function setup_restriction_operators(sh::FESpaceHierarchy,qdegrees::AbstractArray{<:Integer};kwargs...)
+  @check length(qdegrees) == num_levels(sh)
+  mh = sh.mh
+  restrictions  = Vector{DistributedGridTransferOperator}(undef,num_levels(sh)-1)
+  for lev in 1:num_levels(sh)-1
+    parts = get_level_parts(mh,lev)
+    if i_am_in(parts)
+      qdegree = qdegrees[lev]
+      restrictions[lev]  = RestrictionOperator(lev,sh,qdegree;kwargs...)
+    end
+  end
+  return restrictions
 end
 
 ### Applying the operators:

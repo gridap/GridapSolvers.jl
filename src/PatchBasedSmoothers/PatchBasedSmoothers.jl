@@ -15,6 +15,9 @@ export PatchDecomposition
 export PatchFESpace
 export PatchBasedLinearSolver
 
+export PatchProlongationOperator
+export setup_patch_prolongation_operators
+
 # Geometry
 include("seq/PatchDecompositions.jl")
 include("mpi/PatchDecompositions.jl")
@@ -27,5 +30,6 @@ include("seq/PatchMultiFieldFESpaces.jl")
 
 # Solvers
 include("seq/PatchBasedLinearSolvers.jl")
+include("seq/PatchProlongationOperators.jl")
 
 end
