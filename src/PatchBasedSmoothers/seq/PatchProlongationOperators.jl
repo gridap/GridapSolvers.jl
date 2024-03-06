@@ -12,7 +12,7 @@ function PatchProlongationOperator(lev,sh,PD,lhs,rhs,qdegree)
   @assert has_refinement(mh,lev)
 
   # Default prolongation (i.e interpolation)
-  op = ProlongationOperator(lev,sh,qdegree)
+  op = ProlongationOperator(lev,sh,qdegree;mode=:residual)
 
   # Patch-based correction fespace
   fmodel = get_model(mh,lev)
@@ -31,26 +31,28 @@ function PatchProlongationOperator(lev,sh,PD,lhs,rhs,qdegree)
     Ap    = assemble_matrix(assem,matdata)
     numerical_setup(symbolic_setup(LUSolver(),Ap),Ap)
   end
-  dxh, dxp, rp = zero_free_values(Vh), zero_free_values(Ph), zero_free_values(Ph)
-  caches = ns, rhs, dxh, dxp, rp
+  xh, dxh = zero_free_values(Vh), zero_free_values(Vh)
+  dxp, rp = zero_free_values(Ph), zero_free_values(Ph)
+  caches = ns, rhs, xh, dxh, dxp, rp
 
   return PatchProlongationOperator(op,Ph,Vh,PD,caches)
 end
 
-function LinearAlgebra.mul!(xh,op::PatchProlongationOperator,xH)
-  Ap_ns, rhs, dxh, dxp, rp = op.caches
+function LinearAlgebra.mul!(x,op::PatchProlongationOperator,y)
+  Ap_ns, rhs, xh, dxh, dxp, rp = op.caches
 
-  mul!(xh,op.op,xH)
+  mul!(x,op.op,y) # TODO: Quite awful, but should be fixed with PA 0.4
+  copy!(xh,x)
   duh = FEFunction(op.Vh,xh)
   assemble_vector!(v->rhs(duh,v),rp,op.Ph)
   map(solve!,partition(dxp),Ap_ns,partition(rp))
   inject!(dxh,op.Ph,dxp)
 
-  map(own_values(xh),own_values(dxh)) do xh, dxh
-    xh .= xh .- dxh
+  map(own_values(x),own_values(dxh)) do x, dxh
+    x .= x .- dxh
   end
-  consistent!(xh) |> fetch
-  return xh
+  consistent!(x) |> fetch
+  return x
 end
 
 function setup_patch_prolongation_operators(sh,patch_decompositions,lhs,rhs,qdegrees)
@@ -98,24 +100,3 @@ function get_coarse_node_mask(fmodel::DiscreteModel{Dc},glue) where Dc
   return is_coarse
 end
 
-function get_patch_interpolators(mh,tests,patch_decomps,Pr,biform,Ah)
-  nlevs = num_levels(mh)
-  interpolators = Vector{PrologationOperator}(undef,nlevs-1)
-  for lev in 1:nlevs-1
-    parts = get_level_parts(mh,lev)
-    if i_am_in(parts)
-      fmodel = get_model(mh,lev)
-      cmodel = get_model(mh,lev+1)
-      patches_mask = get_patch_masks(fmodel,cmodel)
-      PD = patch_decomps[lev]
-      Vh = GridapSolvers.MultilevelTools.get_fe_space(tests,lev)
-      Ph = get_patch_space(PD,Vh,patches_mask)
-      dΩ = Measure(Triangulation(PD),8)
-      ap(u,v) = biform(u,v,dΩ)
-      I_solver = PatchBasedLinearSolver(ap,Ph,Vh)
-      I_ns = numerical_setup(symbolic_setup(I_solver,Ah),Ah)
-      interpolators[lev] = PrologationOperator(I_ns,Pr[lev],Ph,Vh,PD)
-    end
-  end
-  return interpolators
-end

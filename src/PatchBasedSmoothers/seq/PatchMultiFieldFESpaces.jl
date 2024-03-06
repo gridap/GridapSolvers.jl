@@ -9,11 +9,14 @@ function PatchFESpace(space::Gridap.MultiField.MultiFieldFESpace,
   return MultiFieldFESpace(patch_spaces)
 end
 
-function PatchFESpace(space::GridapDistributed.DistributedMultiFieldFESpace,
-                      patch_decomposition::DistributedPatchDecomposition,
-                      cell_conformity::Vector{<:AbstractArray{<:CellConformity}})
+function PatchFESpace(
+  space::GridapDistributed.DistributedMultiFieldFESpace,
+  patch_decomposition::DistributedPatchDecomposition,
+  cell_conformity::Vector{<:AbstractArray{<:CellConformity}};
+  patches_mask = default_patches_mask(patch_decomposition)
+)
 
-  field_spaces = map((s,c) -> PatchFESpace(s,patch_decomposition,c),space,cell_conformity)
+  field_spaces = map((s,c) -> PatchFESpace(s,patch_decomposition,c;patches_mask),space,cell_conformity)
   part_spaces = map(MultiFieldFESpace,GridapDistributed.to_parray_of_arrays(map(local_views,field_spaces)))
   
   # This PRange has no ghost dofs

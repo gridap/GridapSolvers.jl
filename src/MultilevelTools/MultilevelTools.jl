@@ -7,7 +7,7 @@ using BlockArrays
 
 using Gridap
 using Gridap.Helpers, Gridap.Algebra, Gridap.Arrays, Gridap.Fields, Gridap.CellData
-using Gridap.ReferenceFEs, Gridap.Geometry, Gridap.FESpaces, Gridap.Adaptivity
+using Gridap.ReferenceFEs, Gridap.Geometry, Gridap.FESpaces, Gridap.Adaptivity, Gridap.MultiField
 
 using PartitionedArrays
 
@@ -36,6 +36,8 @@ export RestrictionOperator, ProlongationOperator
 export setup_transfer_operators, setup_prolongation_operators, setup_restriction_operators
 export mul!
 
+export MultiFieldTransferOperator
+
 include("SubpartitioningTools.jl")
 include("GridapFixes.jl")
 include("RefinementTools.jl")
@@ -43,5 +45,6 @@ include("ModelHierarchies.jl")
 include("FESpaceHierarchies.jl")
 include("LocalProjectionMaps.jl")
 include("DistributedGridTransferOperators.jl")
+include("MultiFieldTransferOperators.jl")
 
 end
