@@ -75,15 +75,20 @@ end
 function Gridap.Algebra.numerical_setup(ss::BlockTriangularSolverSS,mat::AbstractBlockMatrix)
   solver      = ss.solver
   block_ns    = map(numerical_setup,ss.block_ss,diag(ss.block_caches))
-  work_caches = allocate_in_range(mat)
+  
+  y = mortar(map(allocate_in_domain,diag(ss.block_caches))) # This should be removed with PA 0.4
+  w = allocate_in_range(mat)
+  work_caches = w, y
   return BlockTriangularSolverNS(solver,block_ns,ss.block_caches,work_caches)
 end
 
 function Gridap.Algebra.numerical_setup(ss::BlockTriangularSolverSS,mat::AbstractBlockMatrix,x::AbstractBlockVector)
   solver      = ss.solver
-  vec_blocks  = blocks(x)
-  block_ns    = map(numerical_setup,ss.block_ss,diag(ss.block_caches),vec_blocks)
-  work_caches = allocate_in_range(mat)
+  block_ns    = map(numerical_setup,ss.block_ss,diag(ss.block_caches),blocks(x))
+
+  y = mortar(map(allocate_in_domain,diag(ss.block_caches)))
+  w = allocate_in_range(mat)
+  work_caches = w, y
   return BlockTriangularSolverNS(solver,block_ns,ss.block_caches,work_caches)
 end
 
@@ -117,7 +122,8 @@ end
 function Gridap.Algebra.solve!(x::AbstractBlockVector,ns::BlockTriangularSolverNS{Val{:lower}},b::AbstractBlockVector)
   @check blocklength(x) == blocklength(b) == length(ns.block_ns)
   NB = length(ns.block_ns)
-  c, w = ns.solver.coeffs, ns.work_caches
+  c = ns.solver.coeffs
+  w, y = ns.work_caches
   mats = ns.block_caches
   for iB in 1:NB
     # Add lower off-diagonal contributions
@@ -134,7 +140,9 @@ function Gridap.Algebra.solve!(x::AbstractBlockVector,ns::BlockTriangularSolverN
     # Solve diagonal block
     nsi = ns.block_ns[iB]
     xi  = x[Block(iB)]
-    solve!(xi,nsi,wi)
+    yi  = y[Block(iB)]
+    solve!(yi,nsi,wi)
+    copy!(xi,yi)
   end
   return x
 end
@@ -142,7 +150,8 @@ end
 function Gridap.Algebra.solve!(x::AbstractBlockVector,ns::BlockTriangularSolverNS{Val{:upper}},b::AbstractBlockVector)
   @check blocklength(x) == blocklength(b) == length(ns.block_ns)
   NB = length(ns.block_ns)
-  c, w = ns.solver.coeffs, ns.work_caches
+  c = ns.solver.coeffs
+  w, y = ns.work_caches
   mats = ns.block_caches
   for iB in NB:-1:1
     # Add upper off-diagonal contributions
@@ -158,8 +167,10 @@ function Gridap.Algebra.solve!(x::AbstractBlockVector,ns::BlockTriangularSolverN
 
     # Solve diagonal block
     nsi = ns.block_ns[iB]
-    xi = x[Block(iB)]
-    solve!(xi,nsi,wi)
+    xi  = x[Block(iB)]
+    yi  = y[Block(iB)]
+    solve!(yi,nsi,wi)
+    copy!(xi,yi) # Remove this with PA 0.4
   end
   return x
 end

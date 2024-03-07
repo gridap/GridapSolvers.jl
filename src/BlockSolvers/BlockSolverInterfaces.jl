@@ -76,22 +76,19 @@ struct TriformBlock <: NonlinearSolverBlock
 end
 
 function instantiate_block_cache(block::BiformBlock,mat::AbstractMatrix)
-  cache = copy(mat) # We have to do this to ensure we have the ghost layout
-  return assemble_matrix!(block.f,cache,block.assem,block.trial,block.test)
+  return assemble_matrix(block.f,block.assem,block.trial,block.test)
 end
 
 function instantiate_block_cache(block::TriformBlock,mat::AbstractMatrix,x::AbstractVector)
-  cache = copy(mat) # We have to do this to ensure we have the ghost layout
   uh = FEFunction(block.trial,x)
   f(u,v) = block.f(uh,u,v)
-  return assemble_matrix!(f,cache,block.assem,block.trial,block.test)
+  return assemble_matrix(f,block.assem,block.trial,block.test)
 end
 
 function update_block_cache!(cache,block::TriformBlock,mat::AbstractMatrix,x::AbstractVector)
   uh = FEFunction(block.trial,x)
   f(u,v) = block.f(uh,u,v)
-  assemble_matrix!(f,cache,block.assem,block.trial,block.test)
-  return cache
+  return assemble_matrix!(f,cache,block.assem,block.trial,block.test)
 end
 
 # CompositeBlock, i.e something that takes from the system matrix and adds another contribution to it.
