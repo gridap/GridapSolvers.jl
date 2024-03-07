@@ -24,7 +24,7 @@ function update_block_cache!(cache,block::NonlinearSolverBlock,mat::AbstractMatr
   @abstractmethod
 end
 function update_block_cache!(cache,block::LinearSolverBlock,mat::AbstractMatrix,x::AbstractVector)
-  update_block_cache!(cache,block,mat)
+  return cache
 end
 
 # MatrixBlock
@@ -88,8 +88,9 @@ end
 function update_block_cache!(cache,block::TriformBlock,mat::AbstractMatrix,x::AbstractVector)
   uh = FEFunction(block.trial,x)
   f(u,v) = block.f(uh,u,v)
-  assemble_matrix!(mat,f,block.assem,block.trial,block.test)
+  assemble_matrix!(f,cache,block.assem,block.trial,block.test)
+  return cache
 end
 
-# CompositeBlock
+# CompositeBlock, i.e something that takes from the system matrix and adds another contribution to it.
 # How do we deal with different sparsity patterns? Not trivial...
