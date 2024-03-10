@@ -76,8 +76,8 @@ function Gridap.Algebra.numerical_setup(ss::BlockTriangularSolverSS,mat::Abstrac
   solver      = ss.solver
   block_ns    = map(numerical_setup,ss.block_ss,diag(ss.block_caches))
   
-  y = mortar(map(allocate_in_domain,diag(ss.block_caches))) # This should be removed with PA 0.4
-  w = allocate_in_range(mat)
+  y = mortar(map(allocate_in_domain,diag(ss.block_caches))); fill!(y,0.0) # This should be removed with PA 0.4
+  w = allocate_in_range(mat); fill!(w,0.0)
   work_caches = w, y
   return BlockTriangularSolverNS(solver,block_ns,ss.block_caches,work_caches)
 end
@@ -86,8 +86,8 @@ function Gridap.Algebra.numerical_setup(ss::BlockTriangularSolverSS,mat::Abstrac
   solver      = ss.solver
   block_ns    = map(numerical_setup,ss.block_ss,diag(ss.block_caches),blocks(x))
 
-  y = mortar(map(allocate_in_domain,diag(ss.block_caches)))
-  w = allocate_in_range(mat)
+  y = mortar(map(allocate_in_domain,diag(ss.block_caches))); fill!(y,0.0)
+  w = allocate_in_range(mat); fill!(w,0.0)
   work_caches = w, y
   return BlockTriangularSolverNS(solver,block_ns,ss.block_caches,work_caches)
 end
