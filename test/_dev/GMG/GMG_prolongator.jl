@@ -115,6 +115,11 @@ I_ns = numerical_setup(symbolic_setup(I_solver,Ah),Ah)
 Ai = assemble_matrix(ap,Ih,Ih)
 
 
+patches_mask_2 = GridapSolvers.PatchBasedSmoothers.get_coarse_node_mask(fmodel,fmodel.glue)
+patches_mask_2 == patches_mask
+_patches_mask_2 = reshape(patches_mask_2,size(fcoords))
+
+
 function prolongate(dxH)
   dxh = interp_c2f(dxH)
   uh = FEFunction(Vh,dxh)

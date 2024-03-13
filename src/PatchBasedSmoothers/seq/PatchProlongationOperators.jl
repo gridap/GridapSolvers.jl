@@ -89,12 +89,13 @@ function get_coarse_node_mask(fmodel::DiscreteModel{Dc},glue) where Dc
   ftopo = get_grid_topology(fmodel)
   n2c_map = Gridap.Geometry.get_faces(ftopo,0,Dc)
   n2c_map_cache = array_cache(n2c_map)
-  f2c_cells = glue.n2o_faces_map[Dc+1]
+  f2c_cells   = glue.n2o_faces_map[Dc+1]
+  is_boundary = get_isboundary_face(ftopo,0)
 
   is_coarse = map(1:length(n2c_map)) do n
     nbor_cells = getindex!(n2c_map_cache,n2c_map,n)
     parent = f2c_cells[first(nbor_cells)]
-    return any(c -> f2c_cells[c] != parent, nbor_cells)
+    return is_boundary[n] || any(c -> f2c_cells[c] != parent, nbor_cells)
   end
 
   return is_coarse

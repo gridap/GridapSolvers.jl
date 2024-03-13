@@ -22,7 +22,7 @@ function get_hierarchy_matrices(trials,tests,biform,qdegree)
   for lev in 1:nlevs
     parts = get_level_parts(mh,lev)
     if i_am_in(parts)
-      model = get_model(mh,lev)
+      model = MultilevelTools.get_model(mh,lev)
       U = GridapSolvers.MultilevelTools.get_fe_space(trials,lev)
       V = GridapSolvers.MultilevelTools.get_fe_space(tests,lev)
       Ω = Triangulation(model)
@@ -80,7 +80,7 @@ parts = with_mpi() do distribute
   distribute(LinearIndices((np,)))
 end
 mh = get_mesh_hierarchy(parts,nc,np_per_level);
-model = get_model(mh,1)
+model = MultilevelTools.get_model(mh,1)
 
 order = 2
 qdegree = 2*(order+1)
