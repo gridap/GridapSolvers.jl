@@ -30,8 +30,8 @@ function get_patch_smoothers(tests,patch_spaces,patch_decompositions,biform,qdeg
       Vh = get_fe_space(tests,lev)
       Ω  = Triangulation(PD)
       dΩ = Measure(Ω,qdegree)
-      local_solver = LUSolver()
-      patch_smoother = PatchBasedLinearSolver(biform,Ph,Vh,dΩ,local_solver)
+      ap = (u,v) -> biform(u,v,dΩ)
+      patch_smoother = PatchBasedLinearSolver(ap,Ph,Vh)
       smoothers[lev] = RichardsonSmoother(patch_smoother,10,0.2)
     end
   end
