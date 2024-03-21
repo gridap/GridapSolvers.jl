@@ -113,7 +113,7 @@ end
 function Gridap.Algebra.numerical_setup(::CGIterativeSolverType,
                                         ss::IterativeLinearSolverSS,
                                         A::AbstractMatrix)
-  x = allocate_in_domain(A)
+  x = allocate_in_domain(A); fill!(x,zero(eltype(x)))
   caches = IterativeSolvers.CGStateVariables(zero(x), similar(x), similar(x))
   return IterativeLinearSolverNS(ss.solver,A,caches)
 end
@@ -121,8 +121,8 @@ end
 function Gridap.Algebra.numerical_setup(::SSORIterativeSolverType,
                                         ss::IterativeLinearSolverSS,
                                         A::AbstractMatrix)
-  x = allocate_in_range(A)
-  b = allocate_in_domain(A)
+  x = allocate_in_range(A); fill!(x,zero(eltype(x)))
+  b = allocate_in_domain(A); fill!(b,zero(eltype(b)))
   ω       = ss.solver.args[:ω]
   maxiter = ss.solver.kwargs[:maxiter]
   caches  = IterativeSolvers.ssor_iterable(x,A,b,ω;maxiter=maxiter)
