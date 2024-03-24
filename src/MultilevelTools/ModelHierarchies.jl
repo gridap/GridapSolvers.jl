@@ -15,31 +15,20 @@ struct ModelHierarchyLevel{A,B,C,D}
   red_glue  :: D
 end
 
-"""
-"""
-struct ModelHierarchy
-  level_parts :: Vector{PartitionedArrays.AbstractArray}
-  levels      :: Vector{ModelHierarchyLevel}
-end
+const ModelHierarchy = HierarchicalArray{<:ModelHierarchyLevel}
 
-num_levels(a::ModelHierarchy) = length(a.levels)
-get_level(a::ModelHierarchy,level::Integer) = a.levels[level]
-
-get_level_parts(a::ModelHierarchy) = a.level_parts
-get_level_parts(a::ModelHierarchy,level::Integer) = a.level_parts[level]
-
-get_model(a::ModelHierarchy,level::Integer) = get_model(get_level(a,level))
+get_model(a::ModelHierarchy,level::Integer) = get_model(a[level])
 get_model(a::ModelHierarchyLevel{A,B,Nothing}) where {A,B} = a.model
 get_model(a::ModelHierarchyLevel{A,B,C}) where {A,B,C} = a.model_red
 
-get_model_before_redist(a::ModelHierarchy,level::Integer) = get_model_before_redist(get_level(a,level))
+get_model_before_redist(a::ModelHierarchy,level::Integer) = get_model_before_redist(a[level])
 get_model_before_redist(a::ModelHierarchyLevel) = a.model
 
-has_redistribution(a::ModelHierarchy,level::Integer) = has_redistribution(a.levels[level])
+has_redistribution(a::ModelHierarchy,level::Integer) = has_redistribution(a[level])
 has_redistribution(a::ModelHierarchyLevel{A,B,C,D}) where {A,B,C,D} = true
 has_redistribution(a::ModelHierarchyLevel{A,B,C,Nothing}) where {A,B,C} = false
 
-has_refinement(a::ModelHierarchy,level::Integer) = has_refinement(a.levels[level])
+has_refinement(a::ModelHierarchy,level::Integer) = has_refinement(a[level])
 has_refinement(a::ModelHierarchyLevel{A,B}) where {A,B} = true
 has_refinement(a::ModelHierarchyLevel{A,Nothing}) where A = false
 
@@ -102,7 +91,7 @@ function _model_hierarchy_without_refinement_bottom_up(root_parts::AbstractArray
     meshes[i] = ModelHierarchyLevel(i,model,nothing,model_red,red_glue)
   end
 
-  mh = ModelHierarchy(level_parts,meshes)
+  mh = HierarchicalArray(meshes,level_parts)
   return mh
 end
 
@@ -128,7 +117,7 @@ function _model_hierarchy_without_refinement_top_down(root_parts::AbstractArray{
   end
   meshes[num_levels] = ModelHierarchyLevel(num_levels,model,nothing,nothing,nothing)
 
-  mh = ModelHierarchy(level_parts,meshes)
+  mh = HierarchicalArray(meshes,level_parts)
   return mh
 end
 
@@ -160,7 +149,7 @@ function _model_hierarchy_by_refinement(root_parts::AbstractArray{T},
     meshes[i] = ModelHierarchyLevel(i,model_ref,ref_glue,model_red,red_glue)
   end
 
-  mh = ModelHierarchy(level_parts,meshes)
+  mh = HierarchicalArray(meshes,level_parts)
   return convert_to_adapted_models(mh)
 end
 
@@ -193,7 +182,7 @@ function _model_hierarchy_by_coarsening(root_parts::AbstractArray{T},
 
   meshes[num_levels] = ModelHierarchyLevel(num_levels,model,nothing,nothing,nothing)
 
-  mh = ModelHierarchy(level_parts,meshes)
+  mh = HierarchicalArray(meshes,level_parts)
   return convert_to_adapted_models(mh)
 end
 
@@ -202,7 +191,7 @@ function convert_to_adapted_models(mh::ModelHierarchy)
   levels = Vector{ModelHierarchyLevel}(undef,nlevs)
   for lev in 1:nlevs-1
     cparts = get_level_parts(mh,lev+1)
-    mhlev  = get_level(mh,lev)
+    mhlev  = mh[lev]
     if i_am_in(cparts)
       model     = get_model_before_redist(mh,lev)
       parent    = get_model(mh,lev+1)
@@ -213,7 +202,7 @@ function convert_to_adapted_models(mh::ModelHierarchy)
     end
     levels[lev] = ModelHierarchyLevel(lev,model_ref,mhlev.ref_glue,mhlev.model_red,mhlev.red_glue)
   end
-  levels[nlevs] = mh.levels[nlevs]
+  levels[nlevs] = mh[nlevs]
 
-  return ModelHierarchy(mh.level_parts,levels)
+  return ModelHierarchy(levels,get_level_parts(mh))
 end

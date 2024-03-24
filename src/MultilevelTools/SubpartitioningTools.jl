@@ -23,6 +23,7 @@ end
 i_am_in(comm::MPI.Comm) = get_part_id(comm) >=0
 i_am_in(comm::MPIArray) = i_am_in(comm.comm)
 i_am_in(comm::GridapDistributed.MPIVoidVector) = i_am_in(comm.comm)
+i_am_in(comm::DebugArray) = true
 
 function generate_level_parts(root_parts::AbstractArray,last_level_parts::AbstractArray,level_parts_size::Integer)
   if level_parts_size == num_parts(last_level_parts)

@@ -27,8 +27,7 @@ end
 function DistributedGridTransferOperator(lev::Int,sh::FESpaceHierarchy,qdegree::Int,op_type::Symbol;
                                          mode::Symbol=:solution,restriction_method::Symbol=:projection,
                                          solver=LUSolver())
-  mh = sh.mh
-  @check lev < num_levels(mh)
+  @check lev < num_levels(sh)
   @check op_type ∈ [:restriction, :prolongation]
   @check mode ∈ [:solution, :residual]
   @check restriction_method ∈ [:projection, :interpolation, :dof_mask]
@@ -44,7 +43,7 @@ function DistributedGridTransferOperator(lev::Int,sh::FESpaceHierarchy,qdegree::
   end
 
   # Redistribution
-  redist = has_redistribution(mh,lev)
+  redist = has_redistribution(sh,lev)
   cache_redist = _get_redistribution_cache(lev,sh,mode,op_type,restriction_method,cache_refine)
 
   cache = cache_refine, cache_redist
@@ -52,11 +51,10 @@ function DistributedGridTransferOperator(lev::Int,sh::FESpaceHierarchy,qdegree::
 end
 
 function _get_interpolation_cache(lev::Int,sh::FESpaceHierarchy,qdegree::Int,mode::Symbol)
-  mh = sh.mh
-  cparts = get_level_parts(mh,lev+1)
+  cparts = get_level_parts(sh,lev+1)
 
   if i_am_in(cparts)
-    model_h = get_model_before_redist(mh,lev)
+    model_h = get_model_before_redist(sh,lev)
     Uh   = get_fe_space_before_redist(sh,lev)
     fv_h = pfill(0.0,partition(Uh.gids))
     dv_h = (mode == :solution) ? get_dirichlet_dof_values(Uh) : zero_dirichlet_values(Uh)
@@ -67,7 +65,7 @@ function _get_interpolation_cache(lev::Int,sh::FESpaceHierarchy,qdegree::Int,mod
 
     cache_refine = model_h, Uh, fv_h, dv_h, UH, fv_H, dv_H
   else
-    model_h = get_model_before_redist(mh,lev)
+    model_h = get_model_before_redist(sh,lev)
     Uh      = get_fe_space_before_redist(sh,lev)
     cache_refine = model_h, Uh, nothing, nothing, nothing, nothing, nothing
   end
@@ -76,17 +74,16 @@ function _get_interpolation_cache(lev::Int,sh::FESpaceHierarchy,qdegree::Int,mod
 end
 
 function _get_projection_cache(lev::Int,sh::FESpaceHierarchy,qdegree::Int,mode::Symbol)
-  mh = sh.mh
-  cparts = get_level_parts(mh,lev+1)
+  cparts = get_level_parts(sh,lev+1)
 
   if i_am_in(cparts)
-    model_h = get_model_before_redist(mh,lev)
+    model_h = get_model_before_redist(sh,lev)
     Uh   = get_fe_space_before_redist(sh,lev)
     Ωh   = Triangulation(model_h)
     fv_h = zero_free_values(Uh)
     dv_h = (mode == :solution) ? get_dirichlet_dof_values(Uh) : zero_dirichlet_values(Uh)
 
-    model_H = get_model(mh,lev+1)
+    model_H = get_model(sh,lev+1)
     UH   = get_fe_space(sh,lev+1)
     VH   = get_fe_space(sh,lev+1)
     ΩH   = Triangulation(model_H)
@@ -111,7 +108,7 @@ function _get_projection_cache(lev::Int,sh::FESpaceHierarchy,qdegree::Int,mode::
 
     cache_refine = model_h, Uh, fv_h, dv_h, VH, AH, lH, xH, bH, bH0, assem
   else
-    model_h = get_model_before_redist(mh,lev)
+    model_h = get_model_before_redist(sh,lev)
     Uh      = get_fe_space_before_redist(sh,lev)
     cache_refine = model_h, Uh, nothing, nothing, nothing, nothing, nothing, nothing, nothing, nothing, nothing
   end
@@ -120,17 +117,16 @@ function _get_projection_cache(lev::Int,sh::FESpaceHierarchy,qdegree::Int,mode::
 end
 
 function _get_dual_projection_cache(lev::Int,sh::FESpaceHierarchy,qdegree::Int,solver)
-  mh = sh.mh
-  cparts = get_level_parts(mh,lev+1)
+  cparts = get_level_parts(sh,lev+1)
 
   if i_am_in(cparts)
-    model_h = get_model_before_redist(mh,lev)
+    model_h = get_model_before_redist(sh,lev)
     Uh   = get_fe_space_before_redist(sh,lev)
     Ωh   = Triangulation(model_h)
     dΩh  = Measure(Ωh,qdegree)
     uh   = FEFunction(Uh,zero_free_values(Uh),zero_dirichlet_values(Uh))
 
-    model_H = get_model(mh,lev+1)
+    model_H = get_model(sh,lev+1)
     UH   = get_fe_space(sh,lev+1)
     ΩH   = Triangulation(model_H)
     dΩhH = Measure(ΩH,Ωh,qdegree)
@@ -142,7 +138,7 @@ function _get_dual_projection_cache(lev::Int,sh::FESpaceHierarchy,qdegree::Int,s
     rh = allocate_in_domain(Mh); fill!(rh,0.0)
     cache_refine = model_h, Uh, UH, Mh_ns, rh, uh, assem, dΩhH
   else
-    model_h = get_model_before_redist(mh,lev)
+    model_h = get_model_before_redist(sh,lev)
     Uh      = get_fe_space_before_redist(sh,lev)
     cache_refine = model_h, Uh, nothing, nothing, nothing, nothing, nothing, nothing
   end
@@ -151,18 +147,17 @@ function _get_dual_projection_cache(lev::Int,sh::FESpaceHierarchy,qdegree::Int,s
 end
 
 function _get_redistribution_cache(lev::Int,sh::FESpaceHierarchy,mode::Symbol,op_type::Symbol,restriction_method::Symbol,cache_refine)
-  mh = sh.mh
-  redist = has_redistribution(mh,lev)
+  redist = has_redistribution(sh,lev)
   if !redist 
     cache_redist = nothing
     return cache_redist
   end
 
   Uh_red      = get_fe_space(sh,lev)
-  model_h_red = get_model(mh,lev)
+  model_h_red = get_model(sh,lev)
   fv_h_red    = pfill(0.0,partition(Uh_red.gids))
   dv_h_red    = (mode == :solution) ? get_dirichlet_dof_values(Uh_red) : zero_dirichlet_values(Uh_red)
-  glue        = mh.levels[lev].red_glue
+  glue        = sh[lev].mh_level.red_glue
 
   if op_type == :prolongation
     model_h, Uh, fv_h, dv_h, UH, fv_H, dv_H = cache_refine
@@ -195,16 +190,10 @@ end
 
 function setup_prolongation_operators(sh::FESpaceHierarchy,qdegrees::AbstractArray{<:Integer};kwargs...)
   @check length(qdegrees) == num_levels(sh)
-  mh = sh.mh
-  prolongations = Vector{DistributedGridTransferOperator}(undef,num_levels(sh)-1)
-  for lev in 1:num_levels(sh)-1
-    parts = get_level_parts(mh,lev)
-    if i_am_in(parts)
-      qdegree = qdegrees[lev]
-      prolongations[lev] = ProlongationOperator(lev,sh,qdegree;kwargs...)
-    end
+  map(view(linear_indices(sh),1:num_levels(sh)-1)) do lev
+    qdegree = qdegrees[lev]
+    ProlongationOperator(lev,sh,qdegree;kwargs...)
   end
-  return prolongations
 end
 
 function setup_restriction_operators(sh::FESpaceHierarchy,qdegree::Integer;kwargs...)
@@ -214,16 +203,10 @@ end
 
 function setup_restriction_operators(sh::FESpaceHierarchy,qdegrees::AbstractArray{<:Integer};kwargs...)
   @check length(qdegrees) == num_levels(sh)
-  mh = sh.mh
-  restrictions  = Vector{DistributedGridTransferOperator}(undef,num_levels(sh)-1)
-  for lev in 1:num_levels(sh)-1
-    parts = get_level_parts(mh,lev)
-    if i_am_in(parts)
-      qdegree = qdegrees[lev]
-      restrictions[lev]  = RestrictionOperator(lev,sh,qdegree;kwargs...)
-    end
+  map(view(linear_indices(sh),1:num_levels(sh)-1)) do lev
+    qdegree = qdegrees[lev]
+    RestrictionOperator(lev,sh,qdegree;kwargs...)
   end
-  return restrictions
 end
 
 ### Applying the operators:

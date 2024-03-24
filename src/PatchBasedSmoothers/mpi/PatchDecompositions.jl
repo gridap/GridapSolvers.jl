@@ -22,16 +22,10 @@ function PatchDecomposition(model::GridapDistributed.DistributedDiscreteModel{Dc
 end
 
 function PatchDecomposition(mh::ModelHierarchy;kwargs...)
-  nlevs = num_levels(mh)
-  decompositions = Vector{DistributedPatchDecomposition}(undef,nlevs-1)
-  for lev in 1:nlevs-1
-    parts = get_level_parts(mh,lev)
-    if i_am_in(parts)
-      model = get_model(mh,lev)
-      decompositions[lev] = PatchDecomposition(model;kwargs...)
-    end
+  map(view(mh,1:num_levels(mh)-1)) do mhl
+    model = get_model(mhl)
+    PatchDecomposition(model;kwargs...)
   end
-  return decompositions
 end
 
 function Gridap.Geometry.Triangulation(a::DistributedPatchDecomposition)

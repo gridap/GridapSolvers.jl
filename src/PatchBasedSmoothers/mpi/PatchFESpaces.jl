@@ -39,22 +39,16 @@ function default_patches_mask(patch_decomposition::DistributedPatchDecomposition
   return patches_mask
 end
 
-function PatchFESpace(sh::FESpaceHierarchy,
-                      patch_decompositions::AbstractArray{<:DistributedPatchDecomposition})
-  mh = sh.mh
-  nlevs  = num_levels(mh)
-  levels = Vector{MultilevelTools.FESpaceHierarchyLevel}(undef,nlevs)
-  for lev in 1:nlevs-1
-    parts = get_level_parts(mh,lev)
-    if i_am_in(parts)
-      space  = MultilevelTools.get_fe_space(sh,lev)
-      decomp = patch_decompositions[lev]
-      cell_conformity = sh.levels[lev].cell_conformity
-      patch_space = PatchFESpace(space,decomp,cell_conformity)
-      levels[lev] = MultilevelTools.FESpaceHierarchyLevel(lev,nothing,patch_space,cell_conformity)
-    end
+function PatchFESpace(
+  sh::FESpaceHierarchy,
+  patch_decompositions::AbstractArray{<:DistributedPatchDecomposition}
+)
+  map(view(sh,1:num_levels(sh)-1),patch_decompositions) do shl,decomp
+    space = get_fe_space(shl)
+    cell_conformity = shl.cell_conformity
+    patch_space = PatchFESpace(space,decomp,cell_conformity)
+    MultilevelTools.FESpaceHierarchyLevel(lev,nothing,patch_space,cell_conformity)
   end
-  return FESpaceHierarchy(mh,levels)
 end
 
 # x \in  PatchFESpace

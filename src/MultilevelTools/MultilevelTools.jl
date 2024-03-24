@@ -21,6 +21,9 @@ using GridapDistributed: generate_subparts, local_views
 export change_parts, num_parts, i_am_in
 export generate_level_parts, generate_subparts
 
+export HierarchicalArray
+export num_levels, get_level_parts
+
 export ModelHierarchy
 export num_levels, get_level, get_level_parts
 export get_model, get_model_before_redist, has_refinement, has_redistribution
@@ -39,8 +42,10 @@ export mul!
 export MultiFieldTransferOperator
 
 include("SubpartitioningTools.jl")
+include("HierarchicalArrays.jl")
 include("GridapFixes.jl")
 include("RefinementTools.jl")
+
 include("ModelHierarchies.jl")
 include("FESpaceHierarchies.jl")
 include("LocalProjectionMaps.jl")
