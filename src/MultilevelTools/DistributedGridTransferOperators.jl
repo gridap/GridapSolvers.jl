@@ -36,7 +36,7 @@ function DistributedGridTransferOperator(lev::Int,sh::FESpaceHierarchy,qdegree::
   if (op_type == :prolongation) || (restriction_method ∈ [:interpolation,:dof_mask])
     cache_refine = _get_interpolation_cache(lev,sh,qdegree,mode)
   elseif mode == :solution
-    cache_refine = _get_projection_cache(lev,sh,qdegree,mode)
+    cache_refine = _get_projection_cache(lev,sh,qdegree,mode,solver)
   else
     cache_refine = _get_dual_projection_cache(lev,sh,qdegree,solver)
     restriction_method = :dual_projection
@@ -73,7 +73,7 @@ function _get_interpolation_cache(lev::Int,sh::FESpaceHierarchy,qdegree::Int,mod
   return cache_refine
 end
 
-function _get_projection_cache(lev::Int,sh::FESpaceHierarchy,qdegree::Int,mode::Symbol)
+function _get_projection_cache(lev::Int,sh::FESpaceHierarchy,qdegree::Int,mode::Symbol,solver)
   cparts = get_level_parts(sh,lev+1)
 
   if i_am_in(cparts)
@@ -103,10 +103,11 @@ function _get_projection_cache(lev::Int,sh::FESpaceHierarchy,qdegree::Int,mode::
     u,v    = get_trial_fe_basis(UH), get_fe_basis(VH)
     data   = collect_cell_matrix_and_vector(UH,VH,aH(u,v),lH(v,u00),u_dir)
     AH,bH0 = assemble_matrix_and_vector(assem,data)
-    xH     = allocate_in_domain(AH)
+    AH_ns  = numerical_setup(symbolic_setup(solver,AH),AH)
+    xH     = allocate_in_domain(AH); fill!(xH,zero(eltype(xH)))
     bH     = copy(bH0)
 
-    cache_refine = model_h, Uh, fv_h, dv_h, VH, AH, lH, xH, bH, bH0, assem
+    cache_refine = model_h, Uh, fv_h, dv_h, VH, AH_ns, lH, xH, bH, bH0, assem
   else
     model_h = get_model_before_redist(sh,lev)
     Uh      = get_fe_space_before_redist(sh,lev)
@@ -135,7 +136,7 @@ function _get_dual_projection_cache(lev::Int,sh::FESpaceHierarchy,qdegree::Int,s
     Mh_ns = numerical_setup(symbolic_setup(solver,Mh),Mh)
 
     assem = SparseMatrixAssembler(UH,UH)
-    rh = allocate_in_domain(Mh); fill!(rh,0.0)
+    rh = allocate_in_domain(Mh); fill!(rh,zero(eltype(rh)))
     cache_refine = model_h, Uh, UH, Mh_ns, rh, uh, assem, dΩhH
   else
     model_h = get_model_before_redist(sh,lev)
@@ -159,7 +160,7 @@ function _get_redistribution_cache(lev::Int,sh::FESpaceHierarchy,mode::Symbol,op
   dv_h_red    = (mode == :solution) ? get_dirichlet_dof_values(Uh_red) : zero_dirichlet_values(Uh_red)
   glue        = sh[lev].mh_level.red_glue
 
-  if op_type == :prolongation
+  if (op_type == :prolongation) || (restriction_method ∈ [:interpolation,:dof_mask])
     model_h, Uh, fv_h, dv_h, UH, fv_H, dv_H = cache_refine
     cache_exchange = get_redistribute_free_values_cache(fv_h_red,Uh_red,fv_h,dv_h,Uh,model_h_red,glue;reverse=false)
   elseif restriction_method == :projection
@@ -240,7 +241,7 @@ end
 # B.2) Restriction, without redistribution, by projection
 function LinearAlgebra.mul!(y::PVector,A::DistributedGridTransferOperator{Val{:restriction},Val{false},Val{:projection}},x::PVector)
   cache_refine, cache_redist = A.cache
-  model_h, Uh, fv_h, dv_h, VH, AH, lH, xH, bH, bH0, assem = cache_refine
+  model_h, Uh, fv_h, dv_h, VH, AH_ns, lH, xH, bH, bH0, assem = cache_refine
 
   copy!(fv_h,x) # Matrix layout -> FE layout
   uh = FEFunction(Uh,fv_h,dv_h)
@@ -248,7 +249,7 @@ function LinearAlgebra.mul!(y::PVector,A::DistributedGridTransferOperator{Val{:r
   vec_data = collect_cell_vector(VH,lH(v,uh))
   copy!(bH,bH0)
   assemble_vector_add!(bH,assem,vec_data) # Matrix layout
-  IterativeSolvers.cg!(xH,AH,bH;reltol=1.0e-06)
+  solve!(xH,AH_ns,bH)
   copy!(y,xH)
   
   return y
@@ -311,7 +312,7 @@ end
 # D.2) Restriction, with redistribution, by projection
 function LinearAlgebra.mul!(y::Union{PVector,Nothing},A::DistributedGridTransferOperator{Val{:restriction},Val{true},Val{:projection}},x::PVector)
   cache_refine, cache_redist = A.cache
-  model_h, Uh, fv_h, dv_h, VH, AH, lH, xH, bH, bH0, assem = cache_refine
+  model_h, Uh, fv_h, dv_h, VH, AH_ns, lH, xH, bH, bH0, assem = cache_refine
   fv_h_red, dv_h_red, Uh_red, model_h_red, glue, cache_exchange = cache_redist
 
   # 1 - Redistribute from fine partition to coarse partition
@@ -327,7 +328,7 @@ function LinearAlgebra.mul!(y::Union{PVector,Nothing},A::DistributedGridTransfer
     vec_data = collect_cell_vector(VH,lH(v,uh))
     copy!(bH,bH0)
     assemble_vector_add!(bH,assem,vec_data) # Matrix layout
-    IterativeSolvers.cg!(xH,AH,bH;reltol=1.0e-06)
+    solve!(xH,AH_ns,bH)
     copy!(y,xH)
   end
 

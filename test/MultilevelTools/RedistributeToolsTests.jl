@@ -39,9 +39,9 @@ function main_driver(parts,mh)
   order = 2
   u(x)  = x[1]^2 + x[2]^2 - 3.0*x[1]*x[2]
   reffe = ReferenceFE(lagrangian,Float64,order)
-  glue  = mh.levels[1].red_glue
+  glue  = mh[1].red_glue
 
-  model_old = get_model_before_redist(mh.levels[1])
+  model_old = get_model_before_redist(mh[1])
   if i_am_in(old_parts)
     VOLD  = TestFESpace(model_old,reffe,dirichlet_tags="boundary")
     UOLD  = TrialFESpace(VOLD,u)
@@ -50,7 +50,7 @@ function main_driver(parts,mh)
     UOLD  = nothing
   end
 
-  model_new = get_model(mh.levels[1])
+  model_new = get_model(mh[1])
   VNEW  = TestFESpace(model_new,reffe,dirichlet_tags="boundary")
   UNEW  = TrialFESpace(VNEW,u)
 

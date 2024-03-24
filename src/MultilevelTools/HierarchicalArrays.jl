@@ -71,7 +71,7 @@ function Base.map(f::Function,args::Vararg{HierarchicalArray,N}) where N
   @assert all(a -> get_level_parts(a) === ranks, args)
 
   arrays = map(a -> a.array, args)
-  array = map(ranks,arrays...) do ranks, arrays...
+  array = map(ranks, arrays...) do ranks, arrays...
     if i_am_in(ranks)
       f(arrays...)
     else

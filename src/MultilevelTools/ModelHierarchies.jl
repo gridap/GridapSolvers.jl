@@ -39,11 +39,13 @@ has_refinement(a::ModelHierarchyLevel{A,Nothing}) where A = false
                          each level into. We need `num_procs_x_level[end]` to be equal to 
                          the number of parts of `model`.
 """
-function ModelHierarchy(root_parts        ::AbstractArray,
-                        model             ::GridapDistributed.DistributedDiscreteModel,
-                        num_procs_x_level ::Vector{<:Integer};
-                        mesh_refinement = true,
-                        kwargs...)
+function ModelHierarchy(
+  root_parts        ::AbstractArray,
+  model             ::GridapDistributed.DistributedDiscreteModel,
+  num_procs_x_level ::Vector{<:Integer};
+  mesh_refinement = true,
+  kwargs...
+)
 
   # Request correct number of parts from MAIN
   model_parts  = get_parts(model)
@@ -187,22 +189,19 @@ function _model_hierarchy_by_coarsening(root_parts::AbstractArray{T},
 end
 
 function convert_to_adapted_models(mh::ModelHierarchy)
-  nlevs  = num_levels(mh)
-  levels = Vector{ModelHierarchyLevel}(undef,nlevs)
-  for lev in 1:nlevs-1
-    cparts = get_level_parts(mh,lev+1)
-    mhlev  = mh[lev]
-    if i_am_in(cparts)
+  map(linear_indices(mh),mh) do lev, mhl
+    if lev == num_levels(mh)
+      return mhl
+    end
+
+    if i_am_in(get_level_parts(mh,lev+1))
       model     = get_model_before_redist(mh,lev)
       parent    = get_model(mh,lev+1)
-      ref_glue  = mhlev.ref_glue
+      ref_glue  = mhl.ref_glue
       model_ref = GridapDistributed.DistributedAdaptedDiscreteModel(model,parent,ref_glue)
     else
       model_ref = nothing
     end
-    levels[lev] = ModelHierarchyLevel(lev,model_ref,mhlev.ref_glue,mhlev.model_red,mhlev.red_glue)
+    return ModelHierarchyLevel(lev,model_ref,mhl.ref_glue,mhl.model_red,mhl.red_glue)
   end
-  levels[nlevs] = mh[nlevs]
-
-  return ModelHierarchy(levels,get_level_parts(mh))
 end
