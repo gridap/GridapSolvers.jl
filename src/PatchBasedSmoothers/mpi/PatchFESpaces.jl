@@ -24,8 +24,9 @@ function PatchFESpace(
   local_ndofs  = map(num_free_dofs,spaces)
   global_ndofs = sum(local_ndofs)
   patch_partition = variable_partition(local_ndofs,global_ndofs,false)
+  trian = get_triangulation(space)
   gids = PRange(patch_partition)
-  return GridapDistributed.DistributedSingleFieldFESpace(spaces,gids,get_vector_type(space))
+  return GridapDistributed.DistributedSingleFieldFESpace(spaces,gids,trian,get_vector_type(space))
 end
 
 function default_patches_mask(patch_decomposition::DistributedPatchDecomposition)
@@ -47,7 +48,7 @@ function PatchFESpace(
     space = get_fe_space(shl)
     cell_conformity = shl.cell_conformity
     patch_space = PatchFESpace(space,decomp,cell_conformity)
-    MultilevelTools.FESpaceHierarchyLevel(lev,nothing,patch_space,cell_conformity)
+    MultilevelTools.FESpaceHierarchyLevel(shl.level,nothing,patch_space,cell_conformity,shl.mh_level)
   end
 end
 

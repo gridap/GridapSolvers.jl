@@ -66,10 +66,19 @@ num_levels(a::HierarchicalArray) = length(a.ranks)
 get_level_parts(a::HierarchicalArray) = a.ranks
 get_level_parts(a::HierarchicalArray,lev) = a.ranks[lev]
 
-function Base.map(f::Function,args::Vararg{HierarchicalArray,N}) where N
-  ranks = get_level_parts(first(args))
-  @assert all(a -> get_level_parts(a) === ranks, args)
+function matching_level_parts(a::HierarchicalArray,b::HierarchicalArray)
+  @assert num_levels(a) == num_levels(b)
+  return all(map(===, get_level_parts(a), get_level_parts(b)))
+end
 
+function matching_level_parts(arrays::Vararg{HierarchicalArray,N}) where N
+  a1 = first(arrays)
+  return all(a -> matching_level_parts(a1,a), arrays)
+end
+
+function Base.map(f::Function,args::Vararg{HierarchicalArray,N}) where N
+  @assert matching_level_parts(args...)
+  ranks  = get_level_parts(first(args))
   arrays = map(a -> a.array, args)
   array = map(ranks, arrays...) do ranks, arrays...
     if i_am_in(ranks)

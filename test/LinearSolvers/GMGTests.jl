@@ -18,24 +18,27 @@ using GridapSolvers.MultilevelTools
 using GridapSolvers.PatchBasedSmoothers
 
 
-function get_patch_smoothers(tests,patch_spaces,patch_decompositions,biform,qdegree)
-  mh = tests.mh
+function get_patch_smoothers(mh,tests,biform,qdegree)
+  patch_decompositions = PatchDecomposition(mh)
+  patch_spaces = PatchFESpace(tests,patch_decompositions)
   nlevs = num_levels(mh)
-  smoothers = Vector{RichardsonSmoother}(undef,nlevs-1)
-  for lev in 1:nlevs-1
-    parts = get_level_parts(mh,lev)
-    if i_am_in(parts)
-      PD = patch_decompositions[lev]
-      Ph = get_fe_space(patch_spaces,lev)
-      Vh = get_fe_space(tests,lev)
-      Ω  = Triangulation(PD)
-      dΩ = Measure(Ω,qdegree)
-      ap = (u,v) -> biform(u,v,dΩ)
-      patch_smoother = PatchBasedLinearSolver(ap,Ph,Vh)
-      smoothers[lev] = RichardsonSmoother(patch_smoother,10,0.2)
-    end
+  smoothers = map(view(tests,1:nlevs-1),patch_decompositions,patch_spaces) do tests, PD, patch_space
+    Vh = get_fe_space(tests)
+    Ph = get_fe_space(patch_space)
+    Ω  = Triangulation(PD)
+    dΩ = Measure(Ω,qdegree)
+    ap = (u,v) -> biform(u,v,dΩ)
+    patch_smoother = PatchBasedLinearSolver(ap,Ph,Vh)
+    return RichardsonSmoother(patch_smoother,10,0.2)
   end
   return smoothers
+end
+
+function get_smoothers(mh)
+  nlevs = num_levels(mh)
+  smoothers = Fill(RichardsonSmoother(JacobiLinearSolver(),10,2.0/3.0),nlevs-1)
+  level_parts = view(get_level_parts(mh),1:nlevs-1)
+  return HierarchicalArray(smoothers,level_parts)
 end
 
 function gmg_driver(t,parts,mh,spaces,qdegree,smoothers,biform,liform,u)
@@ -97,7 +100,7 @@ function gmg_poisson_driver(t,parts,mh,order)
   liform(v,dΩ)   = ∫(v*f)dΩ
   qdegree   = 2*order+1
   reffe     = ReferenceFE(lagrangian,Float64,order)
-  smoothers = Fill(RichardsonSmoother(JacobiLinearSolver(),10,9.0/8.0),num_levels(mh)-1)
+  smoothers = get_smoothers(mh)
 
   tests     = TestFESpace(mh,reffe,dirichlet_tags="boundary")
   trials    = TrialFESpace(tests,u)
@@ -116,7 +119,7 @@ function gmg_laplace_driver(t,parts,mh,order)
   liform(v,dΩ)   = ∫(v*f)dΩ
   qdegree   = 2*order+1
   reffe     = ReferenceFE(lagrangian,Float64,order)
-  smoothers = Fill(RichardsonSmoother(JacobiLinearSolver(),10,2.0/3.0),num_levels(mh)-1)
+  smoothers = get_smoothers(mh)
 
   tests     = TestFESpace(mh,reffe,dirichlet_tags="boundary")
   trials    = TrialFESpace(tests,u)
@@ -136,7 +139,7 @@ function gmg_vector_laplace_driver(t,parts,mh,order)
   liform(v,dΩ)   = ∫(v⋅f)dΩ
   qdegree   = 2*order+1
   reffe     = ReferenceFE(lagrangian,VectorValue{Dc,Float64},order)
-  smoothers = Fill(RichardsonSmoother(JacobiLinearSolver(),10,2.0/3.0),num_levels(mh)-1)
+  smoothers = get_smoothers(mh)
 
   tests     = TestFESpace(mh,reffe,dirichlet_tags="boundary")
   trials    = TrialFESpace(tests,u)
@@ -163,9 +166,7 @@ function gmg_hdiv_driver(t,parts,mh,order)
   toc!(t,"FESpaces")
 
   tic!(t;barrier=true)
-  patch_decompositions = PatchDecomposition(mh)
-  patch_spaces = PatchFESpace(tests,patch_decompositions)
-  smoothers = get_patch_smoothers(tests,patch_spaces,patch_decompositions,biform,qdegree)
+  smoothers = get_patch_smoothers(mh,tests,biform,qdegree)
   toc!(t,"Patch Decomposition")
 
   return gmg_driver(t,parts,mh,spaces,qdegree,smoothers,biform,liform,u)
@@ -198,9 +199,7 @@ function gmg_multifield_driver(t,parts,mh,order)
 
   tic!(t;barrier=true)
   qdegree = 2*(order+1)
-  patch_decompositions = PatchDecomposition(mh)
-  patch_spaces = PatchFESpace(tests,patch_decompositions)
-  smoothers = get_patch_smoothers(tests,patch_spaces,patch_decompositions,biform,qdegree)
+  smoothers = get_patch_smoothers(mh,tests,biform,qdegree)
   toc!(t,"Patch Decomposition")
 
   return gmg_driver(t,parts,mh,spaces,qdegree,smoothers,biform,liform,nothing)

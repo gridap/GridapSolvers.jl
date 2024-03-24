@@ -8,9 +8,9 @@ end
 
 const FESpaceHierarchy = HierarchicalArray{<:FESpaceHierarchyLevel}
 
-get_fe_space(sh::FESpaceHierarchy,lev::Int) = get_fe_space(sh[lev])
-get_fe_space(a::FESpaceHierarchyLevel{A,Nothing}) where {A} = a.fe_space
-get_fe_space(a::FESpaceHierarchyLevel{A,B}) where {A,B} = a.fe_space_red
+FESpaces.get_fe_space(sh::FESpaceHierarchy,lev::Int) = get_fe_space(sh[lev])
+FESpaces.get_fe_space(a::FESpaceHierarchyLevel{A,Nothing}) where {A} = a.fe_space
+FESpaces.get_fe_space(a::FESpaceHierarchyLevel{A,B}) where {A,B} = a.fe_space_red
 
 get_fe_space_before_redist(sh::FESpaceHierarchy,lev::Int) = get_fe_space_before_redist(sh[lev])
 get_fe_space_before_redist(a::FESpaceHierarchyLevel) = a.fe_space

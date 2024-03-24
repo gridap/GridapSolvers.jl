@@ -76,28 +76,23 @@ function Gridap.Algebra.numerical_setup!(ss::GMGNumericalSetup,mat::AbstractMatr
   ns.solver.smatrices[1] = mat
 end
 
-function gmg_finest_level_cache(mh::ModelHierarchy,smatrices::Vector{<:AbstractMatrix})
+function gmg_finest_level_cache(mh::ModelHierarchy,smatrices::AbstractVector{<:AbstractMatrix})
   cache = nothing
   parts = get_level_parts(mh,1)
   if i_am_in(parts)
     Ah = smatrices[1]
-    rh = allocate_in_domain(Ah)
+    rh = allocate_in_domain(Ah); fill!(rh,0.0)
     cache = rh
   end
   return cache
 end
 
-function gmg_smoothers_caches(mh::ModelHierarchy,smoothers::AbstractVector{<:LinearSolver},smatrices::Vector{<:AbstractMatrix})
+function gmg_smoothers_caches(mh::ModelHierarchy,smoothers::AbstractVector{<:LinearSolver},smatrices::AbstractVector{<:AbstractMatrix})
   Gridap.Helpers.@check length(smoothers) == num_levels(mh)-1
   nlevs = num_levels(mh)
   # Last (i.e., coarsest) level does not need pre-/post-smoothing
-  caches = Vector{Any}(undef,nlevs-1)
-  for i = 1:nlevs-1
-    parts = get_level_parts(mh,i)
-    if i_am_in(parts)
-      ss = symbolic_setup(smoothers[i], smatrices[i])
-      caches[i] = numerical_setup(ss, smatrices[i])
-    end
+  caches = map(smoothers,view(smatrices,1:nlevs-1)) do smoother, mat
+    numerical_setup(symbolic_setup(smoother, mat), mat)
   end
   return caches
 end
@@ -117,21 +112,17 @@ function gmg_coarse_solver_caches(mh,s,mats,work_vectors)
   return cache
 end
 
-function gmg_work_vectors(mh::ModelHierarchy,smatrices::Vector{<:AbstractMatrix})
+function gmg_work_vectors(mh::ModelHierarchy,smatrices::AbstractVector{<:AbstractMatrix})
   nlevs = num_levels(mh)
-  work_vectors = Vector{Any}(undef,nlevs-1)
-  for i = 1:nlevs-1
-    parts = get_level_parts(mh,i)
-    if i_am_in(parts)
-      work_vectors[i] = gmg_work_vectors(mh,smatrices,i)
-    end
+  work_vectors = map(view(linear_indices(mh),1:nlevs-1)) do lev
+    gmg_work_vectors(mh,smatrices,lev)
   end
   return work_vectors
 end
 
-function gmg_work_vectors(mh::ModelHierarchy,smatrices::Vector{<:AbstractMatrix},lev::Integer)
-  dxh   = allocate_in_domain(smatrices[lev])
-  Adxh  = allocate_in_range(smatrices[lev])
+function gmg_work_vectors(mh::ModelHierarchy,smatrices::AbstractVector{<:AbstractMatrix},lev::Integer)
+  dxh   = allocate_in_domain(smatrices[lev]); fill!(dxh,0.0)
+  Adxh  = allocate_in_range(smatrices[lev]); fill!(Adxh,0.0)
 
   cparts = get_level_parts(mh,lev+1)
   if i_am_in(cparts)
