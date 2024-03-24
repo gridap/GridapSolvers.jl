@@ -29,9 +29,11 @@ has_refinement(a::FESpaceHierarchyLevel) = has_refinement(a.mh_level)
 
 # Test/Trial FESpaces for ModelHierarchyLevels
 
-function _cell_conformity(model::DiscreteModel,
-                          reffe::Tuple{<:Gridap.FESpaces.ReferenceFEName,Any,Any}; 
-                          conformity=nothing, kwargs...)
+function _cell_conformity(
+  model::DiscreteModel,
+  reffe::Tuple{<:Gridap.FESpaces.ReferenceFEName,Any,Any}; 
+  conformity=nothing, kwargs...
+)
   basis, reffe_args, reffe_kwargs = reffe
   cell_reffe = ReferenceFE(model,basis,reffe_args...;reffe_kwargs...)
   conformity = Conformity(Gridap.Arrays.testitem(cell_reffe),conformity)
@@ -45,22 +47,20 @@ function _cell_conformity(model::GridapDistributed.DistributedDiscreteModel,args
   return cell_conformities
 end
 
-function Gridap.FESpaces.FESpace(
-      mh::ModelHierarchyLevel{A,B,C,Nothing},args...;kwargs...) where {A,B,C}
-  Vh = FESpace(get_model(mh),args...;kwargs...)
-  cell_conformity = _cell_conformity(get_model(mh),args...;kwargs...)
-  return FESpaceHierarchyLevel(mh.level,Vh,nothing,cell_conformity,mh)
-end
-
-function Gridap.FESpaces.FESpace(mh::ModelHierarchyLevel{A,B,C,D},args...;kwargs...) where {A,B,C,D}
-  cparts, _ = get_old_and_new_parts(mh.red_glue,Val(false))
-  Vh     = i_am_in(cparts) ? FESpace(get_model_before_redist(mh),args...;kwargs...) : nothing
-  Vh_red = FESpace(get_model(mh),args...;kwargs...)
+function FESpaces.FESpace(mh::ModelHierarchyLevel,args...;kwargs...)
+  if has_redistribution(mh)
+    cparts, _ = get_old_and_new_parts(mh.red_glue,Val(false))
+    Vh     = i_am_in(cparts) ? FESpace(get_model_before_redist(mh),args...;kwargs...) : nothing
+    Vh_red = FESpace(get_model(mh),args...;kwargs...)
+  else
+    Vh = FESpace(get_model(mh),args...;kwargs...)
+    Vh_red = nothing
+  end
   cell_conformity = _cell_conformity(get_model(mh),args...;kwargs...)
   return FESpaceHierarchyLevel(mh.level,Vh,Vh_red,cell_conformity,mh)
 end
 
-function Gridap.FESpaces.TrialFESpace(a::FESpaceHierarchyLevel,args...;kwargs...)
+function FESpaces.TrialFESpace(a::FESpaceHierarchyLevel,args...;kwargs...)
   Uh     = !isa(a.fe_space,Nothing) ? TrialFESpace(a.fe_space,args...;kwargs...) : nothing
   Uh_red = !isa(a.fe_space_red,Nothing) ? TrialFESpace(a.fe_space_red,args...;kwargs...) : nothing
   return FESpaceHierarchyLevel(a.level,Uh,Uh_red,a.cell_conformity,a.mh_level)
@@ -68,15 +68,15 @@ end
 
 # Test/Trial FESpaces for ModelHierarchies/FESpaceHierarchy
 
-function Gridap.FESpaces.FESpace(mh::ModelHierarchy,args...;kwargs...)
+function FESpaces.FESpace(mh::ModelHierarchy,args...;kwargs...)
   map(mh) do mhl
     TestFESpace(mhl,args...;kwargs...)
   end
 end
 
-function Gridap.FESpaces.FESpace(
+function FESpaces.FESpace(
   mh::ModelHierarchy,
-  arg_vector::AbstractVector{<:Union{ReferenceFE,Tuple{<:Gridap.ReferenceFEs.ReferenceFEName,Any,Any}}};
+  arg_vector::AbstractVector{<:Union{ReferenceFE,Tuple{<:ReferenceFEs.ReferenceFEName,Any,Any}}};
   kwargs...
 )
   map(linear_indices(mh),mh) do l, mhl
@@ -85,21 +85,19 @@ function Gridap.FESpaces.FESpace(
   end
 end
 
-function Gridap.FESpaces.TrialFESpace(sh::FESpaceHierarchy,u)
+function FESpaces.TrialFESpace(sh::FESpaceHierarchy,u)
   map(sh) do shl
     TrialFESpace(shl,u)
   end
 end
 
-function Gridap.FESpaces.TrialFESpace(sh::FESpaceHierarchy)
-  map(sh) do shl
-    TrialFESpace(shl)
-  end
+function FESpaces.TrialFESpace(sh::FESpaceHierarchy)
+  map(TrialFESpace,sh)
 end
 
 # MultiField support
 
-function Gridap.MultiField.MultiFieldFESpace(spaces::Vector{<:FESpaceHierarchyLevel};kwargs...)
+function MultiField.MultiFieldFESpace(spaces::Vector{<:FESpaceHierarchyLevel};kwargs...)
   level  = spaces[1].level
   Uh     = all(map(s -> !isa(s.fe_space,Nothing),spaces)) ? MultiFieldFESpace(map(s -> s.fe_space, spaces); kwargs...) : nothing
   Uh_red = all(map(s -> !isa(s.fe_space_red,Nothing),spaces)) ? MultiFieldFESpace(map(s -> s.fe_space_red, spaces); kwargs...) : nothing
@@ -135,7 +133,7 @@ function compute_hierarchy_matrices(
   mats, vecs = map(linear_indices(trials)) do lev
     U = get_fe_space(trials,lev)
     V = get_fe_space(tests,lev)
-    Ω = get_triangulation(U)
+    Ω = Triangulation(get_model(trials[lev].mh_level))
     dΩ = Measure(Ω,qdegree[lev])
     ai(u,v) = a(u,v,dΩ)
     if lev == 1

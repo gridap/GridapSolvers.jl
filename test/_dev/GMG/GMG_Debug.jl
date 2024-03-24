@@ -141,7 +141,7 @@ end
 # Patch Decomposition
 
 PD = PatchDecomposition(fmodel)
-Ph = PatchFESpace(fmodel,reffe,conformity,PD,Vh)
+Ph = PatchFESpace(Vh,PD,reffe;conformity)
 Ωp = Triangulation(PD)
 dΩp = Measure(Ωp,qdegree)
 
@@ -149,40 +149,10 @@ if conf == :h1
   smoother = RichardsonSmoother(JacobiLinearSolver(),5,0.6)
 else
   ap(u,v) = a_hdiv(u,v,dΩp)
-  local_solver = BackslashSolver()
-  smoother = RichardsonSmoother(PatchBasedLinearSolver(ap,Ph,Vh,local_solver),10,0.1)
+  smoother = RichardsonSmoother(PatchBasedLinearSolver(ap,Ph,Vh),10,0.2)
   Ap = assemble_matrix(ap,Ph,Ph)
 end
 smoother_ns = numerical_setup(symbolic_setup(smoother,Ah),Ah)
-#fill!(smoother_ns.Mns.weights[2],1.0)
-
-function PatchBasedSmoothers.prolongate!(x,Ph::PatchFESpace,y,w,w_sums)
-  dof_to_pdof = Ph.dof_to_pdof
-  
-  ptrs = dof_to_pdof.ptrs
-  data = dof_to_pdof.data
-  for dof in 1:length(dof_to_pdof)
-    for k in ptrs[dof]:ptrs[dof+1]-1
-      pdof = data[k]
-      x[pdof] = y[dof] * w[pdof] / w_sums[dof]
-    end
-  end
-end
-
-function PatchBasedSmoothers.inject!(x,Ph::PatchFESpace,y,w,w_sums)
-  dof_to_pdof = Ph.dof_to_pdof
-  
-  ptrs = dof_to_pdof.ptrs
-  data = dof_to_pdof.data
-  for dof in 1:length(dof_to_pdof)
-    x[dof] = 0.0
-    for k in ptrs[dof]:ptrs[dof+1]-1
-      pdof = data[k]
-      x[dof] += y[pdof] * w[pdof]
-    end
-    x[dof] /= w_sums[dof]
-  end
-end
 
 function smooth!(x,r)
   A  = smoother_ns.A
@@ -222,24 +192,18 @@ end
 
 iter = 0
 error = norm(bh - Ah*xh)
-while iter < niters && error > 1.0e-10
+while iter < niters && error > 1.0e-8
   println("Iter $iter:")
   println(" > Pre-smoother: ")
   println("    > norm(xh) = ",norm(xh))
   println("    > norm(rh) = ",norm(rh))
 
-  smooth!(xh,rh)
+  solve!(xh,smoother_ns,rh)
 
   println(" > Post-smoother: ")
   println("    > norm(xh) = ",norm(xh))
   println("    > norm(rh) = ",norm(rh))
 
-  #rH = project_f2c(rh)
-  #xH = project_f2c(xh)
-  #rH = bH - AH*xH
-
-  #Qrh = Mhh\rh
-  #rH = transpose(MhH)*Qrh
   rH = project_f2c_bis(rh)
 
   qH = AH\rH
@@ -253,7 +217,7 @@ while iter < niters && error > 1.0e-10
   rh = rh - Ah*qh
   xh = xh + qh
 
-  smooth!(xh,rh)
+  solve!(xh,smoother_ns,rh)
 
   iter += 1
   error = norm(bh - Ah*xh)

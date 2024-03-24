@@ -89,3 +89,25 @@ function Base.map(f::Function,args::Vararg{HierarchicalArray,N}) where N
   end
   return HierarchicalArray(array,ranks)
 end
+
+function Base.map!(f::Function,a::HierarchicalArray,args::Vararg{HierarchicalArray,N}) where N
+  @assert matching_level_parts(a,args...)
+  ranks  = get_level_parts(a)
+  arrays = map(a -> a.array, args)
+  map(ranks, a.array, arrays...) do ranks, ai, arrays...
+    if i_am_in(ranks)
+      ai = f(arrays...)
+    else
+      nothing
+    end
+  end
+  return a
+end
+
+function on_level(f::Function,a::HierarchicalArray,lev::Integer)
+  if i_am_in(a.ranks[lev])
+    return f(a.array[lev])
+  else
+    return nothing
+  end
+end

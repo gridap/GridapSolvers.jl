@@ -1,4 +1,4 @@
-abstract type PatchBoundaryStyle end ;
+abstract type PatchBoundaryStyle end
 struct PatchBoundaryExclude  <: PatchBoundaryStyle end
 struct PatchBoundaryInclude  <: PatchBoundaryStyle end
 
@@ -24,7 +24,8 @@ function PatchDecomposition(
   model::DiscreteModel{Dc,Dp};
   Dr=0,
   patch_boundary_style::PatchBoundaryStyle=PatchBoundaryExclude(),
-  boundary_tag_names::AbstractArray{String}=["boundary"]) where {Dc,Dp}
+  boundary_tag_names::AbstractArray{String}=["boundary"]
+) where {Dc,Dp}
   Gridap.Helpers.@check 0 <= Dr <= Dc-1
 
   topology     = get_grid_topology(model)
@@ -32,18 +33,14 @@ function PatchDecomposition(
   patch_facets = Gridap.Geometry.get_faces(topology,Dr,Dc-1)
   patch_cells_overlapped = compute_patch_overlapped_cells(patch_cells)
 
-  patch_cells_faces_on_boundary = 
-    compute_patch_cells_faces_on_boundary(model,
-                                          patch_cells,
-                                          patch_cells_overlapped,
-                                          patch_facets,
-                                          patch_boundary_style,
-                                          boundary_tag_names)
+  patch_cells_faces_on_boundary = compute_patch_cells_faces_on_boundary(
+    model, patch_cells, patch_cells_overlapped,
+    patch_facets, patch_boundary_style, boundary_tag_names
+  )
 
-  return PatchDecomposition{Dr,Dc,Dp}(model,
-                                      patch_cells,
-                                      patch_cells_overlapped,
-                                      patch_cells_faces_on_boundary)
+  return PatchDecomposition{Dr,Dc,Dp}(
+    model, patch_cells, patch_cells_overlapped, patch_cells_faces_on_boundary
+  )
 end
 
 function compute_patch_overlapped_cells(patch_cells)
@@ -54,21 +51,21 @@ end
 
 # patch_cell_faces_on_boundary :: 
 #    [Df][overlapped cell][lface] -> Face is boundary of the patch
-function compute_patch_cells_faces_on_boundary(model::DiscreteModel,
-                                               patch_cells,
-                                               patch_cells_overlapped,
-                                               patch_facets,
-                                               patch_boundary_style,
-                                               boundary_tag_names)
+function compute_patch_cells_faces_on_boundary(
+  model::DiscreteModel,
+  patch_cells,
+  patch_cells_overlapped,
+  patch_facets,
+  patch_boundary_style,
+  boundary_tag_names
+)
   patch_cell_faces_on_boundary = _allocate_patch_cells_faces_on_boundary(model,patch_cells)
   if !isa(patch_boundary_style,PatchBoundaryInclude)
-    _compute_patch_cells_faces_on_boundary!(patch_cell_faces_on_boundary,
-                                          model,
-                                          patch_cells,
-                                          patch_cells_overlapped,
-                                          patch_facets,
-                                          patch_boundary_style,
-                                          boundary_tag_names)
+    _compute_patch_cells_faces_on_boundary!(
+      patch_cell_faces_on_boundary,
+      model, patch_cells, patch_cells_overlapped,
+      patch_facets, patch_boundary_style, boundary_tag_names
+    )
   end
   return patch_cell_faces_on_boundary
 end
@@ -100,39 +97,44 @@ function _allocate_ocell_to_dface(::Type{T},patch_cells,cell_to_ctype,ctype_to_n
   return Gridap.Arrays.Table(data,ptrs)
 end
 
-function _compute_patch_cells_faces_on_boundary!(patch_cells_faces_on_boundary,
-                                                model::DiscreteModel,
-                                                patch_cells,
-                                                patch_cells_overlapped,
-                                                patch_facets,
-                                                patch_boundary_style,
-                                                boundary_tag_names)
-
-    num_patches = length(patch_cells.ptrs)-1
-    cache_patch_cells  = array_cache(patch_cells)
-    cache_patch_facets = array_cache(patch_facets)
-    for patch = 1:num_patches
-      current_patch_cells  = getindex!(cache_patch_cells,patch_cells,patch)
-      current_patch_facets = getindex!(cache_patch_facets,patch_facets,patch)
-      _compute_patch_cells_faces_on_boundary!(patch_cells_faces_on_boundary,
-                                             model,
-                                             patch,
-                                             current_patch_cells,
-                                             patch_cells_overlapped,
-                                             current_patch_facets,
-                                             patch_boundary_style,
-                                             boundary_tag_names)
-    end
+function _compute_patch_cells_faces_on_boundary!(
+  patch_cells_faces_on_boundary,
+  model::DiscreteModel,
+  patch_cells,
+  patch_cells_overlapped,
+  patch_facets,
+  patch_boundary_style,
+  boundary_tag_names
+)
+  num_patches = length(patch_cells.ptrs)-1
+  cache_patch_cells  = array_cache(patch_cells)
+  cache_patch_facets = array_cache(patch_facets)
+  for patch = 1:num_patches
+    current_patch_cells  = getindex!(cache_patch_cells,patch_cells,patch)
+    current_patch_facets = getindex!(cache_patch_facets,patch_facets,patch)
+    _compute_patch_cells_faces_on_boundary!(
+      patch_cells_faces_on_boundary,
+      model,
+      patch,
+      current_patch_cells,
+      patch_cells_overlapped,
+      current_patch_facets,
+      patch_boundary_style,
+      boundary_tag_names
+    )
+  end
 end
 
-function _compute_patch_cells_faces_on_boundary!(patch_cells_faces_on_boundary,
-                                                model::DiscreteModel{Dc},
-                                                patch,
-                                                patch_cells,
-                                                patch_cells_overlapped,
-                                                patch_facets,
-                                                patch_boundary_style,
-                                                boundary_tag_names) where Dc
+function _compute_patch_cells_faces_on_boundary!(
+  patch_cells_faces_on_boundary,
+  model::DiscreteModel{Dc},
+  patch,
+  patch_cells,
+  patch_cells_overlapped,
+  patch_facets,
+  patch_boundary_style,
+  boundary_tag_names
+) where Dc
   face_labeling = get_face_labeling(model)
   topology = get_grid_topology(model)
 

@@ -128,7 +128,7 @@ function _get_dual_projection_cache(lev::Int,sh::FESpaceHierarchy,qdegree::Int,s
     uh   = FEFunction(Uh,zero_free_values(Uh),zero_dirichlet_values(Uh))
 
     model_H = get_model(sh,lev+1)
-    UH   = get_fe_space(sh,lev+1)
+    UH   = MultilevelTools.get_fe_space(sh,lev+1)
     ΩH   = Triangulation(model_H)
     dΩhH = Measure(ΩH,Ωh,qdegree)
 

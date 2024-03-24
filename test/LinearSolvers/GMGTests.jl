@@ -17,14 +17,12 @@ using GridapSolvers.LinearSolvers
 using GridapSolvers.MultilevelTools
 using GridapSolvers.PatchBasedSmoothers
 
-
 function get_patch_smoothers(mh,tests,biform,qdegree)
   patch_decompositions = PatchDecomposition(mh)
   patch_spaces = PatchFESpace(tests,patch_decompositions)
   nlevs = num_levels(mh)
-  smoothers = map(view(tests,1:nlevs-1),patch_decompositions,patch_spaces) do tests, PD, patch_space
+  smoothers = map(view(tests,1:nlevs-1),patch_decompositions,patch_spaces) do tests, PD, Ph
     Vh = get_fe_space(tests)
-    Ph = get_fe_space(patch_space)
     Ω  = Triangulation(PD)
     dΩ = Measure(Ω,qdegree)
     ap = (u,v) -> biform(u,v,dΩ)
@@ -34,7 +32,7 @@ function get_patch_smoothers(mh,tests,biform,qdegree)
   return smoothers
 end
 
-function get_smoothers(mh)
+function get_jacobi_smoothers(mh)
   nlevs = num_levels(mh)
   smoothers = Fill(RichardsonSmoother(JacobiLinearSolver(),10,2.0/3.0),nlevs-1)
   level_parts = view(get_level_parts(mh),1:nlevs-1)
@@ -67,7 +65,7 @@ function gmg_driver(t,parts,mh,spaces,qdegree,smoothers,biform,liform,u)
                         mode=:preconditioner)
   
   solver = CGSolver(gmg;maxiter=20,atol=1e-14,rtol=1.e-6,verbose=i_am_main(parts))
-  #solver = GMRESSolver(5;Pr=gmg,maxiter=20,atol=1e-14,rtol=1.e-6,verbose=i_am_main(parts))
+  #solver = FGMRESSolver(5,gmg;maxiter=20,atol=1e-14,rtol=1.e-6,verbose=i_am_main(parts))
   ns = numerical_setup(symbolic_setup(solver,A),A)
   toc!(t,"GMG setup")
 
@@ -100,7 +98,7 @@ function gmg_poisson_driver(t,parts,mh,order)
   liform(v,dΩ)   = ∫(v*f)dΩ
   qdegree   = 2*order+1
   reffe     = ReferenceFE(lagrangian,Float64,order)
-  smoothers = get_smoothers(mh)
+  smoothers = get_jacobi_smoothers(mh)
 
   tests     = TestFESpace(mh,reffe,dirichlet_tags="boundary")
   trials    = TrialFESpace(tests,u)
@@ -119,7 +117,7 @@ function gmg_laplace_driver(t,parts,mh,order)
   liform(v,dΩ)   = ∫(v*f)dΩ
   qdegree   = 2*order+1
   reffe     = ReferenceFE(lagrangian,Float64,order)
-  smoothers = get_smoothers(mh)
+  smoothers = get_jacobi_smoothers(mh)
 
   tests     = TestFESpace(mh,reffe,dirichlet_tags="boundary")
   trials    = TrialFESpace(tests,u)
@@ -139,7 +137,7 @@ function gmg_vector_laplace_driver(t,parts,mh,order)
   liform(v,dΩ)   = ∫(v⋅f)dΩ
   qdegree   = 2*order+1
   reffe     = ReferenceFE(lagrangian,VectorValue{Dc,Float64},order)
-  smoothers = get_smoothers(mh)
+  smoothers = get_jacobi_smoothers(mh)
 
   tests     = TestFESpace(mh,reffe,dirichlet_tags="boundary")
   trials    = TrialFESpace(tests,u)
@@ -240,7 +238,7 @@ function main(distribute,np::Integer,nc::Tuple,np_per_level::Vector)
   mh = get_mesh_hierarchy(parts,nc,np_per_level)
   Dc = length(nc)
 
-  for pde in [:poisson,:laplace,:vector_laplace,:hdiv,:multifield]
+  for pde in [:hdiv]#[:poisson,:laplace,:vector_laplace,:hdiv,:multifield]
     if (pde != :multifield) || (Dc == 3)
       if i_am_main(parts)
         println(repeat("=",80))

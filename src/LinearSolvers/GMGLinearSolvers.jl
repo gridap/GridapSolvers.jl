@@ -88,7 +88,7 @@ function gmg_finest_level_cache(mh::ModelHierarchy,smatrices::AbstractVector{<:A
 end
 
 function gmg_smoothers_caches(mh::ModelHierarchy,smoothers::AbstractVector{<:LinearSolver},smatrices::AbstractVector{<:AbstractMatrix})
-  Gridap.Helpers.@check length(smoothers) == num_levels(mh)-1
+  @check length(smoothers) == num_levels(mh)-1
   nlevs = num_levels(mh)
   # Last (i.e., coarsest) level does not need pre-/post-smoothing
   caches = map(smoothers,view(smatrices,1:nlevs-1)) do smoother, mat
@@ -97,15 +97,15 @@ function gmg_smoothers_caches(mh::ModelHierarchy,smoothers::AbstractVector{<:Lin
   return caches
 end
 
-function gmg_coarse_solver_caches(mh,s,mats,work_vectors)
+function gmg_coarse_solver_caches(mh,solver,mats,work_vectors)
   cache = nothing
   nlevs = num_levels(mh)
   parts = get_level_parts(mh,nlevs)
   if i_am_in(parts)
     mat = mats[nlevs]
     _, _, xH, rH = work_vectors[nlevs-1]
-    cache = numerical_setup(symbolic_setup(s, mat), mat)
-    if isa(s,PETScLinearSolver)
+    cache = numerical_setup(symbolic_setup(solver, mat), mat)
+    if isa(solver,PETScLinearSolver)
       cache = CachedPETScNS(cache, xH, rH)
     end
   end
@@ -113,6 +113,7 @@ function gmg_coarse_solver_caches(mh,s,mats,work_vectors)
 end
 
 function gmg_work_vectors(mh::ModelHierarchy,smatrices::AbstractVector{<:AbstractMatrix})
+  @check MultilevelTools.matching_level_parts(mh,smatrices)
   nlevs = num_levels(mh)
   work_vectors = map(view(linear_indices(mh),1:nlevs-1)) do lev
     gmg_work_vectors(mh,smatrices,lev)
@@ -121,8 +122,9 @@ function gmg_work_vectors(mh::ModelHierarchy,smatrices::AbstractVector{<:Abstrac
 end
 
 function gmg_work_vectors(mh::ModelHierarchy,smatrices::AbstractVector{<:AbstractMatrix},lev::Integer)
-  dxh   = allocate_in_domain(smatrices[lev]); fill!(dxh,0.0)
-  Adxh  = allocate_in_range(smatrices[lev]); fill!(Adxh,0.0)
+  Ah   = smatrices[lev]
+  dxh  = allocate_in_domain(Ah); fill!(dxh,zero(eltype(dxh)))
+  Adxh = allocate_in_range(Ah); fill!(Adxh,zero(eltype(Adxh)))
 
   cparts = get_level_parts(mh,lev+1)
   if i_am_in(cparts)

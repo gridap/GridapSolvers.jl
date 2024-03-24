@@ -31,51 +31,54 @@
 # [[6, 7], [7, -2]]
 # [[8, -2]]
 
-struct PatchFESpace  <: Gridap.FESpaces.SingleFieldFESpace
-  Vh                  :: Gridap.FESpaces.SingleFieldFESpace
+struct PatchFESpace  <: FESpaces.SingleFieldFESpace
+  Vh                  :: FESpaces.SingleFieldFESpace
   patch_decomposition :: PatchDecomposition
   num_dofs            :: Int
-  patch_cell_dofs_ids :: Gridap.Arrays.Table
-  dof_to_pdof         :: Gridap.Arrays.Table
+  patch_cell_dofs_ids :: Arrays.Table
+  dof_to_pdof         :: Arrays.Table
 end
 
 # Issue: I have to pass model, reffe, and conformity, so that I can
 #        build the cell_conformity instance. I would have liked to
 #        avoid that, given that these were already used in order to
 #        build Vh. However, I cannot extract this info out of Vh!!! :-(
-function PatchFESpace(space::Gridap.FESpaces.SingleFieldFESpace,
-                      patch_decomposition::PatchDecomposition,
-                      reffe::Union{ReferenceFE,Tuple{<:Gridap.ReferenceFEs.ReferenceFEName,Any,Any}};
-                      conformity=nothing,
-                      patches_mask=Fill(false,num_patches(patch_decomposition)))
+function PatchFESpace(
+  space::FESpaces.SingleFieldFESpace,
+  patch_decomposition::PatchDecomposition,
+  reffe::Union{ReferenceFE,Tuple{<:ReferenceFEs.ReferenceFEName,Any,Any}};
+  conformity=nothing,
+  patches_mask=Fill(false,num_patches(patch_decomposition))
+)
   cell_conformity = MultilevelTools._cell_conformity(patch_decomposition.model,reffe;conformity=conformity)
   return PatchFESpace(space,patch_decomposition,cell_conformity;patches_mask=patches_mask)
 end
 
-function PatchFESpace(space::Gridap.FESpaces.SingleFieldFESpace,
-                      patch_decomposition::PatchDecomposition,
-                      cell_conformity::CellConformity;
-                      patches_mask=Fill(false,num_patches(patch_decomposition)))
-
+function PatchFESpace(
+  space::FESpaces.SingleFieldFESpace,
+  patch_decomposition::PatchDecomposition,
+  cell_conformity::CellConformity;
+  patches_mask = Fill(false,num_patches(patch_decomposition))
+)
   cell_dofs_ids = get_cell_dof_ids(space)
-  patch_cell_dofs_ids, num_dofs = 
-    generate_patch_cell_dofs_ids(get_grid_topology(patch_decomposition.model),
-                                 patch_decomposition.patch_cells,
-                                 patch_decomposition.patch_cells_overlapped,
-                                 patch_decomposition.patch_cells_faces_on_boundary,
-                                 cell_dofs_ids,cell_conformity,patches_mask)
-
+  patch_cell_dofs_ids, num_dofs = generate_patch_cell_dofs_ids(
+    get_grid_topology(patch_decomposition.model),
+    patch_decomposition.patch_cells,
+    patch_decomposition.patch_cells_overlapped,
+    patch_decomposition.patch_cells_faces_on_boundary,
+    cell_dofs_ids,cell_conformity,patches_mask
+  )
   dof_to_pdof = generate_dof_to_pdof(space,patch_decomposition,patch_cell_dofs_ids)
   return PatchFESpace(space,patch_decomposition,num_dofs,patch_cell_dofs_ids,dof_to_pdof)
 end
 
-Gridap.FESpaces.get_dof_value_type(a::PatchFESpace)   = Gridap.FESpaces.get_dof_value_type(a.Vh)
-Gridap.FESpaces.get_free_dof_ids(a::PatchFESpace)     = Base.OneTo(a.num_dofs)
-Gridap.FESpaces.get_fe_basis(a::PatchFESpace)         = get_fe_basis(a.Vh)
-Gridap.FESpaces.ConstraintStyle(::PatchFESpace)       = Gridap.FESpaces.UnConstrained()
-Gridap.FESpaces.ConstraintStyle(::Type{PatchFESpace}) = Gridap.FESpaces.UnConstrained()
-Gridap.FESpaces.get_vector_type(a::PatchFESpace)      = get_vector_type(a.Vh)
-Gridap.FESpaces.get_fe_dof_basis(a::PatchFESpace)     = get_fe_dof_basis(a.Vh)
+FESpaces.get_dof_value_type(a::PatchFESpace)   = Gridap.FESpaces.get_dof_value_type(a.Vh)
+FESpaces.get_free_dof_ids(a::PatchFESpace)     = Base.OneTo(a.num_dofs)
+FESpaces.get_fe_basis(a::PatchFESpace)         = get_fe_basis(a.Vh)
+FESpaces.ConstraintStyle(::PatchFESpace)       = Gridap.FESpaces.UnConstrained()
+FESpaces.ConstraintStyle(::Type{PatchFESpace}) = Gridap.FESpaces.UnConstrained()
+FESpaces.get_vector_type(a::PatchFESpace)      = get_vector_type(a.Vh)
+FESpaces.get_fe_dof_basis(a::PatchFESpace)     = get_fe_dof_basis(a.Vh)
 
 function Gridap.CellData.get_triangulation(a::PatchFESpace)
   PD = a.patch_decomposition
@@ -86,29 +89,29 @@ end
 
 # get_cell_dof_ids
 
-Gridap.FESpaces.get_cell_dof_ids(a::PatchFESpace) = a.patch_cell_dofs_ids
-Gridap.FESpaces.get_cell_dof_ids(a::PatchFESpace,::Triangulation) = @notimplemented
+FESpaces.get_cell_dof_ids(a::PatchFESpace) = a.patch_cell_dofs_ids
+FESpaces.get_cell_dof_ids(a::PatchFESpace,::Triangulation) = @notimplemented
 
-function Gridap.FESpaces.get_cell_dof_ids(a::PatchFESpace,trian::PatchTriangulation)
+function FESpaces.get_cell_dof_ids(a::PatchFESpace,trian::PatchTriangulation)
   return get_cell_dof_ids(trian.trian,a,trian)
 end
 
-function Gridap.FESpaces.get_cell_dof_ids(t::Gridap.Adaptivity.AdaptedTriangulation,a::PatchFESpace,trian::PatchTriangulation)
+function FESpaces.get_cell_dof_ids(t::Gridap.Adaptivity.AdaptedTriangulation,a::PatchFESpace,trian::PatchTriangulation)
   return get_cell_dof_ids(t.trian,a,trian)
 end
 
-function Gridap.FESpaces.get_cell_dof_ids(::Triangulation,a::PatchFESpace,trian::PatchTriangulation)
+function FESpaces.get_cell_dof_ids(::Triangulation,a::PatchFESpace,trian::PatchTriangulation)
   return a.patch_cell_dofs_ids
 end
 
-function Gridap.FESpaces.get_cell_dof_ids(::BoundaryTriangulation,a::PatchFESpace,trian::PatchTriangulation)
+function FESpaces.get_cell_dof_ids(::BoundaryTriangulation,a::PatchFESpace,trian::PatchTriangulation)
   cell_dof_ids     = get_cell_dof_ids(a)
   pfaces_to_pcells = trian.pfaces_to_pcells
   pcells = isempty(pfaces_to_pcells) ? Int[] : lazy_map(x->x[1],pfaces_to_pcells)
   return lazy_map(Reindex(cell_dof_ids),pcells)
 end
 
-function Gridap.FESpaces.get_cell_dof_ids(::SkeletonTriangulation,a::PatchFESpace,trian::PatchTriangulation)
+function FESpaces.get_cell_dof_ids(::SkeletonTriangulation,a::PatchFESpace,trian::PatchTriangulation)
   cell_dof_ids     = get_cell_dof_ids(a)
   pfaces_to_pcells = trian.pfaces_to_pcells
 
@@ -117,13 +120,13 @@ function Gridap.FESpaces.get_cell_dof_ids(::SkeletonTriangulation,a::PatchFESpac
   
   plus  = lazy_map(Reindex(cell_dof_ids),pcells_plus)
   minus = lazy_map(Reindex(cell_dof_ids),pcells_minus)
-  return lazy_map(Gridap.Fields.BlockMap(2,[1,2]),plus,minus)
+  return lazy_map(Fields.BlockMap(2,[1,2]),plus,minus)
 end
 
 # scatter dof values
 
-function Gridap.FESpaces.scatter_free_and_dirichlet_values(f::PatchFESpace,free_values,dirichlet_values)
-  cell_vals = Gridap.Fields.PosNegReindex(free_values,dirichlet_values)
+function FESpaces.scatter_free_and_dirichlet_values(f::PatchFESpace,free_values,dirichlet_values)
+  cell_vals = Fields.PosNegReindex(free_values,dirichlet_values)
   return lazy_map(Broadcasting(cell_vals),f.patch_cell_dofs_ids)
 end
 
