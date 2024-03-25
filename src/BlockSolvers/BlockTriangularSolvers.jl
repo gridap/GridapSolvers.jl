@@ -3,9 +3,11 @@
 
   Solver representing a block-triangular (upper/lower) solver, i.e 
 
-  [ A11  c12⋅A12  c13⋅A13 ] [ x1 ] = [ r1 ]
-  [  0       A22  c23⋅A23 ] [ x2 ] = [ r2 ]
-  [  0      0       A33   ] [ x3 ] = [ r3 ]
+  ```
+  [ A11  c12⋅A12  c13⋅A13 ] [ x1 ] = [ r1 ] \\
+  [  0       A22  c23⋅A23 ] [ x2 ] = [ r2 ] \\
+  [  0      0       A33   ] [ x3 ] = [ r3 ] \\
+  ```
 
   # Parameters: 
   - `blocks::AbstractMatrix{<:SolverBlock}`: Matrix of solver blocks, indicating how 

@@ -82,7 +82,7 @@ end
   Maps a function to a set of `HierarchicalArrays`. The function is applied only in the
   subcommunicators where the processor belongs to.
 """
-function Base.map(f::Function,args::Vararg{HierarchicalArray,N}) where N
+function Base.map(f,args::Vararg{HierarchicalArray,N}) where N
   @assert matching_level_parts(args...)
   ranks  = get_level_parts(first(args))
   arrays = map(a -> a.array, args)
@@ -96,7 +96,18 @@ function Base.map(f::Function,args::Vararg{HierarchicalArray,N}) where N
   return HierarchicalArray(array,ranks)
 end
 
-function Base.map!(f::Function,a::HierarchicalArray,args::Vararg{HierarchicalArray,N}) where N
+function Base.map(f,a::HierarchicalArray)
+  array = map(a.ranks, a.array) do ranks, ai
+    if i_am_in(ranks)
+      f(ai)
+    else
+      nothing
+    end
+  end
+  return HierarchicalArray(array,a.ranks)
+end
+
+function Base.map!(f,a::HierarchicalArray,args::Vararg{HierarchicalArray,N}) where N
   @assert matching_level_parts(a,args...)
   ranks  = get_level_parts(a)
   arrays = map(a -> a.array, args)

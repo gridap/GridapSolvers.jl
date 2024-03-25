@@ -97,7 +97,7 @@ end
 
 # MultiField support
 
-function MultiField.MultiFieldFESpace(spaces::Vector{<:FESpaceHierarchyLevel};kwargs...)
+function Gridap.MultiField.MultiFieldFESpace(spaces::Vector{<:FESpaceHierarchyLevel};kwargs...)
   level  = spaces[1].level
   Uh     = all(map(s -> !isa(s.fe_space,Nothing),spaces)) ? MultiFieldFESpace(map(s -> s.fe_space, spaces); kwargs...) : nothing
   Uh_red = all(map(s -> !isa(s.fe_space_red,Nothing),spaces)) ? MultiFieldFESpace(map(s -> s.fe_space_red, spaces); kwargs...) : nothing
@@ -105,9 +105,12 @@ function MultiField.MultiFieldFESpace(spaces::Vector{<:FESpaceHierarchyLevel};kw
   return FESpaceHierarchyLevel(level,Uh,Uh_red,cell_conformity,first(spaces).mh_level)
 end
 
-function Gridap.MultiField.MultiFieldFESpace(spaces::Vector{<:FESpaceHierarchy};kwargs...)
-  map(spaces...) do spaces...
-    MultiFieldFESpace([spaces...],u)
+function Gridap.MultiField.MultiFieldFESpace(spaces::Vector{<:HierarchicalArray};kwargs...)
+  @check all(s -> isa(s,FESpaceHierarchy),spaces)
+  println(eltype(spaces))
+  map(spaces...) do spaces_i...
+    println(typeof(spaces_i))
+    MultiFieldFESpace([spaces_i...];kwargs...)
   end
 end
 

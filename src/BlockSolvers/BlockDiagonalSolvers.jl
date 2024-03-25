@@ -3,9 +3,11 @@
 
   Solver representing a block-diagonal solver, i.e 
 
-  [ A11   0   0  ] [ x1 ] = [ r1 ]
-  [  0   A22  0  ] [ x2 ] = [ r2 ]
-  [  0    0  A33 ] [ x3 ] = [ r3 ]
+  ```
+  [ A11   0   0  ] [ x1 ] = [ r1 ] \\
+  [  0   A22  0  ] [ x2 ] = [ r2 ] \\
+  [  0    0  A33 ] [ x3 ] = [ r3 ] \\
+  ```
 
   # Parameters: 
   - `blocks::AbstractVector{<:SolverBlock}`: Matrix of solver blocks, indicating how 
