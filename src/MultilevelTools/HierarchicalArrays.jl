@@ -76,6 +76,12 @@ function matching_level_parts(arrays::Vararg{HierarchicalArray,N}) where N
   return all(a -> matching_level_parts(a1,a), arrays)
 end
 
+"""
+    Base.map(f::Function,args::Vararg{HierarchicalArray,N}) where N
+
+  Maps a function to a set of `HierarchicalArrays`. The function is applied only in the
+  subcommunicators where the processor belongs to.
+"""
 function Base.map(f::Function,args::Vararg{HierarchicalArray,N}) where N
   @assert matching_level_parts(args...)
   ranks  = get_level_parts(first(args))
@@ -104,6 +110,12 @@ function Base.map!(f::Function,a::HierarchicalArray,args::Vararg{HierarchicalArr
   return a
 end
 
+"""
+    with_level(f::Function,a::HierarchicalArray,lev::Integer;default=nothing)
+  
+  Applies a function to the `lev`-th level of a `HierarchicalArray`. If the processor does not
+  belong to the subcommunicator of the `lev`-th level, then `default` is returned.
+"""
 function with_level(f::Function,a::HierarchicalArray,lev::Integer;default=nothing)
   if i_am_in(a.ranks[lev])
     return f(a.array[lev])

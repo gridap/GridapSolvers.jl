@@ -39,41 +39,91 @@ function get_jacobi_smoothers(mh)
   return HierarchicalArray(smoothers,level_parts)
 end
 
-function gmg_driver(t,parts,mh,spaces,qdegree,smoothers,biform,liform,u)
+function get_bilinear_form(mh_lev,biform,qdegree)
+  model = get_model(mh_lev)
+  Ω = Triangulation(model)
+  dΩ = Measure(Ω,qdegree)
+  return (u,v) -> biform(u,v,dΩ)
+end
+
+function gmg_driver_from_mats(t,parts,mh,spaces,qdegree,smoothers,biform,liform,u)
   tests, trials = spaces
 
-  tic!(t;barrier=true)
-  # Integration
-  smatrices, A, b = compute_hierarchy_matrices(trials,tests,biform,liform,qdegree)
+  restrictions, prolongations = setup_transfer_operators(
+    trials, qdegree; mode=:residual, solver=IS_ConjugateGradientSolver(;reltol=1.e-6)
+  )
 
-  # Preconditioner
-  coarse_solver = LUSolver()
-  restrictions, prolongations = setup_transfer_operators(trials,
-                                                         qdegree;
-                                                         mode=:residual,
-                                                         solver=IS_ConjugateGradientSolver(;reltol=1.e-6))
-  gmg = GMGLinearSolver(mh,
-                        smatrices,
-                        prolongations,
-                        restrictions,
-                        pre_smoothers=smoothers,
-                        post_smoothers=smoothers,
-                        coarsest_solver=coarse_solver,
-                        maxiter=1,
-                        rtol=1.0e-8,
-                        verbose=false,
-                        mode=:preconditioner)
+  smatrices, A, b = compute_hierarchy_matrices(trials,tests,biform,liform,qdegree)
+  gmg = GMGLinearSolver(
+    mh,smatrices,
+    prolongations,restrictions,
+    pre_smoothers=smoothers,
+    post_smoothers=smoothers,
+    coarsest_solver=LUSolver(),
+    maxiter=1,mode=:preconditioner
+  )
   
   solver = CGSolver(gmg;maxiter=20,atol=1e-14,rtol=1.e-6,verbose=i_am_main(parts))
   #solver = FGMRESSolver(5,gmg;maxiter=20,atol=1e-14,rtol=1.e-6,verbose=i_am_main(parts))
   ns = numerical_setup(symbolic_setup(solver,A),A)
-  toc!(t,"GMG setup")
 
   # Solve
   tic!(t;barrier=true)
   x = pfill(0.0,partition(axes(A,2)))
   solve!(x,ns,b)
-  toc!(t,"Solver")
+
+  # Error
+  if !isa(u,Nothing)
+    model = get_model(mh,1)
+    Uh    = get_fe_space(trials,1)
+    Ω     = Triangulation(model)
+    dΩ    = Measure(Ω,qdegree)
+    uh    = FEFunction(Uh,x)
+    eh    = u-uh
+    e_l2  = sum(∫(eh⋅eh)dΩ)
+    if i_am_main(parts)
+      println("L2 error = ", e_l2)
+    end
+  end
+end
+
+function gmg_driver_from_weakform(t,parts,mh,spaces,qdegree,smoothers,biform,liform,u)
+  tests, trials = spaces
+
+  restrictions, prolongations = setup_transfer_operators(
+    trials, qdegree; mode=:residual, solver=IS_ConjugateGradientSolver(;reltol=1.e-6)
+  )
+
+  A, b = with_level(mh,1) do _
+    model = get_model(mh,1)
+    U = get_fe_space(trials,1)
+    V = get_fe_space(tests,1)
+    Ω = Triangulation(model)
+    dΩ = Measure(Ω,qdegree)
+    al(du,dv) = biform(du,dv,dΩ)
+    ll(dv)    = liform(dv,dΩ)
+    op = AffineFEOperator(al,ll,U,V)
+    return get_matrix(op), get_vector(op)
+  end
+
+  biforms = map(mhl -> get_bilinear_form(mhl,biform,qdegree),mh)
+
+  gmg = GMGLinearSolver(
+    mh,trials,tests,biforms,
+    prolongations,restrictions,
+    pre_smoothers=smoothers,
+    post_smoothers=smoothers,
+    coarsest_solver=LUSolver(),
+    maxiter=1,mode=:preconditioner
+  )
+  
+  solver = CGSolver(gmg;maxiter=20,atol=1e-14,rtol=1.e-6,verbose=i_am_main(parts))
+  #solver = FGMRESSolver(5,gmg;maxiter=20,atol=1e-14,rtol=1.e-6,verbose=i_am_main(parts))
+  ns = numerical_setup(symbolic_setup(solver,A),A)
+
+  # Solve
+  x = pfill(0.0,partition(axes(A,2)))
+  solve!(x,ns,b)
 
   # Error
   if !isa(u,Nothing)
@@ -105,7 +155,12 @@ function gmg_poisson_driver(t,parts,mh,order)
   spaces    = tests, trials
   toc!(t,"FESpaces")
 
-  return gmg_driver(t,parts,mh,spaces,qdegree,smoothers,biform,liform,u)
+  tic!(t;barrier=true)
+  gmg_driver_from_mats(t,parts,mh,spaces,qdegree,smoothers,biform,liform,u)
+  toc!(t,"Solve with matrices")
+  tic!(t;barrier=true)
+  gmg_driver_from_weakform(t,parts,mh,spaces,qdegree,smoothers,biform,liform,u)
+  toc!(t,"Solve with weakforms")
 end
 
 function gmg_laplace_driver(t,parts,mh,order)
@@ -124,7 +179,12 @@ function gmg_laplace_driver(t,parts,mh,order)
   spaces    = tests, trials
   toc!(t,"FESpaces")
 
-  return gmg_driver(t,parts,mh,spaces,qdegree,smoothers,biform,liform,u)
+  tic!(t;barrier=true)
+  gmg_driver_from_mats(t,parts,mh,spaces,qdegree,smoothers,biform,liform,u)
+  toc!(t,"Solve with matrices")
+  tic!(t;barrier=true)
+  gmg_driver_from_weakform(t,parts,mh,spaces,qdegree,smoothers,biform,liform,u)
+  toc!(t,"Solve with weakforms")
 end
 
 function gmg_vector_laplace_driver(t,parts,mh,order)
@@ -144,7 +204,12 @@ function gmg_vector_laplace_driver(t,parts,mh,order)
   spaces    = tests, trials
   toc!(t,"FESpaces")
 
-  return gmg_driver(t,parts,mh,spaces,qdegree,smoothers,biform,liform,u)
+  tic!(t;barrier=true)
+  gmg_driver_from_mats(t,parts,mh,spaces,qdegree,smoothers,biform,liform,u)
+  toc!(t,"Solve with matrices")
+  tic!(t;barrier=true)
+  gmg_driver_from_weakform(t,parts,mh,spaces,qdegree,smoothers,biform,liform,u)
+  toc!(t,"Solve with weakforms")
 end
 
 function gmg_hdiv_driver(t,parts,mh,order)
@@ -167,7 +232,12 @@ function gmg_hdiv_driver(t,parts,mh,order)
   smoothers = get_patch_smoothers(mh,tests,biform,qdegree)
   toc!(t,"Patch Decomposition")
 
-  return gmg_driver(t,parts,mh,spaces,qdegree,smoothers,biform,liform,u)
+  tic!(t;barrier=true)
+  gmg_driver_from_mats(t,parts,mh,spaces,qdegree,smoothers,biform,liform,u)
+  toc!(t,"Solve with matrices")
+  tic!(t;barrier=true)
+  gmg_driver_from_weakform(t,parts,mh,spaces,qdegree,smoothers,biform,liform,u)
+  toc!(t,"Solve with weakforms")
 end
 
 function gmg_multifield_driver(t,parts,mh,order)
@@ -200,7 +270,12 @@ function gmg_multifield_driver(t,parts,mh,order)
   smoothers = get_patch_smoothers(mh,tests,biform,qdegree)
   toc!(t,"Patch Decomposition")
 
-  return gmg_driver(t,parts,mh,spaces,qdegree,smoothers,biform,liform,nothing)
+  tic!(t;barrier=true)
+  gmg_driver_from_mats(t,parts,mh,spaces,qdegree,smoothers,biform,liform,nothing)
+  toc!(t,"Solve with matrices")
+  tic!(t;barrier=true)
+  gmg_driver_from_weakform(t,parts,mh,spaces,qdegree,smoothers,biform,liform,nothing)
+  toc!(t,"Solve with weakforms")
 end
 
 function main_gmg_driver(parts,mh,order,pde)

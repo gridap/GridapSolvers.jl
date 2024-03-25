@@ -31,9 +31,9 @@ end
 
 struct GMGLinearSolverFromWeakform{A,B,C,D,E,F,G,H,I} <: Algebra.LinearSolver
   mh              :: A
-  biforms         :: B
-  trials          :: C
-  tests           :: D
+  trials          :: B
+  tests           :: C
+  biforms         :: D
   interp          :: E
   restrict        :: F
   pre_smoothers   :: G
@@ -58,6 +58,7 @@ function GMGLinearSolver(
   maxiter = 100, atol = 1.0e-14, rtol = 1.0e-08, verbose = false,
 )
   @check mode ∈ [:preconditioner,:solver]
+  @check matching_level_parts(mh,trials,tests,biforms)
   tols = SolverTolerances{Float64}(;maxiter=maxiter,atol=atol,rtol=rtol)
   log  = ConvergenceLog("GMG",tols;verbose=verbose)
 
@@ -78,16 +79,17 @@ function Algebra.symbolic_setup(solver::GMGLinearSolverFromWeakform,::AbstractMa
   return GMGSymbolicSetup(solver)
 end
 
-struct GMGNumericalSetup{A,B,C,D,E,F} <: Algebra.NumericalSetup
+struct GMGNumericalSetup{A,B,C,D,E,F,G} <: Algebra.NumericalSetup
   solver                 :: A
-  finest_level_cache     :: B
-  pre_smoothers_caches   :: C
-  post_smoothers_caches  :: D
-  coarsest_solver_cache  :: E
-  work_vectors           :: F
+  smatrices              :: B
+  finest_level_cache     :: C
+  pre_smoothers_caches   :: D
+  post_smoothers_caches  :: E
+  coarsest_solver_cache  :: F
+  work_vectors           :: G
 end
 
-function Algebra.numerical_setup(ss::GMGSymbolicSetup{<:GMGLinearSolverFromMatrices},mat::AbstractMatrix)
+function Algebra.numerical_setup(ss::GMGSymbolicSetup,mat::AbstractMatrix)
   s = ss.solver
   smatrices = gmg_compute_smatrices(s,mat)
 
@@ -102,7 +104,7 @@ function Algebra.numerical_setup(ss::GMGSymbolicSetup{<:GMGLinearSolverFromMatri
   coarsest_solver_cache = gmg_coarse_solver_caches(s.coarsest_solver,smatrices,work_vectors)
 
   return GMGNumericalSetup(
-    s,finest_level_cache,pre_smoothers_caches,post_smoothers_caches,coarsest_solver_cache,work_vectors
+    s,smatrices,finest_level_cache,pre_smoothers_caches,post_smoothers_caches,coarsest_solver_cache,work_vectors
   )
 end
 
@@ -144,15 +146,14 @@ function gmg_compute_smatrices(s::GMGLinearSolverFromMatrices,mat::AbstractMatri
 end
 
 function gmg_compute_smatrices(s::GMGLinearSolverFromWeakform,mat::AbstractMatrix)
-  mh = s.mh
-  map(linear_indices(mh)) do l
+  map(linear_indices(s.mh),s.biforms) do l, biform
     if l == 1
       return mat
     end
-    Ul = get_fe_space(s.trials,l)
-    Vl = get_fe_space(s.tests,l)
+    Ul = MultilevelTools.get_fe_space(s.trials,l)
+    Vl = MultilevelTools.get_fe_space(s.tests,l)
     uh = zero(Ul)
-    al(u,v) = s.is_nonlinear ? s.biforms[l](uh,u,v) : s.biforms[l](u,v)
+    al(u,v) = s.is_nonlinear ? biform(uh,u,v) : biform(u,v)
     return assemble_matrix(al,Ul,Vl)
   end
 end
@@ -211,7 +212,7 @@ function apply_GMG_level!(lev::Integer,xh::Union{PVector,Nothing},rh::Union{PVec
       solve!(xh, ns.coarsest_solver_cache, rh)
     else
       ## General case
-      Ah = ns.solver.smatrices[lev]
+      Ah = ns.smatrices[lev]
       restrict, interp = ns.solver.restrict[lev], ns.solver.interp[lev]
       dxh, Adxh, dxH, rH = ns.work_vectors[lev]
 
@@ -248,7 +249,7 @@ function Gridap.Algebra.solve!(x::AbstractVector,ns::GMGNumericalSetup,b::Abstra
     fill!(x,0.0)
     copy!(rh,b)
   else
-    Ah = ns.solver.smatrices[1]
+    Ah = ns.smatrices[1]
     mul!(rh,Ah,x)
     rh .= b .- rh
   end
