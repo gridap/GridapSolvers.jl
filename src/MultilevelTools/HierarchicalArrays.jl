@@ -104,10 +104,14 @@ function Base.map!(f::Function,a::HierarchicalArray,args::Vararg{HierarchicalArr
   return a
 end
 
-function on_level(f::Function,a::HierarchicalArray,lev::Integer)
+function with_level(f::Function,a::HierarchicalArray,lev::Integer;default=nothing)
   if i_am_in(a.ranks[lev])
     return f(a.array[lev])
   else
-    return nothing
+    return default
   end
+end
+
+function with_level(f::Function,a::AbstractArray,lev::Integer;default=nothing)
+  f(a.array[lev])
 end

@@ -131,9 +131,10 @@ function compute_hierarchy_matrices(
   qdegree::AbstractArray{<:Integer}
 )
   mats, vecs = map(linear_indices(trials)) do lev
+    model = get_model(trials,lev)
     U = get_fe_space(trials,lev)
     V = get_fe_space(tests,lev)
-    Ω = Triangulation(get_model(trials[lev].mh_level))
+    Ω = Triangulation(model)
     dΩ = Measure(Ω,qdegree[lev])
     ai(u,v) = a(u,v,dΩ)
     if lev == 1

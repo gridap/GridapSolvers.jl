@@ -1,4 +1,4 @@
-struct GMGLinearSolver{A,B,C,D,E,F,G} <: Gridap.Algebra.LinearSolver
+struct GMGLinearSolverFromMatrices{A,B,C,D,E,F,G} <: Algebra.LinearSolver
   mh              :: A
   smatrices       :: B
   interp          :: C
@@ -11,7 +11,9 @@ struct GMGLinearSolver{A,B,C,D,E,F,G} <: Gridap.Algebra.LinearSolver
 end
 
 function GMGLinearSolver(
-  mh,smatrices,interp,restrict;
+  mh::ModelHierarchy,
+  smatrices::AbstractArray{<:AbstractMatrix},
+  interp,restrict;
   pre_smoothers   = Fill(RichardsonSmoother(JacobiLinearSolver(),10),num_levels(mh)-1),
   post_smoothers  = pre_smoothers,
   coarsest_solver = Gridap.Algebra.LUSolver(),
@@ -21,75 +23,149 @@ function GMGLinearSolver(
   @check mode ∈ [:preconditioner,:solver]
   tols = SolverTolerances{Float64}(;maxiter=maxiter,atol=atol,rtol=rtol)
   log  = ConvergenceLog("GMG",tols;verbose=verbose)
-  
-  A = typeof(mh)
-  B = typeof(smatrices)
-  C = typeof(interp)
-  D = typeof(restrict)
-  E = typeof(pre_smoothers)
-  F = typeof(post_smoothers)
-  G = typeof(coarsest_solver)
-  return GMGLinearSolver{A,B,C,D,E,F,G}(mh,smatrices,interp,restrict,pre_smoothers,post_smoothers,
-                                        coarsest_solver,mode,log)
+
+  return GMGLinearSolverFromMatrices(
+    mh,smatrices,interp,restrict,pre_smoothers,post_smoothers,coarsest_solver,mode,log
+  )
 end
 
-struct GMGSymbolicSetup <: Gridap.Algebra.SymbolicSetup
-  solver :: GMGLinearSolver
+struct GMGLinearSolverFromWeakform{A,B,C,D,E,F,G,H,I} <: Algebra.LinearSolver
+  mh              :: A
+  biforms         :: B
+  trials          :: C
+  tests           :: D
+  interp          :: E
+  restrict        :: F
+  pre_smoothers   :: G
+  post_smoothers  :: H
+  coarsest_solver :: I
+  mode            :: Symbol
+  log             :: ConvergenceLog{Float64}
+  is_nonlinear    :: Bool
 end
 
-function Gridap.Algebra.symbolic_setup(solver::GMGLinearSolver,mat::AbstractMatrix)
+function GMGLinearSolver(
+  mh::ModelHierarchy,
+  trials::FESpaceHierarchy,
+  tests::FESpaceHierarchy,
+  biforms::AbstractArray{<:Function},
+  interp,restrict;
+  pre_smoothers   = Fill(RichardsonSmoother(JacobiLinearSolver(),10),num_levels(mh)-1),
+  post_smoothers  = pre_smoothers,
+  coarsest_solver = Gridap.Algebra.LUSolver(),
+  mode::Symbol    = :preconditioner,
+  is_nonlinear    = false,
+  maxiter = 100, atol = 1.0e-14, rtol = 1.0e-08, verbose = false,
+)
+  @check mode ∈ [:preconditioner,:solver]
+  tols = SolverTolerances{Float64}(;maxiter=maxiter,atol=atol,rtol=rtol)
+  log  = ConvergenceLog("GMG",tols;verbose=verbose)
+
+  return GMGLinearSolverFromWeakform(
+    mh,trials,tests,biforms,interp,restrict,pre_smoothers,post_smoothers,coarsest_solver,mode,log,is_nonlinear
+  )
+end
+
+struct GMGSymbolicSetup{A} <: Algebra.SymbolicSetup
+  solver :: A
+end
+
+function Algebra.symbolic_setup(solver::GMGLinearSolverFromMatrices,::AbstractMatrix)
   return GMGSymbolicSetup(solver)
 end
 
-struct GMGNumericalSetup{A,B,C,D,E} <: Gridap.Algebra.NumericalSetup
-  solver                 :: GMGLinearSolver
-  finest_level_cache     :: A
-  pre_smoothers_caches   :: B
-  post_smoothers_caches  :: C
-  coarsest_solver_cache  :: D
-  work_vectors           :: E
+function Algebra.symbolic_setup(solver::GMGLinearSolverFromWeakform,::AbstractMatrix)
+  return GMGSymbolicSetup(solver)
 end
 
-function Gridap.Algebra.numerical_setup(ss::GMGSymbolicSetup,mat::AbstractMatrix)
-  mh              = ss.solver.mh
-  pre_smoothers   = ss.solver.pre_smoothers
-  post_smoothers  = ss.solver.post_smoothers
-  smatrices       = ss.solver.smatrices
-  coarsest_solver = ss.solver.coarsest_solver
+struct GMGNumericalSetup{A,B,C,D,E,F} <: Algebra.NumericalSetup
+  solver                 :: A
+  finest_level_cache     :: B
+  pre_smoothers_caches   :: C
+  post_smoothers_caches  :: D
+  coarsest_solver_cache  :: E
+  work_vectors           :: F
+end
 
-  smatrices[1] = mat
-  finest_level_cache = gmg_finest_level_cache(mh,smatrices)
-  work_vectors = gmg_work_vectors(mh,smatrices)
-  pre_smoothers_caches = gmg_smoothers_caches(mh,pre_smoothers,smatrices)
-  if !(pre_smoothers === post_smoothers)
-    post_smoothers_caches = gmg_smoothers_caches(mh,post_smoothers,smatrices)
+function Algebra.numerical_setup(ss::GMGSymbolicSetup{<:GMGLinearSolverFromMatrices},mat::AbstractMatrix)
+  s = ss.solver
+  smatrices = gmg_compute_smatrices(s,mat)
+
+  finest_level_cache = gmg_finest_level_cache(smatrices)
+  work_vectors = gmg_work_vectors(smatrices)
+  pre_smoothers_caches = gmg_smoothers_caches(s.pre_smoothers,smatrices)
+  if !(s.pre_smoothers === s.post_smoothers)
+    post_smoothers_caches = gmg_smoothers_caches(s.post_smoothers,smatrices)
   else
     post_smoothers_caches = pre_smoothers_caches
   end
-  coarsest_solver_cache = gmg_coarse_solver_caches(mh,coarsest_solver,smatrices,work_vectors)
+  coarsest_solver_cache = gmg_coarse_solver_caches(s.coarsest_solver,smatrices,work_vectors)
 
-  return GMGNumericalSetup(ss.solver,finest_level_cache,pre_smoothers_caches,post_smoothers_caches,coarsest_solver_cache,work_vectors)
+  return GMGNumericalSetup(
+    s,finest_level_cache,pre_smoothers_caches,post_smoothers_caches,coarsest_solver_cache,work_vectors
+  )
 end
 
-function Gridap.Algebra.numerical_setup!(ss::GMGNumericalSetup,mat::AbstractMatrix)
-  # TODO: This does not modify all matrices... How should we deal with this?
-  ns.solver.smatrices[1] = mat
+function Gridap.Algebra.numerical_setup!(
+  ns::GMGNumericalSetup{<:GMGLinearSolverFromMatrices},
+  mat::AbstractMatrix
+)
+  msg = "
+    GMGLinearSolverFromMatrices does not support updates.\n
+    Please use GMGLinearSolverFromWeakform instead.
+  "
+  @error msg
 end
 
-function gmg_finest_level_cache(mh::ModelHierarchy,smatrices::AbstractVector{<:AbstractMatrix})
-  cache = nothing
-  parts = get_level_parts(mh,1)
-  if i_am_in(parts)
-    Ah = smatrices[1]
-    rh = allocate_in_domain(Ah); fill!(rh,0.0)
-    cache = rh
+function Gridap.Algebra.numerical_setup!(
+  ns::GMGNumericalSetup{<:GMGLinearSolverFromWeakform},
+  mat::AbstractMatrix,
+  x::AbstractVector
+)
+  s = ns.solver
+  mh = s.mh
+  map(linear_indices(mh)) do l
+    if l == 1
+      copyto!(ns.smatrices[l],mat)
+    end
+    Ul = get_fe_space(s.trials,l)
+    Vl = get_fe_space(s.tests,l)
+    A  = ns.smatrices[l]
+    uh = FEFunction(Ul,x)
+    al(u,v) = s.is_nonlinear ? s.biforms[l](uh,u,v) : s.biforms[l](u,v)
+    return assemble_matrix!(al,A,Ul,Vl)
   end
-  return cache
 end
 
-function gmg_smoothers_caches(mh::ModelHierarchy,smoothers::AbstractVector{<:LinearSolver},smatrices::AbstractVector{<:AbstractMatrix})
-  @check length(smoothers) == num_levels(mh)-1
-  nlevs = num_levels(mh)
+function gmg_compute_smatrices(s::GMGLinearSolverFromMatrices,mat::AbstractMatrix)
+  smatrices = s.smatrices
+  smatrices[1] = mat
+  return smatrices
+end
+
+function gmg_compute_smatrices(s::GMGLinearSolverFromWeakform,mat::AbstractMatrix)
+  mh = s.mh
+  map(linear_indices(mh)) do l
+    if l == 1
+      return mat
+    end
+    Ul = get_fe_space(s.trials,l)
+    Vl = get_fe_space(s.tests,l)
+    uh = zero(Ul)
+    al(u,v) = s.is_nonlinear ? s.biforms[l](uh,u,v) : s.biforms[l](u,v)
+    return assemble_matrix(al,Ul,Vl)
+  end
+end
+
+function gmg_finest_level_cache(smatrices::AbstractVector{<:AbstractMatrix})
+  with_level(smatrices,1) do Ah
+    rh = allocate_in_domain(Ah); fill!(rh,0.0)
+    return rh
+  end
+end
+
+function gmg_smoothers_caches(smoothers::AbstractVector{<:LinearSolver},smatrices::AbstractVector{<:AbstractMatrix})
+  nlevs = num_levels(smatrices)
   # Last (i.e., coarsest) level does not need pre-/post-smoothing
   caches = map(smoothers,view(smatrices,1:nlevs-1)) do smoother, mat
     numerical_setup(symbolic_setup(smoother, mat), mat)
@@ -97,45 +173,33 @@ function gmg_smoothers_caches(mh::ModelHierarchy,smoothers::AbstractVector{<:Lin
   return caches
 end
 
-function gmg_coarse_solver_caches(mh,solver,mats,work_vectors)
-  cache = nothing
-  nlevs = num_levels(mh)
-  parts = get_level_parts(mh,nlevs)
-  if i_am_in(parts)
-    mat = mats[nlevs]
+function gmg_coarse_solver_caches(solver::LinearSolver,smatrices,work_vectors)
+  nlevs = num_levels(smatrices)
+  with_level(smatrices,nlevs) do AH
     _, _, xH, rH = work_vectors[nlevs-1]
-    cache = numerical_setup(symbolic_setup(solver, mat), mat)
+    cache = numerical_setup(symbolic_setup(solver, AH), AH)
     if isa(solver,PETScLinearSolver)
       cache = CachedPETScNS(cache, xH, rH)
     end
+    return cache
   end
-  return cache
 end
 
-function gmg_work_vectors(mh::ModelHierarchy,smatrices::AbstractVector{<:AbstractMatrix})
-  @check MultilevelTools.matching_level_parts(mh,smatrices)
-  nlevs = num_levels(mh)
-  work_vectors = map(view(linear_indices(mh),1:nlevs-1)) do lev
-    gmg_work_vectors(mh,smatrices,lev)
+function gmg_work_vectors(smatrices::AbstractVector{<:AbstractMatrix})
+  nlevs = num_levels(smatrices)
+  mats = view(smatrices,1:nlevs-1)
+  work_vectors = map(linear_indices(mats),mats) do lev, Ah
+    dxh  = allocate_in_domain(Ah); fill!(dxh,zero(eltype(dxh)))
+    Adxh = allocate_in_range(Ah); fill!(Adxh,zero(eltype(Adxh)))
+
+    rH, dxH = with_level(smatrices,lev+1;default=(nothing,nothing)) do AH
+      rH  = allocate_in_domain(AH); fill!(rH,zero(eltype(rH)))
+      dxH = allocate_in_domain(AH); fill!(dxH,zero(eltype(dxH)))
+      rH, dxH
+    end
+    dxh, Adxh, dxH, rH
   end
   return work_vectors
-end
-
-function gmg_work_vectors(mh::ModelHierarchy,smatrices::AbstractVector{<:AbstractMatrix},lev::Integer)
-  Ah   = smatrices[lev]
-  dxh  = allocate_in_domain(Ah); fill!(dxh,zero(eltype(dxh)))
-  Adxh = allocate_in_range(Ah); fill!(Adxh,zero(eltype(Adxh)))
-
-  cparts = get_level_parts(mh,lev+1)
-  if i_am_in(cparts)
-    AH  = smatrices[lev+1]
-    rH  = allocate_in_domain(AH)
-    dxH = allocate_in_domain(AH)
-  else
-    rH  = nothing
-    dxH = nothing
-  end
-  return dxh, Adxh, dxH, rH
 end
 
 function apply_GMG_level!(lev::Integer,xh::Union{PVector,Nothing},rh::Union{PVector,Nothing},ns::GMGNumericalSetup)
@@ -145,7 +209,7 @@ function apply_GMG_level!(lev::Integer,xh::Union{PVector,Nothing},rh::Union{PVec
     if (lev == num_levels(mh)) 
       ## Coarsest level
       solve!(xh, ns.coarsest_solver_cache, rh)
-    else 
+    else
       ## General case
       Ah = ns.solver.smatrices[lev]
       restrict, interp = ns.solver.restrict[lev], ns.solver.interp[lev]

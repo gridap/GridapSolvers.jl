@@ -22,7 +22,7 @@ export change_parts, num_parts, i_am_in
 export generate_level_parts, generate_subparts
 
 export HierarchicalArray
-export num_levels, get_level_parts
+export num_levels, get_level_parts, with_level, matching_level_parts
 
 export ModelHierarchy
 export num_levels, get_level, get_level_parts
