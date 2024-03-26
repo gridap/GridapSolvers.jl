@@ -18,15 +18,16 @@ using GridapSolvers.BlockSolvers: LinearSystemBlock, BiformBlock, BlockTriangula
 function main(distribute,np,nc)
   parts = distribute(LinearIndices((prod(np),)))
 
+  # Geometry
   model = CartesianDiscreteModel(parts,np,(0,1,0,1),nc)
-  labels = get_face_labeling(model)
+  labels = get_face_labeling(model);
   add_tag_from_tags!(labels,"top",[3,4,6])
   add_tag_from_tags!(labels,"walls",[1,2,5,7,8])
 
+  # FE spaces
   order = 2
   qdegree = 2*(order+1)
   Dc = length(nc)
-
   reffe_u = ReferenceFE(lagrangian,VectorValue{Dc,Float64},order)
   reffe_p = ReferenceFE(lagrangian,Float64,order-1;space=:P)
 
@@ -41,7 +42,8 @@ function main(distribute,np,nc)
   X = MultiFieldFESpace([U,Q];style=mfs)
   Y = MultiFieldFESpace([V,Q];style=mfs)
 
-  α = 1.e6
+  # Weak formulation
+  α = 1.e2
   f = VectorValue(1.0,1.0)
   Π_Qh = LocalProjectionMap(QUAD,lagrangian,Float64,order-1;quad_order=qdegree,space=:P)
   graddiv(u,v,dΩ) = ∫(α*Π_Qh(divergence(u))⋅Π_Qh(divergence(v)))dΩ
@@ -57,10 +59,10 @@ function main(distribute,np,nc)
   op = AffineFEOperator(a,l,X,Y)
   A, b = get_matrix(op), get_vector(op);
 
-  # Solve
-
+  # Solver
   solver_u = LUSolver() # or mumps
-  solver_p = CGSolver(RichardsonSmoother(JacobiLinearSolver(),10,0.2);maxiter=20,atol=1e-14,rtol=1.e-6,verbose=false)
+  solver_p = CGSolver(JacobiLinearSolver();maxiter=20,atol=1e-14,rtol=1.e-6,verbose=i_am_main(parts))
+  solver_p.log.depth = 2
 
   diag_blocks  = [LinearSystemBlock(),BiformBlock((p,q) -> ∫(-1.0/α*p*q)dΩ,Q,Q)]
   bblocks = map(CartesianIndices((2,2))) do I

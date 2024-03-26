@@ -1,3 +1,8 @@
+"""
+    struct JacobiLinearSolver <: Gridap.Algebra.LinearSolver
+
+  Given a matrix `A`, the Jacobi or Diagonal preconditioner is defined as `P = diag(A)`.
+"""
 struct JacobiLinearSolver <: Gridap.Algebra.LinearSolver
 end
 
@@ -47,4 +52,8 @@ function Gridap.Algebra.solve!(x::PVector, ns::JacobiNumericalSetup, b::PVector)
     x .= inv_diag .* b
   end
   return x
+end
+
+function LinearAlgebra.ldiv!(x::AbstractVector,ns::JacobiNumericalSetup,b::AbstractVector)
+  solve!(x,ns,b)
 end

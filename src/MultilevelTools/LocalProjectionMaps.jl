@@ -132,7 +132,7 @@ end
 
 function Arrays.evaluate!(cache,k::LocalProjectionMap,f::GridapDistributed.DistributedCellField)
   fields = map(k,local_views(f))
-  return GridapDistributed.DistributedCellField(fields)
+  return GridapDistributed.DistributedCellField(fields,f.trian)
 end
 
 # Optimization for MultiField
