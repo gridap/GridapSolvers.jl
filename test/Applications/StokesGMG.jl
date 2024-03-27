@@ -9,6 +9,7 @@ using Gridap.ReferenceFEs, Gridap.Algebra, Gridap.Geometry, Gridap.FESpaces
 using Gridap.CellData, Gridap.MultiField, Gridap.Algebra
 using PartitionedArrays
 using GridapDistributed
+using GridapP4est
 
 using GridapSolvers
 using GridapSolvers.LinearSolvers, GridapSolvers.MultilevelTools, GridapSolvers.PatchBasedSmoothers
@@ -67,8 +68,8 @@ function main(distribute,np,nc)
   reffe_u = ReferenceFE(lagrangian,VectorValue{Dc,Float64},order)
   reffe_p = ReferenceFE(lagrangian,Float64,order-1;space=:P)
 
-  u_wall = VectorValue(0.0,0.0)
-  u_top = VectorValue(1.0,0.0)
+  u_wall = (Dc==2) ? VectorValue(0.0,0.0) : VectorValue(0.0,0.0,0.0)
+  u_top = (Dc==2) ? VectorValue(1.0,0.0) : VectorValue(1.0,0.0,0.0)
 
   tests_u  = TestFESpace(mh,reffe_u,dirichlet_tags=["walls","top"]);
   trials_u = TrialFESpace(tests_u,[u_wall,u_top]);
@@ -81,8 +82,9 @@ function main(distribute,np,nc)
 
   # Weak formulation
   α = 1.e2
-  f = VectorValue(1.0,1.0)
-  Π_Qh = LocalProjectionMap(QUAD,lagrangian,Float64,order-1;quad_order=qdegree,space=:P)
+  f = (Dc==2) ? VectorValue(1.0,1.0) : VectorValue(1.0,1.0,1.0)
+  poly = (Dc==2) ? QUAD : HEX
+  Π_Qh = LocalProjectionMap(poly,lagrangian,Float64,order-1;quad_order=qdegree,space=:P)
   graddiv(u,v,dΩ) = ∫(α*Π_Qh(divergence(u))⋅Π_Qh(divergence(v)))dΩ
   biform_u(u,v,dΩ) = ∫(∇(v)⊙∇(u))dΩ + graddiv(u,v,dΩ)
   biform((u,p),(v,q),dΩ) = biform_u(u,v,dΩ) - ∫(divergence(v)*p)dΩ - ∫(divergence(u)*q)dΩ
