@@ -16,6 +16,12 @@ makedocs(;
     ),
     pages=[
         "Home" => "index.md",
+        "SolverInterfaces" => "SolverInterfaces.md",
+        "MultilevelTools" => "MultilevelTools.md",
+        "LinearSolvers" => "LinearSolvers.md",
+        "NonlinearSolvers" => "NonlinearSolvers.md",
+        "BlockSolvers" => "BlockSolvers.md",
+        "PatchBasedSmoothers" => "PatchBasedSmoothers.md",
     ],
 )
 
