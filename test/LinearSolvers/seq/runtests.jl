@@ -1,5 +1,5 @@
 using Test
 
-include("KrylovSolversTests.jl")
+include("KrylovTests.jl")
 include("IterativeSolversWrappersTests.jl")
 include("SmoothersTests.jl")

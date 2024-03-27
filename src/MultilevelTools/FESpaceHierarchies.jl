@@ -115,9 +115,7 @@ end
 
 function Gridap.MultiField.MultiFieldFESpace(spaces::Vector{<:HierarchicalArray};kwargs...)
   @check all(s -> isa(s,FESpaceHierarchy),spaces)
-  println(eltype(spaces))
   map(spaces...) do spaces_i...
-    println(typeof(spaces_i))
     MultiFieldFESpace([spaces_i...];kwargs...)
   end
 end

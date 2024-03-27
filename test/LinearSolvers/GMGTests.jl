@@ -313,7 +313,7 @@ function main(distribute,np::Integer,nc::Tuple,np_per_level::Vector)
   mh = get_mesh_hierarchy(parts,nc,np_per_level)
   Dc = length(nc)
 
-  for pde in [:multifield]#[:poisson,:laplace,:vector_laplace,:hdiv,:multifield]
+  for pde in [:poisson,:laplace,:vector_laplace,:hdiv,:multifield]
     if (pde != :multifield) || (Dc == 3)
       if i_am_main(parts)
         println(repeat("=",80))
