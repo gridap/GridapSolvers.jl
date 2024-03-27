@@ -1,4 +1,4 @@
-module StokesApplication
+module NavierStokesApplication
 
 using Test
 using LinearAlgebra
@@ -11,8 +11,8 @@ using PartitionedArrays
 using GridapDistributed
 
 using GridapSolvers
-using GridapSolvers.LinearSolvers, GridapSolvers.MultilevelTools
-using GridapSolvers.BlockSolvers: LinearSystemBlock, BiformBlock, BlockTriangularSolver
+using GridapSolvers.LinearSolvers, GridapSolvers.MultilevelTools, GridapSolvers.NonlinearSolvers
+using GridapSolvers.BlockSolvers: LinearSystemBlock, NonlinearSystemBlock, BiformBlock, BlockTriangularSolver
 
 function main(distribute,np,nc)
   parts = distribute(LinearIndices((prod(np),)))
@@ -43,29 +43,41 @@ function main(distribute,np,nc)
   Y = MultiFieldFESpace([V,Q];style=mfs)
 
   # Weak formulation
+  Re = 10.0
+  ν = 1/Re
   α = 1.e2
   f = (Dc==2) ? VectorValue(1.0,1.0) : VectorValue(1.0,1.0,1.0)
+
   poly = (Dc==2) ? QUAD : HEX
   Π_Qh = LocalProjectionMap(poly,lagrangian,Float64,order-1;quad_order=qdegree,space=:P)
   graddiv(u,v,dΩ) = ∫(α*Π_Qh(divergence(u))⋅Π_Qh(divergence(v)))dΩ
-  biform_u(u,v,dΩ) = ∫(∇(v)⊙∇(u))dΩ + graddiv(u,v,dΩ)
-  biform((u,p),(v,q),dΩ) = biform_u(u,v,dΩ) - ∫(divergence(v)*p)dΩ - ∫(divergence(u)*q)dΩ
-  liform((v,q),dΩ) = ∫(v⋅f)dΩ
 
-  Ω = Triangulation(model)
+  conv(u,∇u) = (∇u')⋅u
+  dconv(du,∇du,u,∇u) = conv(u,∇du)+conv(du,∇u)
+  c(u,v,dΩ) = ∫(v⊙(conv∘(u,∇(u))))dΩ
+  dc(u,du,dv,dΩ) = ∫(dv⊙(dconv∘(du,∇(du),u,∇(u))))dΩ
+
+  lap(u,v,dΩ) = ∫(ν*∇(v)⊙∇(u))dΩ
+  rhs(v,dΩ) = ∫(v⋅f)dΩ
+
+  jac_u(u,du,dv,dΩ) = lap(du,dv,dΩ) + dc(u,du,dv,dΩ) + graddiv(du,dv,dΩ)
+  jac((u,p),(du,dp),(dv,dq),dΩ) = jac_u(u,du,dv,dΩ) - ∫(divergence(dv)*dp)dΩ - ∫(divergence(du)*dq)dΩ
+
+  res_u(u,v,dΩ) = lap(u,v,dΩ) + c(u,v,dΩ) + graddiv(u,v,dΩ) - rhs(v,dΩ)
+  res((u,p),(v,q),dΩ) = res_u(u,v,dΩ) - ∫(divergence(v)*p)dΩ - ∫(divergence(u)*q)dΩ
+
+  Ω  = Triangulation(model)
   dΩ = Measure(Ω,qdegree)
-
-  a(u,v) = biform(u,v,dΩ)
-  l(v) = liform(v,dΩ)
-  op = AffineFEOperator(a,l,X,Y)
-  A, b = get_matrix(op), get_vector(op);
+  jac_h(x,dx,dy) = jac(x,dx,dy,dΩ)
+  res_h(x,dy) = res(x,dy,dΩ)
+  op = FEOperator(res_h,jac_h,X,Y)
 
   # Solver
   solver_u = LUSolver() # or mumps
   solver_p = CGSolver(JacobiLinearSolver();maxiter=20,atol=1e-14,rtol=1.e-6,verbose=i_am_main(parts))
-  solver_p.log.depth = 2
+  solver_p.log.depth = 4
 
-  diag_blocks  = [LinearSystemBlock(),BiformBlock((p,q) -> ∫(-1.0/α*p*q)dΩ,Q,Q)]
+  diag_blocks  = [NonlinearSystemBlock(),BiformBlock((p,q) -> ∫(-1.0/α*p*q)dΩ,Q,Q)]
   bblocks = map(CartesianIndices((2,2))) do I
     (I[1] == I[2]) ? diag_blocks[I[1]] : LinearSystemBlock()
   end
@@ -73,16 +85,10 @@ function main(distribute,np,nc)
             0.0 1.0]  
   P = BlockTriangularSolver(bblocks,[solver_u,solver_p],coeffs,:upper)
   solver = FGMRESSolver(20,P;atol=1e-14,rtol=1.e-8,verbose=i_am_main(parts))
-  ns = numerical_setup(symbolic_setup(solver,A),A)
-
-  x = allocate_in_domain(A); fill!(x,0.0)
-  solve!(x,ns,b)
-  xh = FEFunction(X,x)
-
-  r = allocate_in_range(A)
-  mul!(r,A,x)
-  r .-= b
-  @test norm(r) < 1.e-7
+  solver.log.depth = 2
+  
+  nlsolver = NewtonSolver(solver;maxiter=20,atol=1e-14,rtol=1.e-7,verbose=i_am_main(parts))
+  xh = solve(nlsolver,op)
 end
 
 end # module

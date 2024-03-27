@@ -1,4 +1,3 @@
-
 module StokesApplicationMPI
 using MPI, PartitionedArrays
 include("../Stokes.jl")
