@@ -1,4 +1,4 @@
-module KrylovSolversTests
+module KrylovTests
 
 using Test
 using Gridap, Gridap.Algebra

@@ -8,19 +8,18 @@ struct PatchProlongationOperator{A,B,C,D,E}
 end
 
 function PatchProlongationOperator(lev,sh,PD,lhs,rhs,qdegree)
-  mh = sh.mh
-  @assert has_refinement(mh,lev)
+  @assert has_refinement(sh,lev)
 
   # Default prolongation (i.e interpolation)
   op = ProlongationOperator(lev,sh,qdegree;mode=:residual)
 
   # Patch-based correction fespace
-  fmodel = get_model(mh,lev)
-  glue = mh.levels[lev].ref_glue
+  fmodel = get_model(sh,lev)
+  glue = sh[lev].mh_level.ref_glue
   patches_mask = get_coarse_node_mask(fmodel,glue)
 
   Vh = MultilevelTools.get_fe_space(sh,lev)
-  cell_conformity = sh.levels[lev].cell_conformity
+  cell_conformity = sh[lev].cell_conformity
   Ph = PatchFESpace(Vh,PD,cell_conformity;patches_mask)
 
   # Solver caches
@@ -56,21 +55,14 @@ function LinearAlgebra.mul!(x,op::PatchProlongationOperator,y)
 end
 
 function setup_patch_prolongation_operators(sh,patch_decompositions,lhs,rhs,qdegrees)
-  mh = sh.mh
-  prolongations = Vector{PatchProlongationOperator}(undef,num_levels(sh)-1)
-  for lev in 1:num_levels(sh)-1
-    parts = get_level_parts(mh,lev)
-    if i_am_in(parts)
-      qdegree = isa(qdegrees,Number) ? qdegrees : qdegrees[lev]
-      PD = patch_decompositions[lev]
-      Ω = Triangulation(PD)
-      dΩ = Measure(Ω,qdegree)
-      rhs_i(u,v) = rhs(u,v,dΩ)
-      lhs_i(u,v) = lhs(u,v,dΩ)
-      prolongations[lev] = PatchProlongationOperator(lev,sh,PD,lhs_i,rhs_i,qdegree)
-    end
+  map(linear_indices(patch_decompositions),patch_decompositions) do lev,PD
+    qdegree = isa(qdegrees,Number) ? qdegrees : qdegrees[lev]
+    Ω = Triangulation(PD)
+    dΩ = Measure(Ω,qdegree)
+    rhs_i(u,v) = rhs(u,v,dΩ)
+    lhs_i(u,v) = lhs(u,v,dΩ)
+    PatchProlongationOperator(lev,sh,PD,lhs_i,rhs_i,qdegree)
   end
-  return prolongations
 end
 
 function get_coarse_node_mask(fmodel::GridapDistributed.DistributedDiscreteModel,glue)

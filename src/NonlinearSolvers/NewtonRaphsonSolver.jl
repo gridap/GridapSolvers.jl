@@ -1,5 +1,13 @@
 
 # TODO: This should be called NewtonRaphsonSolver, but it would clash with Gridap. 
+"""
+    struct NewtonSolver <: Algebra.NonlinearSolver
+  
+  Newton-Raphson solver. Same as `NewtonRaphsonSolver` in Gridap, but with a couple addons: 
+  - Better logging and verbosity control.
+  - Better convergence criteria. 
+  - Works with geometric LinearSolvers/Preconditioners. 
+"""
 struct NewtonSolver <: Algebra.NonlinearSolver
   ls ::Algebra.LinearSolver
   log::ConvergenceLog{Float64}
