@@ -16,7 +16,7 @@ using GridapDistributed: redistribute_cell_dofs, redistribute_cell_dofs!, get_re
 using GridapDistributed: redistribute_free_values, redistribute_free_values!, get_redistribute_free_values_cache
 using GridapDistributed: redistribute_fe_function
 using GridapDistributed: get_old_and_new_parts
-using GridapDistributed: generate_subparts, local_views
+using GridapDistributed: i_am_in, num_parts, change_parts, generate_subparts, local_views
 
 export change_parts, num_parts, i_am_in
 export generate_level_parts, generate_subparts

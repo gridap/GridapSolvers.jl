@@ -39,7 +39,7 @@ end
 function get_mesh_hierarchy(parts,nc,np_per_level)
   Dc = length(nc)
   domain = (Dc == 2) ? (0,1,0,1) : (0,1,0,1,0,1)
-  num_refs_coarse = (Dc == 2) ? 1 : 0
+  num_refs_coarse = 0#(Dc == 2) ? 1 : 0
   
   num_levels   = length(np_per_level)
   cparts       = generate_subparts(parts,np_per_level[num_levels])
@@ -62,6 +62,13 @@ function main(distribute,np,nc)
   mh = get_mesh_hierarchy(parts,nc,[np,1])
   model = get_model(mh,1)
 
+  #Dc = length(nc)
+  #domain = (Dc == 2) ? (0,1,0,1) : (0,1,0,1,0,1)
+  #model = CartesianDiscreteModel(parts,(2,2),domain,nc)
+  #labels = get_face_labeling(model);
+  #add_tag_from_tags!(labels,"top",[3,4,6])
+  #add_tag_from_tags!(labels,"walls",[1,2,5,7,8])
+
   # FE spaces
   order = 2
   qdegree = 2*(order+1)
@@ -73,7 +80,9 @@ function main(distribute,np,nc)
 
   tests_u  = TestFESpace(mh,reffe_u,dirichlet_tags=["walls","top"]);
   trials_u = TrialFESpace(tests_u,[u_wall,u_top]);
-  U, V = get_fe_space(trials_u,1), get_fe_space(tests_u,1)
+  #U, V = get_fe_space(trials_u,1), get_fe_space(tests_u,1)
+  V = TestFESpace(model,reffe_u;conformity=:H1,dirichlet_tags=["walls","top"])
+  U = TrialFESpace(V,[u_wall,u_top])
   Q = TestFESpace(model,reffe_p;conformity=:L2,constraint=:zeromean) 
 
   mfs = Gridap.MultiField.BlockMultiFieldStyle()
