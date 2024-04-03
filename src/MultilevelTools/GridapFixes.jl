@@ -1,4 +1,5 @@
 
+"""
 function Base.map(::typeof(Gridap.Arrays.testitem),
   a::Tuple{<:AbstractVector{<:AbstractVector{<:VectorValue}},<:AbstractVector{<:Gridap.Fields.LinearCombinationFieldVector}})
   a2=Gridap.Arrays.testitem(a[2])
@@ -6,6 +7,7 @@ function Base.map(::typeof(Gridap.Arrays.testitem),
   a1.=zero(Gridap.Arrays.testitem(a1))
   (a1,a2)
 end
+"""
 
 # MultiField/DistributedMultiField missing API
 
