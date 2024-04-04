@@ -42,6 +42,7 @@ struct GMGLinearSolverFromWeakform{A,B,C,D,E,F,G,H,I} <: Algebra.LinearSolver
   mode            :: Symbol
   log             :: ConvergenceLog{Float64}
   is_nonlinear    :: Bool
+  primal_restrictions
 end
 
 function GMGLinearSolver(
@@ -62,8 +63,9 @@ function GMGLinearSolver(
   tols = SolverTolerances{Float64}(;maxiter=maxiter,atol=atol,rtol=rtol)
   log  = ConvergenceLog("GMG",tols;verbose=verbose)
 
+  primal_restrictions = is_nonlinear ? setup_restriction_operators(trials,8;mode=:solution,solver=IS_ConjugateGradientSolver(;reltol=1.e-6)) : nothing
   return GMGLinearSolverFromWeakform(
-    mh,trials,tests,biforms,interp,restrict,pre_smoothers,post_smoothers,coarsest_solver,mode,log,is_nonlinear
+    mh,trials,tests,biforms,interp,restrict,pre_smoothers,post_smoothers,coarsest_solver,mode,log,is_nonlinear,primal_restrictions
   )
 end
 
@@ -124,18 +126,44 @@ function Gridap.Algebra.numerical_setup!(
   mat::AbstractMatrix,
   x::AbstractVector
 )
+  @check ns.solver.is_nonlinear
+
   s = ns.solver
-  mh = s.mh
-  map(linear_indices(mh)) do l
-    if l == 1
-      copyto!(ns.smatrices[l],mat)
+  mh, trials, tests, restrictions = s.mh, s.trials, s.tests, s.primal_restrictions
+  work_vectors = ns.work_vectors
+
+  # Project solution to all levels
+  xh = Vector{eltype(x)}(undef,num_levels(mh))
+  map(linear_indices(mh),restrictions) do lev, R
+    if lev == 1
+      xh[lev] = x
+    else
+      dxh, Adxh, dxH, rH = work_vectors[lev-1]
+      mul!(dxH,R,xh[lev-1])
+      xh[lev] = dxH
     end
-    Ul = get_fe_space(s.trials,l)
-    Vl = get_fe_space(s.tests,l)
-    A  = ns.smatrices[l]
-    uh = FEFunction(Ul,x)
-    al(u,v) = s.is_nonlinear ? s.biforms[l](uh,u,v) : s.biforms[l](u,v)
-    return assemble_matrix!(al,A,Ul,Vl)
+  end
+
+  # Update matrices, prolongations and smoothers
+  map(linear_indices(mh),ns.smatrices,xh) do lev, Ah, xh
+    if lev == 1
+      copyto!(Ah,mat)
+    else
+      Uh = MultilevelTools.get_fe_space(trials,lev)
+      Vh = MultilevelTools.get_fe_space(tests,lev)
+      uh = FEFunction(Uh,xh)
+      ah(u,v) = s.is_nonlinear ? s.biforms[lev](uh,u,v) : s.biforms[lev](u,v)
+      assemble_matrix!(ah,Ah,Uh,Vh)
+    end
+    if lev != num_levels(mh)
+      if isa(s.interp[lev],PatchProlongationOperator)
+        update_patch_operator!(s.interp[lev],xh)
+      end
+      numerical_setup!(ns.pre_smoothers_caches[lev],Ah,xh)
+      if !(s.pre_smoothers === s.post_smoothers)
+        numerical_setup!(ns.post_smoothers_caches[lev],Ah,xh)
+      end
+    end
   end
 end
 

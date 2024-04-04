@@ -4,14 +4,17 @@ struct PatchProlongationOperator{A,B,C,D,E}
   Ph :: B
   Vh :: C
   PD :: D
+  lhs :: Function
+  rhs :: Function
   caches :: E
+  is_nonlinear :: Bool
 end
 
-function PatchProlongationOperator(lev,sh,PD,lhs,rhs,qdegree)
+function PatchProlongationOperator(lev,sh,PD,lhs,rhs;is_nonlinear=false)
   @assert has_refinement(sh,lev)
 
   # Default prolongation (i.e interpolation)
-  op = ProlongationOperator(lev,sh,qdegree;mode=:residual)
+  op = ProlongationOperator(lev,sh,0;mode=:residual)
 
   # Patch-based correction fespace
   fmodel = get_model(sh,lev)
@@ -24,26 +27,45 @@ function PatchProlongationOperator(lev,sh,PD,lhs,rhs,qdegree)
 
   # Solver caches
   u, v = get_trial_fe_basis(Vh), get_fe_basis(Vh)
-  matdata = collect_cell_matrix(Ph,Ph,lhs(u,v))
-  ns = map(local_views(Ph),matdata) do Ph, matdata
+  contr = is_nonlinear ? lhs(zero(Vh),u,v) : lhs(u,v)
+  matdata = collect_cell_matrix(Ph,Ph,contr)
+  ns, Ap = map(local_views(Ph),matdata) do Ph, matdata
     assem = SparseMatrixAssembler(Ph,Ph)
     Ap    = assemble_matrix(assem,matdata)
-    numerical_setup(symbolic_setup(LUSolver(),Ap),Ap)
-  end
+    ns = numerical_setup(symbolic_setup(LUSolver(),Ap),Ap)
+    return ns, Ap
+  end |> tuple_of_arrays
+  Ap = is_nonlinear ? Ap : nothing
+
   xh, dxh = zero_free_values(Vh), zero_free_values(Vh)
   dxp, rp = zero_free_values(Ph), zero_free_values(Ph)
-  caches = ns, rhs, xh, dxh, dxp, rp
+  caches = ns, xh, dxh, dxp, rp, Ap
 
-  return PatchProlongationOperator(op,Ph,Vh,PD,caches)
+  return PatchProlongationOperator(op,Ph,Vh,PD,lhs,rhs,caches,is_nonlinear)
+end
+
+# Please make this a standard API or something
+function update_patch_operator!(op::PatchProlongationOperator,x::PVector)
+  Vh, Ph = op.Vh, op.Ph
+  ns, _, _, _, _, Ap = op.caches
+  
+  u, v = get_trial_fe_basis(Vh), get_fe_basis(Vh)
+  contr = is_nonlinear ? op.lhs(FEFunction(x,Vh),u,v) : op.lhs(u,v)
+  matdata = collect_cell_matrix(Ph,Ph,contr)
+  map(ns,Ap,local_views(Ph),matdata) do ns,Ap,Ph, matdata
+    assem = SparseMatrixAssembler(Ph,Ph)
+    assemble_matrix!(Ap,assem,matdata)
+    numerical_setup!(ns,Ap)
+  end
 end
 
 function LinearAlgebra.mul!(x,op::PatchProlongationOperator,y)
-  Ap_ns, rhs, xh, dxh, dxp, rp = op.caches
+  Ap_ns, xh, dxh, dxp, rp, _ = op.caches
 
   mul!(x,op.op,y) # TODO: Quite awful, but should be fixed with PA 0.4
   copy!(xh,x)
   duh = FEFunction(op.Vh,xh)
-  assemble_vector!(v->rhs(duh,v),rp,op.Ph)
+  assemble_vector!(v->op.rhs(duh,v),rp,op.Ph)
   map(solve!,partition(dxp),Ap_ns,partition(rp))
   inject!(dxh,op.Ph,dxp)
 
@@ -54,14 +76,14 @@ function LinearAlgebra.mul!(x,op::PatchProlongationOperator,y)
   return x
 end
 
-function setup_patch_prolongation_operators(sh,patch_decompositions,lhs,rhs,qdegrees)
+function setup_patch_prolongation_operators(sh,patch_decompositions,lhs,rhs,qdegrees;is_nonlinear=false)
   map(linear_indices(patch_decompositions),patch_decompositions) do lev,PD
     qdegree = isa(qdegrees,Number) ? qdegrees : qdegrees[lev]
     Ω = Triangulation(PD)
     dΩ = Measure(Ω,qdegree)
-    rhs_i(u,v) = rhs(u,v,dΩ)
-    lhs_i(u,v) = lhs(u,v,dΩ)
-    PatchProlongationOperator(lev,sh,PD,lhs_i,rhs_i,qdegree)
+    lhs_i = is_nonlinear ? (u,du,dv) -> lhs(u,du,dv,dΩ) : (u,v) -> lhs(u,v,dΩ)
+    rhs_i = (u,v) -> rhs(u,v,dΩ)
+    PatchProlongationOperator(lev,sh,PD,lhs_i,rhs_i;is_nonlinear)
   end
 end
 
@@ -92,4 +114,3 @@ function get_coarse_node_mask(fmodel::DiscreteModel{Dc},glue) where Dc
 
   return is_coarse
 end
-
