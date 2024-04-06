@@ -61,7 +61,7 @@ function main(distribute,np,nc)
 
   # Geometry
   Dc = length(nc)
-  mh = get_mesh_hierarchy(parts,nc,[np,np])
+  mh = get_mesh_hierarchy(parts,nc,[np,1])
   model = get_model(mh,1)
 
   # FE spaces

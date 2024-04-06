@@ -134,7 +134,7 @@ function Gridap.Algebra.numerical_setup!(
   nlevs = num_levels(mh)
 
   # Project solution to all levels
-  xh = Vector{AbstractVector}(undef,nlevs)
+  xh = Vector{Union{AbstractVector,Nothing}}(undef,nlevs)
   xh[1] = work_vectors[1][1]; copy!(xh[1],x)
   map(view(linear_indices(mh),1:nlevs-1),restrictions) do lev, R
     dxh, Adxh, dxH, rH = work_vectors[lev]
@@ -143,23 +143,23 @@ function Gridap.Algebra.numerical_setup!(
   end
 
   # Update matrices, prolongations and smoothers
-  map(linear_indices(mh),ns.smatrices,xh) do lev, Ah, xh
+  map(linear_indices(mh),ns.smatrices) do lev, Ah
     if lev == 1
       copyto!(Ah,mat)
     else
       Uh = MultilevelTools.get_fe_space(trials,lev)
       Vh = MultilevelTools.get_fe_space(tests,lev)
-      uh = FEFunction(Uh,xh)
+      uh = FEFunction(Uh,xh[lev])
       ah(u,v) = s.is_nonlinear ? s.biforms[lev](uh,u,v) : s.biforms[lev](u,v)
       assemble_matrix!(ah,Ah,Uh,Vh)
     end
     if lev != num_levels(mh)
       if isa(s.interp[lev],PatchProlongationOperator) || isa(s.interp[lev],MultiFieldTransferOperator)
-        MultilevelTools.update_transfer_operator!(s.interp[lev],xh)
+        MultilevelTools.update_transfer_operator!(s.interp[lev],xh[lev])
       end
-      numerical_setup!(ns.pre_smoothers_caches[lev],Ah,xh)
+      numerical_setup!(ns.pre_smoothers_caches[lev],Ah,xh[lev])
       if !(s.pre_smoothers === s.post_smoothers)
-        numerical_setup!(ns.post_smoothers_caches[lev],Ah,xh)
+        numerical_setup!(ns.post_smoothers_caches[lev],Ah,xh[lev])
       end
     end
   end

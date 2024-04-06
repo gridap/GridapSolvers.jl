@@ -2,8 +2,8 @@
 struct PatchProlongationOperator{R,A,B,C}
   sh :: A
   PD :: B
-  lhs :: Function
-  rhs :: Function
+  lhs :: Union{Nothing,Function}
+  rhs :: Union{Nothing,Function}
   is_nonlinear :: Bool
   caches :: C
 
@@ -14,7 +14,7 @@ struct PatchProlongationOperator{R,A,B,C}
 end
 
 function PatchProlongationOperator(lev,sh,PD,lhs,rhs;is_nonlinear=false)
-  @assert has_refinement(sh,lev) "Level $lev does not have refinement!"
+  #@assert has_refinement(sh,lev) "Level $lev does not have refinement!"
 
   cache_refine = MultilevelTools._get_interpolation_cache(lev,sh,0,:residual)
   cache_redist = MultilevelTools._get_redistribution_cache(lev,sh,:residual,:prolongation,:interpolation,cache_refine)
@@ -34,7 +34,10 @@ function _get_patch_cache(lev,sh,PD,lhs,rhs,is_nonlinear,cache_refine)
     # Patch-based correction fespace
     glue = sh[lev].mh_level.ref_glue
     patches_mask = get_coarse_node_mask(model_h,glue)
-    cell_conformity = sh[lev].cell_conformity
+    #cell_conformity = sh[lev].cell_conformity
+    #_PD = PatchDecomposition(model_h)
+    Dc = num_cell_dims(model_h)
+    cell_conformity = MultilevelTools._cell_conformity(model_h,ReferenceFE(lagrangian,VectorValue{Dc,Float64},2))
     Ph = PatchFESpace(Uh,PD,cell_conformity;patches_mask)
 
     # Solver caches
@@ -67,12 +70,12 @@ function MultilevelTools.update_transfer_operator!(op::PatchProlongationOperator
     fv_h_red, dv_h_red, Uh_red, model_h_red, glue, cache_exchange = cache_redist
     copy!(fv_h_red,x)
     consistent!(fv_h_red) |> fetch
-    redistribute_free_values(fv_h,Uh,fv_h_red,dv_h_red,Uh_red,model_h,glue;reverse=true)
+    GridapDistributed.redistribute_free_values(fv_h,Uh,fv_h_red,dv_h_red,Uh_red,model_h,glue;reverse=true)
   else
     copy!(fv_h,x)
   end
 
-  if !isa(x,Nothing)
+  if !isa(fv_h,Nothing)
     u, v = get_trial_fe_basis(Uh), get_fe_basis(Uh)
     contr = op.is_nonlinear ? op.lhs(FEFunction(Uh,fv_h),u,v) : op.lhs(u,v)
     matdata = collect_cell_matrix(Ph,Ph,contr)
@@ -121,19 +124,26 @@ function LinearAlgebra.mul!(y::PVector,A::PatchProlongationOperator{Val{true}},x
   end
 
   # 2 - Redistribute from coarse partition to fine partition
-  redistribute_free_values!(cache_exchange,fv_h_red,Uh_red,fv_h,dv_h,Uh,model_h_red,glue;reverse=false)
+  GridapDistributed.redistribute_free_values!(cache_exchange,fv_h_red,Uh_red,fv_h,dv_h,Uh,model_h_red,glue;reverse=false)
   copy!(y,fv_h_red) # FE layout -> Matrix layout
 
   return y
 end
 
 function setup_patch_prolongation_operators(sh,patch_decompositions,lhs,rhs,qdegrees;is_nonlinear=false)
-  map(linear_indices(patch_decompositions),patch_decompositions) do lev,PD
+  map(linear_indices(patch_decompositions),patch_decompositions) do lev, _PD
     qdegree = isa(qdegrees,Number) ? qdegrees : qdegrees[lev]
-    Ω = Triangulation(PD)
-    dΩ = Measure(Ω,qdegree)
-    lhs_i = is_nonlinear ? (u,du,dv) -> lhs(u,du,dv,dΩ) : (u,v) -> lhs(u,v,dΩ)
-    rhs_i = (u,v) -> rhs(u,v,dΩ)
+    cparts = get_level_parts(sh,lev+1)
+    if i_am_in(cparts)
+      model = get_model_before_redist(sh,lev)
+      PD = PatchDecomposition(model)
+      Ω = Triangulation(PD)
+      dΩ = Measure(Ω,qdegree)
+      lhs_i = is_nonlinear ? (u,du,dv) -> lhs(u,du,dv,dΩ) : (u,v) -> lhs(u,v,dΩ)
+      rhs_i = (u,v) -> rhs(u,v,dΩ)
+    else
+      PD, lhs_i, rhs_i = nothing, nothing, nothing
+    end
     PatchProlongationOperator(lev,sh,PD,lhs_i,rhs_i;is_nonlinear)
   end
 end
