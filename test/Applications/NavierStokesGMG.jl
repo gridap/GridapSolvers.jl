@@ -14,7 +14,7 @@ using GridapP4est
 using GridapSolvers
 using GridapSolvers.LinearSolvers, GridapSolvers.MultilevelTools
 using GridapSolvers.PatchBasedSmoothers, GridapSolvers.NonlinearSolvers
-using GridapSolvers.BlockSolvers: LinearSystemBlock, BiformBlock, BlockTriangularSolver
+using GridapSolvers.BlockSolvers: NonlinearSystemBlock, LinearSystemBlock, BiformBlock, BlockTriangularSolver
 
 function get_patch_smoothers(mh,tests,biform,patch_decompositions,qdegree)
   patch_spaces = PatchFESpace(tests,patch_decompositions)
@@ -56,12 +56,18 @@ function get_mesh_hierarchy(parts,nc,np_per_level)
   return mh
 end
 
-function main(distribute,np,nc)
-  parts = distribute(LinearIndices((prod(np),)))
+#function main(distribute,np,nc)
+#  parts = distribute(LinearIndices((prod(np),)))
+
+np = 1
+nc = [4,4]
+parts = with_mpi() do distribute 
+  distribute(LinearIndices((prod(np),)))
+end
 
   # Geometry
   Dc = length(nc)
-  mh = get_mesh_hierarchy(parts,nc,[np,1])
+  mh = get_mesh_hierarchy(parts,nc,[np,np])
   model = get_model(mh,1)
 
   # FE spaces
@@ -136,9 +142,10 @@ function main(distribute,np,nc)
   # Solver
   solver_u = gmg
   solver_p = CGSolver(JacobiLinearSolver();maxiter=20,atol=1e-14,rtol=1.e-6,verbose=i_am_main(parts))
-  solver_p.log.depth = 2
+  solver_u.log.depth = 3
+  solver_p.log.depth = 3
 
-  diag_blocks  = [LinearSystemBlock(),BiformBlock((p,q) -> ∫(-1.0/α*p*q)dΩ,Q,Q)]
+  diag_blocks  = [NonlinearSystemBlock(),BiformBlock((p,q) -> ∫(-1.0/α*p*q)dΩ,Q,Q)]
   bblocks = map(CartesianIndices((2,2))) do I
     (I[1] == I[2]) ? diag_blocks[I[1]] : LinearSystemBlock()
   end
@@ -146,6 +153,7 @@ function main(distribute,np,nc)
             0.0 1.0]  
   P = BlockTriangularSolver(bblocks,[solver_u,solver_p],coeffs,:upper)
   solver = FGMRESSolver(20,P;atol=1e-14,rtol=1.e-8,verbose=i_am_main(parts))
+  solver.log.depth = 2
 
   nlsolver = NewtonSolver(solver;maxiter=20,atol=1e-14,rtol=1.e-7,verbose=i_am_main(parts))
   xh = solve(nlsolver,op);

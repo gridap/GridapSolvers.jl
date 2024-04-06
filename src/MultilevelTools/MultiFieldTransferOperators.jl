@@ -42,6 +42,19 @@ function MultiFieldTransferOperator(sh::FESpaceHierarchy,operators;op_type=:prol
   return mfops
 end
 
+function update_transfer_operator!(op::MultiFieldTransferOperator,x::PVector)
+  xh, _ = op.cache
+
+  if !isnothing(xh)
+    copy!(x,xh)
+  end
+
+  for (i,op_i) in enumerate(op.ops)
+    xh_i = isnothing(xh) ? nothing : MultiField.restrict_to_field(op.Vh_out,xh,i)
+    update_transfer_operator!(op_i,xh_i)
+  end
+end
+
 function LinearAlgebra.mul!(x,op::MultiFieldTransferOperator,y)
   xh, yh = op.cache
 
