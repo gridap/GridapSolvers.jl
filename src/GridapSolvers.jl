@@ -3,8 +3,8 @@ module GridapSolvers
   include("SolverInterfaces/SolverInterfaces.jl")
   include("MultilevelTools/MultilevelTools.jl")
   include("BlockSolvers/BlockSolvers.jl")
-  include("LinearSolvers/LinearSolvers.jl")
   include("PatchBasedSmoothers/PatchBasedSmoothers.jl")
+  include("LinearSolvers/LinearSolvers.jl")
   include("NonlinearSolvers/NonlinearSolvers.jl")
 
   using GridapSolvers.SolverInterfaces

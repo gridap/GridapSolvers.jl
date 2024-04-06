@@ -56,14 +56,8 @@ function get_mesh_hierarchy(parts,nc,np_per_level)
   return mh
 end
 
-#function main(distribute,np,nc)
-#  parts = distribute(LinearIndices((prod(np),)))
-
-np = 1
-nc = [4,4]
-parts = with_mpi() do distribute 
-  distribute(LinearIndices((prod(np),)))
-end
+function main(distribute,np,nc)
+  parts = distribute(LinearIndices((prod(np),)))
 
   # Geometry
   Dc = length(nc)
