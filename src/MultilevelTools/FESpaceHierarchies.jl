@@ -1,9 +1,10 @@
-struct FESpaceHierarchyLevel{A,B,C,D}
-  level           :: Int
-  fe_space        :: A
-  fe_space_red    :: B
-  cell_conformity :: C
-  mh_level        :: D
+struct FESpaceHierarchyLevel{A,B,C,D,E}
+  level               :: Int
+  fe_space            :: A
+  fe_space_red        :: B
+  cell_conformity     :: C
+  cell_conformity_red :: D
+  mh_level            :: E
 end
 
 """
@@ -22,6 +23,13 @@ FESpaces.get_fe_space(a::FESpaceHierarchyLevel{A,B}) where {A,B} = a.fe_space_re
 
 get_fe_space_before_redist(sh::FESpaceHierarchy,lev::Int) = get_fe_space_before_redist(sh[lev])
 get_fe_space_before_redist(a::FESpaceHierarchyLevel) = a.fe_space
+
+get_cell_conformity(sh::FESpaceHierarchy,lev::Int) = get_cell_conformity(sh[lev])
+get_cell_conformity(a::FESpaceHierarchyLevel{A,Nothing}) where A = a.cell_conformity
+get_cell_conformity(a::FESpaceHierarchyLevel{A,B}) where {A,B} = a.cell_conformity_red
+
+get_cell_conformity_before_redist(sh::FESpaceHierarchy,lev::Int) = get_cell_conformity_before_redist(sh[lev])
+get_cell_conformity_before_redist(a::FESpaceHierarchyLevel) = a.cell_conformity
 
 get_model(sh::FESpaceHierarchy,level::Integer) = get_model(sh[level])
 get_model(a::FESpaceHierarchyLevel) = get_model(a.mh_level)
@@ -60,18 +68,21 @@ function FESpaces.FESpace(mh::ModelHierarchyLevel,args...;kwargs...)
     cparts, _ = get_old_and_new_parts(mh.red_glue,Val(false))
     Vh     = i_am_in(cparts) ? FESpace(get_model_before_redist(mh),args...;kwargs...) : nothing
     Vh_red = FESpace(get_model(mh),args...;kwargs...)
+    cell_conformity = i_am_in(cparts) ? _cell_conformity(get_model_before_redist(mh),args...;kwargs...) : nothing
+    cell_conformity_red = _cell_conformity(get_model(mh),args...;kwargs...)
   else
     Vh = FESpace(get_model(mh),args...;kwargs...)
     Vh_red = nothing
+    cell_conformity = _cell_conformity(get_model(mh),args...;kwargs...)
+    cell_conformity_red = nothing
   end
-  cell_conformity = _cell_conformity(get_model(mh),args...;kwargs...)
-  return FESpaceHierarchyLevel(mh.level,Vh,Vh_red,cell_conformity,mh)
+  return FESpaceHierarchyLevel(mh.level,Vh,Vh_red,cell_conformity,cell_conformity_red,mh)
 end
 
 function FESpaces.TrialFESpace(a::FESpaceHierarchyLevel,args...;kwargs...)
   Uh     = !isa(a.fe_space,Nothing) ? TrialFESpace(a.fe_space,args...;kwargs...) : nothing
   Uh_red = !isa(a.fe_space_red,Nothing) ? TrialFESpace(a.fe_space_red,args...;kwargs...) : nothing
-  return FESpaceHierarchyLevel(a.level,Uh,Uh_red,a.cell_conformity,a.mh_level)
+  return FESpaceHierarchyLevel(a.level,Uh,Uh_red,a.cell_conformity,a.cell_conformity_red,a.mh_level)
 end
 
 # Test/Trial FESpaces for ModelHierarchies/FESpaceHierarchy
@@ -110,7 +121,8 @@ function Gridap.MultiField.MultiFieldFESpace(spaces::Vector{<:FESpaceHierarchyLe
   Uh     = all(map(s -> !isa(s.fe_space,Nothing),spaces)) ? MultiFieldFESpace(map(s -> s.fe_space, spaces); kwargs...) : nothing
   Uh_red = all(map(s -> !isa(s.fe_space_red,Nothing),spaces)) ? MultiFieldFESpace(map(s -> s.fe_space_red, spaces); kwargs...) : nothing
   cell_conformity = map(s -> s.cell_conformity, spaces)
-  return FESpaceHierarchyLevel(level,Uh,Uh_red,cell_conformity,first(spaces).mh_level)
+  cell_conformity_red = map(s -> s.cell_conformity_red, spaces)
+  return FESpaceHierarchyLevel(level,Uh,Uh_red,cell_conformity,cell_conformity_red,first(spaces).mh_level)
 end
 
 function Gridap.MultiField.MultiFieldFESpace(spaces::Vector{<:HierarchicalArray};kwargs...)

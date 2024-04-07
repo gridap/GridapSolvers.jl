@@ -109,7 +109,7 @@ function main(distribute,np,nc)
     tests_u,qdegree;mode=:residual,solver=IS_ConjugateGradientSolver(;reltol=1.e-6)
   )
   prolongations = setup_patch_prolongation_operators(
-    tests_u,patch_decompositions,biform_u,graddiv,qdegree
+    tests_u,biform_u,graddiv,qdegree
   )
   gmg = GMGLinearSolver(
     mh,trials_u,tests_u,biforms,

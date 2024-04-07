@@ -14,7 +14,6 @@ struct PatchProlongationOperator{R,A,B,C}
 end
 
 function PatchProlongationOperator(lev,sh,PD,lhs,rhs;is_nonlinear=false)
-  #@assert has_refinement(sh,lev) "Level $lev does not have refinement!"
 
   cache_refine = MultilevelTools._get_interpolation_cache(lev,sh,0,:residual)
   cache_redist = MultilevelTools._get_redistribution_cache(lev,sh,:residual,:prolongation,:interpolation,cache_refine)
@@ -34,10 +33,7 @@ function _get_patch_cache(lev,sh,PD,lhs,rhs,is_nonlinear,cache_refine)
     # Patch-based correction fespace
     glue = sh[lev].mh_level.ref_glue
     patches_mask = get_coarse_node_mask(model_h,glue)
-    #cell_conformity = sh[lev].cell_conformity
-    #_PD = PatchDecomposition(model_h)
-    Dc = num_cell_dims(model_h)
-    cell_conformity = MultilevelTools._cell_conformity(model_h,ReferenceFE(lagrangian,VectorValue{Dc,Float64},2))
+    cell_conformity = MultilevelTools.get_cell_conformity_before_redist(sh,lev)
     Ph = PatchFESpace(Uh,PD,cell_conformity;patches_mask)
 
     # Solver caches
@@ -130,8 +126,8 @@ function LinearAlgebra.mul!(y::PVector,A::PatchProlongationOperator{Val{true}},x
   return y
 end
 
-function setup_patch_prolongation_operators(sh,patch_decompositions,lhs,rhs,qdegrees;is_nonlinear=false)
-  map(linear_indices(patch_decompositions),patch_decompositions) do lev, _PD
+function setup_patch_prolongation_operators(sh,lhs,rhs,qdegrees;is_nonlinear=false)
+  map(view(linear_indices(sh),1:num_levels(sh)-1)) do lev
     qdegree = isa(qdegrees,Number) ? qdegrees : qdegrees[lev]
     cparts = get_level_parts(sh,lev+1)
     if i_am_in(cparts)
