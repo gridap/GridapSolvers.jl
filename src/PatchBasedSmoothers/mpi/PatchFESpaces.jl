@@ -1,8 +1,12 @@
 
-function PatchFESpace(space::GridapDistributed.DistributedSingleFieldFESpace,
-                      patch_decomposition::DistributedPatchDecomposition,
-                      reffe::Union{ReferenceFE,Tuple{<:Gridap.ReferenceFEs.ReferenceFEName,Any,Any}};
-                      conformity=nothing)
+const DistributedPatchFESpace = GridapDistributed.DistributedSingleFieldFESpace{<:AbstractVector{<:PatchFESpace}}
+
+function PatchFESpace(
+  space::GridapDistributed.DistributedSingleFieldFESpace,
+  patch_decomposition::DistributedPatchDecomposition,
+  reffe::Union{ReferenceFE,Tuple{<:ReferenceFEs.ReferenceFEName,Any,Any}};
+  conformity=nothing
+)
   cell_conformity = MultilevelTools._cell_conformity(patch_decomposition.model,reffe;conformity=conformity)
   return PatchFESpace(space,patch_decomposition,cell_conformity)
 end
@@ -13,10 +17,9 @@ function PatchFESpace(
   cell_conformity::AbstractArray{<:CellConformity};
   patches_mask = default_patches_mask(patch_decomposition)
 )
-  spaces = map(local_views(space),
-               local_views(patch_decomposition),
-               cell_conformity,
-               patches_mask) do space, patch_decomposition, cell_conformity, patches_mask
+  spaces = map(
+    local_views(space), local_views(patch_decomposition), cell_conformity, patches_mask
+  ) do space, patch_decomposition, cell_conformity, patches_mask
     PatchFESpace(space,patch_decomposition,cell_conformity;patches_mask)
   end
   
@@ -24,8 +27,9 @@ function PatchFESpace(
   local_ndofs  = map(num_free_dofs,spaces)
   global_ndofs = sum(local_ndofs)
   patch_partition = variable_partition(local_ndofs,global_ndofs,false)
+  trian = Triangulation(patch_decomposition)
   gids = PRange(patch_partition)
-  return GridapDistributed.DistributedSingleFieldFESpace(spaces,gids,get_vector_type(space))
+  return GridapDistributed.DistributedSingleFieldFESpace(spaces,gids,trian,get_vector_type(space))
 end
 
 function default_patches_mask(patch_decomposition::DistributedPatchDecomposition)
@@ -39,31 +43,28 @@ function default_patches_mask(patch_decomposition::DistributedPatchDecomposition
   return patches_mask
 end
 
-function PatchFESpace(sh::FESpaceHierarchy,
-                      patch_decompositions::AbstractArray{<:DistributedPatchDecomposition})
-  mh = sh.mh
-  nlevs  = num_levels(mh)
-  levels = Vector{MultilevelTools.FESpaceHierarchyLevel}(undef,nlevs)
-  for lev in 1:nlevs-1
-    parts = get_level_parts(mh,lev)
-    if i_am_in(parts)
-      space  = MultilevelTools.get_fe_space(sh,lev)
-      decomp = patch_decompositions[lev]
-      cell_conformity = sh.levels[lev].cell_conformity
-      patch_space = PatchFESpace(space,decomp,cell_conformity)
-      levels[lev] = MultilevelTools.FESpaceHierarchyLevel(lev,nothing,patch_space,cell_conformity)
-    end
+function PatchFESpace(
+  sh::FESpaceHierarchy,
+  patch_decompositions::AbstractArray{<:DistributedPatchDecomposition}
+)
+  nlevs = num_levels(sh)
+  psh = map(view(sh,1:nlevs-1),patch_decompositions) do shl,decomp
+    space = MultilevelTools.get_fe_space(shl)
+    cell_conformity = MultilevelTools.get_cell_conformity(shl)
+    return PatchFESpace(space,decomp,cell_conformity)
   end
-  return FESpaceHierarchy(mh,levels)
+  return psh
 end
 
 # x \in  PatchFESpace
 # y \in  SingleFESpace
 # x is always consistent at the end since Ph has no ghosts
-function prolongate!(x::PVector,
-                     Ph::GridapDistributed.DistributedSingleFieldFESpace,
-                     y::PVector;
-                     is_consistent::Bool=false)
+function prolongate!(
+  x::PVector,
+  Ph::DistributedPatchFESpace,
+  y::PVector;
+  is_consistent::Bool=false
+)
   if is_consistent 
     map(prolongate!,partition(x),local_views(Ph),partition(y))
   else
@@ -84,11 +85,12 @@ end
 # x \in  SingleFESpace
 # y \in  PatchFESpace
 # y is always consistent at the start since Ph has no ghosts
-function inject!(x::PVector,
-                 Ph::GridapDistributed.DistributedSingleFieldFESpace,
-                 y::PVector;
-                 make_consistent::Bool=true)
-
+function inject!(
+  x::PVector,
+  Ph::DistributedPatchFESpace,
+  y::PVector;
+  make_consistent::Bool=true
+)
   map(partition(x),local_views(Ph),partition(y)) do x,Ph,y
     inject!(x,Ph,y)
   end
@@ -101,13 +103,14 @@ function inject!(x::PVector,
   return x
 end
 
-function inject!(x::PVector,
-                 Ph::GridapDistributed.DistributedSingleFieldFESpace,
-                 y::PVector,
-                 w::PVector,
-                 w_sums::PVector;
-                 make_consistent::Bool=true)
-
+function inject!(
+  x::PVector,
+  Ph::DistributedPatchFESpace,
+  y::PVector,
+  w::PVector,
+  w_sums::PVector;
+  make_consistent::Bool=true
+)
   map(partition(x),local_views(Ph),partition(y),partition(w),partition(w_sums)) do x,Ph,y,w,w_sums
     inject!(x,Ph,y,w,w_sums)
   end
@@ -120,7 +123,7 @@ function inject!(x::PVector,
   return x
 end
 
-function compute_weight_operators(Ph::GridapDistributed.DistributedSingleFieldFESpace,Vh)
+function compute_weight_operators(Ph::DistributedPatchFESpace,Vh)
   # Local weights and partial sums
   w_values, w_sums_values = map(compute_weight_operators,local_views(Ph),local_views(Vh)) |> tuple_of_arrays
   w      = PVector(w_values,partition(Ph.gids))

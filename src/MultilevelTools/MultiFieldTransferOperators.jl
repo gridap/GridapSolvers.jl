@@ -1,4 +1,6 @@
 
+"""
+"""
 struct MultiFieldTransferOperator{T,A,B,C,D}
   Vh_in  :: A
   Vh_out :: B
@@ -15,7 +17,7 @@ end
 
 function MultiFieldTransferOperator(lev::Integer,sh::FESpaceHierarchy,operators;op_type=:prolongation)
   @check op_type in (:prolongation,:restriction)
-  cparts = get_level_parts(sh.mh,lev+1)
+  cparts = get_level_parts(sh,lev+1)
   Vh = get_fe_space(sh,lev)
   VH = i_am_in(cparts) ? get_fe_space(sh,lev+1) : nothing
 
@@ -32,12 +34,25 @@ function MultiFieldTransferOperator(sh::FESpaceHierarchy,operators;op_type=:prol
 
   mfops = Vector{MultiFieldTransferOperator}(undef,nlevs-1)
   for (lev,ops) in enumerate(zip(operators...))
-    parts = get_level_parts(sh.mh,lev)
+    parts = get_level_parts(sh,lev)
     if i_am_in(parts)
       mfops[lev] = MultiFieldTransferOperator(lev,sh,ops;op_type)
     end
   end
   return mfops
+end
+
+function update_transfer_operator!(op::MultiFieldTransferOperator,x::PVector)
+  xh, _ = op.cache
+
+  if !isnothing(xh)
+    copy!(x,xh)
+  end
+
+  for (i,op_i) in enumerate(op.ops)
+    xh_i = isnothing(xh) ? nothing : MultiField.restrict_to_field(op.Vh_out,xh,i)
+    update_transfer_operator!(op_i,xh_i)
+  end
 end
 
 function LinearAlgebra.mul!(x,op::MultiFieldTransferOperator,y)

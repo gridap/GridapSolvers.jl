@@ -22,6 +22,12 @@ CurrentModule = GridapSolvers.LinearSolvers
   RichardsonSmoother
 ```
 
+## Preconditioners
+
+```@docs
+  JacobiLinearSolver
+```
+
 ## Wrappers
 
 ### PETSc

@@ -1,76 +1,147 @@
 
-struct PatchProlongationOperator{A,B,C,D,E}
-  op :: A
-  Ph :: B
-  Vh :: C
-  PD :: D
-  caches :: E
-end
+struct PatchProlongationOperator{R,A,B,C}
+  sh :: A
+  PD :: B
+  lhs :: Union{Nothing,Function}
+  rhs :: Union{Nothing,Function}
+  is_nonlinear :: Bool
+  caches :: C
 
-function PatchProlongationOperator(lev,sh,PD,lhs,rhs,qdegree)
-  mh = sh.mh
-  @assert has_refinement(mh,lev)
-
-  # Default prolongation (i.e interpolation)
-  op = ProlongationOperator(lev,sh,qdegree;mode=:residual)
-
-  # Patch-based correction fespace
-  fmodel = get_model(mh,lev)
-  glue = mh.levels[lev].ref_glue
-  patches_mask = get_coarse_node_mask(fmodel,glue)
-
-  Vh = MultilevelTools.get_fe_space(sh,lev)
-  cell_conformity = sh.levels[lev].cell_conformity
-  Ph = PatchFESpace(Vh,PD,cell_conformity;patches_mask)
-
-  # Solver caches
-  u, v = get_trial_fe_basis(Vh), get_fe_basis(Vh)
-  matdata = collect_cell_matrix(Ph,Ph,lhs(u,v))
-  ns = map(local_views(Ph),matdata) do Ph, matdata
-    assem = SparseMatrixAssembler(Ph,Ph)
-    Ap    = assemble_matrix(assem,matdata)
-    numerical_setup(symbolic_setup(LUSolver(),Ap),Ap)
+  function PatchProlongationOperator{R}(sh,PD,lhs,rhs,is_nonlinear,caches) where R
+    A, B, C = typeof(sh), typeof(PD), typeof(caches)
+    new{R,A,B,C}(sh,PD,lhs,rhs,is_nonlinear,caches)
   end
-  xh, dxh = zero_free_values(Vh), zero_free_values(Vh)
-  dxp, rp = zero_free_values(Ph), zero_free_values(Ph)
-  caches = ns, rhs, xh, dxh, dxp, rp
-
-  return PatchProlongationOperator(op,Ph,Vh,PD,caches)
 end
 
-function LinearAlgebra.mul!(x,op::PatchProlongationOperator,y)
-  Ap_ns, rhs, xh, dxh, dxp, rp = op.caches
+function PatchProlongationOperator(lev,sh,PD,lhs,rhs;is_nonlinear=false)
 
-  mul!(x,op.op,y) # TODO: Quite awful, but should be fixed with PA 0.4
-  copy!(xh,x)
-  duh = FEFunction(op.Vh,xh)
-  assemble_vector!(v->rhs(duh,v),rp,op.Ph)
-  map(solve!,partition(dxp),Ap_ns,partition(rp))
-  inject!(dxh,op.Ph,dxp)
+  cache_refine = MultilevelTools._get_interpolation_cache(lev,sh,0,:residual)
+  cache_redist = MultilevelTools._get_redistribution_cache(lev,sh,:residual,:prolongation,:interpolation,cache_refine)
+  cache_patch = _get_patch_cache(lev,sh,PD,lhs,rhs,is_nonlinear,cache_refine)
+  caches = cache_refine, cache_patch, cache_redist
 
-  map(own_values(x),own_values(dxh)) do x, dxh
-    x .= x .- dxh
+  redist = has_redistribution(sh,lev)
+  R = typeof(Val(redist))
+  return PatchProlongationOperator{R}(sh,PD,lhs,rhs,is_nonlinear,caches)
+end
+
+function _get_patch_cache(lev,sh,PD,lhs,rhs,is_nonlinear,cache_refine)
+  model_h, Uh, fv_h, dv_h, UH, fv_H, dv_H = cache_refine
+
+  cparts = get_level_parts(sh,lev+1)
+  if i_am_in(cparts)
+    # Patch-based correction fespace
+    glue = sh[lev].mh_level.ref_glue
+    patches_mask = get_coarse_node_mask(model_h,glue)
+    cell_conformity = MultilevelTools.get_cell_conformity_before_redist(sh,lev)
+    Ph = PatchFESpace(Uh,PD,cell_conformity;patches_mask)
+
+    # Solver caches
+    u, v = get_trial_fe_basis(Uh), get_fe_basis(Uh)
+    contr = is_nonlinear ? lhs(zero(Uh),u,v) : lhs(u,v)
+    matdata = collect_cell_matrix(Ph,Ph,contr)
+    Ap_ns, Ap = map(local_views(Ph),matdata) do Ph, matdata
+      assem = SparseMatrixAssembler(Ph,Ph)
+      Ap    = assemble_matrix(assem,matdata)
+      Ap_ns = numerical_setup(symbolic_setup(LUSolver(),Ap),Ap)
+      return Ap_ns, Ap
+    end |> tuple_of_arrays
+    Ap = is_nonlinear ? Ap : nothing
+
+    dxh = zero_free_values(Uh)
+    dxp, rp = zero_free_values(Ph), zero_free_values(Ph)
+    return  Ph, Ap_ns, Ap, dxh, dxp, rp
+  else
+    return nothing, nothing, nothing, nothing, nothing, nothing
   end
-  consistent!(x) |> fetch
-  return x
 end
 
-function setup_patch_prolongation_operators(sh,patch_decompositions,lhs,rhs,qdegrees)
-  mh = sh.mh
-  prolongations = Vector{PatchProlongationOperator}(undef,num_levels(sh)-1)
-  for lev in 1:num_levels(sh)-1
-    parts = get_level_parts(mh,lev)
-    if i_am_in(parts)
-      qdegree = isa(qdegrees,Number) ? qdegrees : qdegrees[lev]
-      PD = patch_decompositions[lev]
-      Ω = Triangulation(PD)
-      dΩ = Measure(Ω,qdegree)
-      rhs_i(u,v) = rhs(u,v,dΩ)
-      lhs_i(u,v) = lhs(u,v,dΩ)
-      prolongations[lev] = PatchProlongationOperator(lev,sh,PD,lhs_i,rhs_i,qdegree)
+# Please make this a standard API or something
+function MultilevelTools.update_transfer_operator!(op::PatchProlongationOperator,x::Union{PVector,Nothing})
+  cache_refine, cache_patch, cache_redist = op.caches
+  model_h, Uh, fv_h, dv_h, UH, fv_H, dv_H = cache_refine
+  Ph, Ap_ns, Ap, dxh, dxp, rp = cache_patch
+
+  if !isa(cache_redist,Nothing)
+    fv_h_red, dv_h_red, Uh_red, model_h_red, glue, cache_exchange = cache_redist
+    copy!(fv_h_red,x)
+    consistent!(fv_h_red) |> fetch
+    GridapDistributed.redistribute_free_values(fv_h,Uh,fv_h_red,dv_h_red,Uh_red,model_h,glue;reverse=true)
+  else
+    copy!(fv_h,x)
+  end
+
+  if !isa(fv_h,Nothing)
+    u, v = get_trial_fe_basis(Uh), get_fe_basis(Uh)
+    contr = op.is_nonlinear ? op.lhs(FEFunction(Uh,fv_h),u,v) : op.lhs(u,v)
+    matdata = collect_cell_matrix(Ph,Ph,contr)
+    map(Ap_ns,Ap,local_views(Ph),matdata) do Ap_ns, Ap, Ph, matdata
+      assem = SparseMatrixAssembler(Ph,Ph)
+      assemble_matrix!(Ap,assem,matdata)
+      numerical_setup!(Ap_ns,Ap)
     end
   end
-  return prolongations
+end
+
+function LinearAlgebra.mul!(y::PVector,A::PatchProlongationOperator{Val{false}},x::PVector)
+  cache_refine, cache_patch, cache_redist = A.caches
+  model_h, Uh, fv_h, dv_h, UH, fv_H, dv_H = cache_refine
+  Ph, Ap_ns, Ap, dxh, dxp, rp = cache_patch
+
+  copy!(fv_H,x) # Matrix layout -> FE layout
+  uH = FEFunction(UH,fv_H,dv_H)
+  uh = interpolate!(uH,fv_h,Uh)
+
+  assemble_vector!(v->A.rhs(uh,v),rp,Ph)
+  map(solve!,partition(dxp),Ap_ns,partition(rp))
+  inject!(dxh,Ph,dxp)
+  fv_h .= fv_h .- dxh
+  copy!(y,fv_h)
+
+  return y
+end
+
+function LinearAlgebra.mul!(y::PVector,A::PatchProlongationOperator{Val{true}},x::Union{PVector,Nothing})
+  cache_refine, cache_patch, cache_redist = A.caches
+  model_h, Uh, fv_h, dv_h, UH, fv_H, dv_H = cache_refine
+  fv_h_red, dv_h_red, Uh_red, model_h_red, glue, cache_exchange = cache_redist
+  Ph, Ap_ns, Ap, dxh, dxp, rp = cache_patch
+
+  # 1 - Interpolate in coarse partition
+  if !isa(x,Nothing)
+    copy!(fv_H,x) # Matrix layout -> FE layout
+    uH = FEFunction(UH,fv_H,dv_H)
+    uh = interpolate!(uH,fv_h,Uh)
+
+    assemble_vector!(v->A.rhs(uh,v),rp,Ph)
+    map(solve!,partition(dxp),Ap_ns,partition(rp))
+    inject!(dxh,Ph,dxp)
+    fv_h .= fv_h .- dxh
+  end
+
+  # 2 - Redistribute from coarse partition to fine partition
+  GridapDistributed.redistribute_free_values!(cache_exchange,fv_h_red,Uh_red,fv_h,dv_h,Uh,model_h_red,glue;reverse=false)
+  copy!(y,fv_h_red) # FE layout -> Matrix layout
+
+  return y
+end
+
+function setup_patch_prolongation_operators(sh,lhs,rhs,qdegrees;is_nonlinear=false)
+  map(view(linear_indices(sh),1:num_levels(sh)-1)) do lev
+    qdegree = isa(qdegrees,Number) ? qdegrees : qdegrees[lev]
+    cparts = get_level_parts(sh,lev+1)
+    if i_am_in(cparts)
+      model = get_model_before_redist(sh,lev)
+      PD = PatchDecomposition(model)
+      Ω = Triangulation(PD)
+      dΩ = Measure(Ω,qdegree)
+      lhs_i = is_nonlinear ? (u,du,dv) -> lhs(u,du,dv,dΩ) : (u,v) -> lhs(u,v,dΩ)
+      rhs_i = (u,v) -> rhs(u,v,dΩ)
+    else
+      PD, lhs_i, rhs_i = nothing, nothing, nothing
+    end
+    PatchProlongationOperator(lev,sh,PD,lhs_i,rhs_i;is_nonlinear)
+  end
 end
 
 function get_coarse_node_mask(fmodel::GridapDistributed.DistributedDiscreteModel,glue)
@@ -100,4 +171,3 @@ function get_coarse_node_mask(fmodel::DiscreteModel{Dc},glue) where Dc
 
   return is_coarse
 end
-

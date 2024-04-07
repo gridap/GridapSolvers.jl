@@ -89,10 +89,9 @@ function Gridap.Algebra.numerical_setup!(ns::PatchBasedSmootherNumericalSetup, A
   Ph, Vh = solver.patch_space, solver.space
   Ap, Ap_ns = ns.local_A, ns.local_ns
 
-  u0 = FEFunction(Vh,x)
-  ap(u,v) = solver.biform(u0,u,v)
-
-  matdata = collect_cell_matrix(Ph,Ph,ap)
+  u0, u, v = FEFunction(Vh,x), get_trial_fe_basis(Vh), get_fe_basis(Vh)
+  contr = solver.biform(u0,u,v)
+  matdata = collect_cell_matrix(Ph,Ph,contr)
   map(Ap, Ap_ns, local_views(Ph), matdata) do Ap, Ap_ns, Ph, matdata
     assem = SparseMatrixAssembler(Ph,Ph)
     assemble_matrix!(Ap,assem,matdata)

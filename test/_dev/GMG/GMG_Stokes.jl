@@ -121,7 +121,7 @@ A, b = get_matrix(op), get_vector(op);
 Auu = blocks(A)[1,1]
 
 restrictions = setup_restriction_operators(tests_u,qdegree;mode=:residual,solver=LUSolver());
-prolongations = setup_patch_prolongation_operators(tests_u,patch_decompositions,biform_u,graddiv,qdegree);
+prolongations = setup_patch_prolongation_operators(tests_u,biform_u,graddiv,qdegree);
 
 gmg = GMGLinearSolver(mh,
                       smatrices,

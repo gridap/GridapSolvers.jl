@@ -16,6 +16,7 @@ using GridapPETSc
 using GridapDistributed
 using GridapSolvers.MultilevelTools
 using GridapSolvers.SolverInterfaces
+using GridapSolvers.PatchBasedSmoothers
 
 export JacobiLinearSolver
 export RichardsonSmoother

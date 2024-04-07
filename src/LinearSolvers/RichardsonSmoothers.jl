@@ -53,6 +53,10 @@ function Gridap.Algebra.numerical_setup!(ns::RichardsonSmootherNumericalSetup, A
   numerical_setup!(ns.Mns,A)
 end
 
+function Gridap.Algebra.numerical_setup!(ns::RichardsonSmootherNumericalSetup, A::AbstractMatrix, x::AbstractVector)
+  numerical_setup!(ns.Mns,A,x)
+end
+
 function Gridap.Algebra.solve!(x::AbstractVector,ns::RichardsonSmootherNumericalSetup,r::AbstractVector)
   Adx,dx,Mns = ns.Adx,ns.dx,ns.Mns
   niter, ω = ns.smoother.niter, ns.smoother.ω

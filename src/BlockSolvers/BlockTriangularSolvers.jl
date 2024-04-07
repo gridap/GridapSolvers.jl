@@ -1,3 +1,25 @@
+"""
+    struct BlockTriangularSolver <: Gridap.Algebra.LinearSolver
+
+  Solver representing a block-triangular (upper/lower) solver, i.e 
+
+  ```
+  [ A11  c12⋅A12  c13⋅A13 ] [ x1 ] = [ r1 ] \\
+  [  0       A22  c23⋅A23 ] [ x2 ] = [ r2 ] \\
+  [  0      0       A33   ] [ x3 ] = [ r3 ] \\
+  ```
+
+  # Parameters: 
+  - `blocks::AbstractMatrix{<:SolverBlock}`: Matrix of solver blocks, indicating how 
+      each block of the preconditioner is obtained. 
+  - `solvers::AbstractVector{<:Gridap.Algebra.LinearSolver}`: Vector of solvers, 
+      one for each diagonal block.
+  - `coeffs::AbstractMatrix{<:Real}`: Matrix of coefficients, indicating the 
+      contribution of the off-diagonal blocks to the right-hand side of each 
+      diagonal. In particular, blocks can be turned off by setting the corresponding 
+      coefficient to zero.
+  - `half::Symbol`: Either `:upper` or `:lower`.
+"""
 struct BlockTriangularSolver{T,N,A,B,C} <: Gridap.Algebra.LinearSolver
   blocks  :: A
   solvers :: B

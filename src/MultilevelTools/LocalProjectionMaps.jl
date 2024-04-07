@@ -1,4 +1,24 @@
+"""
+    struct LocalProjectionMap <: Map
 
+  Map that projects a field/field-basis onto another local reference space 
+  given by a `ReferenceFE`.
+
+  Usage:
+
+  ```julia
+  model = CartesianDiscreteModel((0,1,0,1),(2,2))
+
+  reffe_h1 = ReferenceFE(QUAD,lagrangian,Float64,1,space=:Q)
+  reffe_l2 = ReferenceFE(QUAD,lagrangian,Float64,1,space=:P)
+  U = FESpace(model,reffe_h1)
+  u_h1 = interpolate(f,U)
+
+  q_degree = 2
+  Π = LocalProjectionMap(reffe_l2,q_degree)
+  u_l2 = Π(u_h1)
+  ```
+"""
 struct LocalProjectionMap{A,B,C} <: Map
   reffe :: A
   quad  :: B
@@ -112,7 +132,7 @@ end
 
 function Arrays.evaluate!(cache,k::LocalProjectionMap,f::GridapDistributed.DistributedCellField)
   fields = map(k,local_views(f))
-  return GridapDistributed.DistributedCellField(fields)
+  return GridapDistributed.DistributedCellField(fields,f.trian)
 end
 
 # Optimization for MultiField

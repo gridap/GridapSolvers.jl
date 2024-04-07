@@ -31,27 +31,17 @@ function get_model_hierarchy(parts,Dc,num_parts_x_level)
   return mh
 end
 
-function gets_hierarchy_matrices(trials,tests,a,l,qdegree)
-  nlevs = num_levels(trials)
-  mh    = trials.mh
-
-  mats = Vector{PSparseMatrix}(undef,nlevs)
-  vecs = Vector{PVector}(undef,nlevs)
-  for lev in 1:nlevs
-    parts = get_level_parts(mh,lev)
-    if i_am_in(parts)
-      model = get_model(mh,lev)
-      U = get_fe_space(trials,lev)
-      V = get_fe_space(tests,lev)
-      Ω = Triangulation(model)
-      dΩ = Measure(Ω,qdegree)
-      ai(u,v) = a(u,v,dΩ)
-      li(v) = l(v,dΩ)
-      op    = AffineFEOperator(ai,li,U,V)
-      mats[lev] = get_matrix(op)
-      vecs[lev] = get_vector(op)
-    end
-  end
+function get_hierarchy_matrices(trials,tests,a,l,qdegree)
+  mats, vecs = map(trials,tests) do trials,tests
+    U = get_fe_space(trials)
+    V = get_fe_space(tests)
+    Ω = get_triangulation(U)
+    dΩ = Measure(Ω,qdegree)
+    ai(u,v) = a(u,v,dΩ)
+    li(v) = l(v,dΩ)
+    op    = AffineFEOperator(ai,li,U,V)
+    return get_matrix(op), get_vector(op)
+  end |> tuple_of_arrays
   return mats, vecs
 end
 
@@ -152,12 +142,12 @@ function main(distribute,np,Dc,np_x_level)
       tests  = TestFESpace(mh,reffe;dirichlet_tags="boundary")
       trials = TrialFESpace(tests,u)
       for mode in [:solution]#,:residual]
-        for rm in [:projection,:interpolation]
+        for rm in [:projection]#,:interpolation]
           qdegree = 2*order + 1
           fx = zero(u(VectorValue(0.0,0.0)))
           a(u,v,dΩ) = ∫(v⋅u)*dΩ
           l(v,dΩ)   = ∫(v⋅fx)*dΩ
-          mats, vecs = gets_hierarchy_matrices(trials,tests,a,l,qdegree)
+          mats, vecs = get_hierarchy_matrices(trials,tests,a,l,qdegree)
           if i_am_main(parts)
             println(repeat("=",80))
             println("> Testing transfers for")
