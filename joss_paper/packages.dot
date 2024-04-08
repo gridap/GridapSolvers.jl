@@ -1,0 +1,22 @@
+# https://sketchviz.com/@JordiManyer/a34cdc3942aab5c0e011c05ce12bc2e5
+
+digraph G {
+  graph [fontname = "Handlee"];
+  node [fontname = "Handlee"];
+  edge [fontname = "Handlee",arrowhead=vee,arrowtail=vee];
+
+  bgcolor=transparent;
+ 
+  "Gridap.jl" -> "GridapDistributed.jl" [dir=back]
+  "Gridap.jl" -> "GridapPETSC.jl" [dir=back]
+  "PartitionedArrays.jl" -> "GridapPETSC.jl" [dir=back]
+  "PartitionedArrays.jl" -> "GridapDistributed.jl" [dir=back]
+  "GridapDistributed.jl" -> "GridapP4est.jl" [dir=back]
+  "GridapDistributed.jl" -> "GridapSolvers.jl" [dir=back]
+  "GridapPETSC.jl" -> "GridapSolvers.jl" [dir=back,style=dashed]
+  "GridapP4est.jl" -> "GridapSolvers.jl" [dir=back,style=dashed]
+  
+  "Gridap.jl" [shape=rectangle];
+  "PartitionedArrays.jl" [shape=rectangle]
+  "GridapSolvers.jl" [style=filled;]
+}
