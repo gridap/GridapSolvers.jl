@@ -70,8 +70,8 @@ function inject!(x,Ph::MultiFieldFESpace,y)
   Ph_ndofs = map(num_free_dofs,Ph_spaces)
   Vh_ndofs = map(num_free_dofs,Vh_spaces)
   for (i,Ph_i) in enumerate(Ph_spaces)
-    y_i = view(y, Ph_offsets[i]+1, Ph_offsets[i]+Ph_ndofs[i])
-    x_i = view(x, Vh_offsets[i]+1, Vh_offsets[i]+Vh_ndofs[i])
+    y_i = view(y, Ph_offsets[i]+1:Ph_offsets[i]+Ph_ndofs[i])
+    x_i = view(x, Vh_offsets[i]+1:Vh_offsets[i]+Vh_ndofs[i])
     inject!(x_i,Ph_i,y_i)
   end
 end
