@@ -18,14 +18,28 @@ CurrentModule = GridapSolvers.LinearSolvers
 
 ## Smoothers
 
+Given a linear system ``Ax = b``, a **smoother** is an operator `S` that takes an iterative solution ``x_k`` and its residual ``r_k = b - A x_k``, and modifies them **in place**
+
+```math
+  S : (x_k,r_k) \rightarrow (x_{k+1},r_{k+1})
+```
+
+such that ``|r_{k+1}| < |r_k|``.
+
 ```@docs
   RichardsonSmoother
+  RichardsonSmoother(M::LinearSolver)
 ```
 
 ## Preconditioners
 
+Given a linear system ``Ax = b``, a **preconditioner** is an operator that takes an iterative residual ``r_k`` and returns a correction ``dx_k``.
+
 ```@docs
   JacobiLinearSolver
+  GMGLinearSolverFromMatrices
+  GMGLinearSolverFromWeakform
+  GMGLinearSolver
 ```
 
 ## Wrappers
@@ -36,7 +50,9 @@ Building on top of [GridapPETSc.jl](https://github.com/gridap/GridapPETSc.jl), G
 
 ```@docs
   ElasticitySolver
+  ElasticitySolver(::FESpace)
   CachedPETScNS
+  CachedPETScNS(::GridapPETSc.PETScLinearSolverNS,::AbstractVector,::AbstractVector)
   get_dof_coordinates
 ```
 

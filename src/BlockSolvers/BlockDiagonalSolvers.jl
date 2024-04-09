@@ -1,27 +1,40 @@
 """
-    struct BlockDiagonalSolver <: Gridap.Algebra.LinearSolver
+    struct BlockDiagonalSolver{N} <: LinearSolver
 
-  Solver representing a block-diagonal solver, i.e 
+Solver representing a block-diagonal solver, i.e 
 
-  ```
-  [ A11   0   0  ] [ x1 ] = [ r1 ] \\
-  [  0   A22  0  ] [ x2 ] = [ r2 ] \\
-  [  0    0  A33 ] [ x3 ] = [ r3 ] \\
-  ```
+```
+│ A11   0    0  │   │ x1 │   │ r1 │
+│  0   A22   0  │ ⋅ │ x2 │ = │ r2 │
+│  0    0   A33 │   │ x3 │   │ r3 │
+```
 
-  # Parameters: 
-  - `blocks::AbstractVector{<:SolverBlock}`: Matrix of solver blocks, indicating how 
-      each diagonal block of the preconditioner is obtained. 
-  - `solvers::AbstractVector{<:Gridap.Algebra.LinearSolver}`: Vector of solvers, 
-      one for each diagonal block.
+where `N` is the number of diagonal blocks.
+
+# Properties:
+
+- `blocks::AbstractVector{<:SolverBlock}`: Matrix of solver blocks, indicating how 
+    each diagonal block of the preconditioner is obtained. 
+- `solvers::AbstractVector{<:LinearSolver}`: Vector of solvers, 
+    one for each diagonal block.
+  
 """
 struct BlockDiagonalSolver{N,A,B} <: Gridap.Algebra.LinearSolver
   blocks  :: A
   solvers :: B
+
+  @doc """
+      function BlockDiagonalSolver(
+        blocks  :: AbstractVector{<:SolverBlock},
+        solvers :: AbstractVector{<:LinearSolver}
+      )
+
+  Create and instance of [`BlockDiagonalSolver`](@ref) from its underlying properties.
+  """
   function BlockDiagonalSolver(
     blocks  :: AbstractVector{<:SolverBlock},
     solvers :: AbstractVector{<:Gridap.Algebra.LinearSolver}
-    )
+  )
     N = length(solvers)
     @check length(blocks) == N
 
@@ -33,25 +46,59 @@ end
 
 # Constructors
 
+@doc """
+    function BlockDiagonalSolver(
+      solvers::AbstractVector{<:LinearSolver}; 
+      is_nonlinear::Vector{Bool}=fill(false,length(solvers))
+    )
+  
+Create and instance of [`BlockDiagonalSolver`](@ref) where all blocks are extracted from 
+the linear system.
+"""
 function BlockDiagonalSolver(solvers::AbstractVector{<:Gridap.Algebra.LinearSolver}; 
                              is_nonlinear::Vector{Bool}=fill(false,length(solvers)))
   blocks = map(nl -> nl ? NonlinearSystemBlock() : LinearSystemBlock(),is_nonlinear)
   return BlockDiagonalSolver(blocks,solvers)
 end
 
-function BlockDiagonalSolver(funcs   :: AbstractArray{<:Function},
-                             trials  :: AbstractArray{<:FESpace},
-                             tests   :: AbstractArray{<:FESpace},
-                             solvers :: AbstractArray{<:Gridap.Algebra.LinearSolver};
-                             is_nonlinear::Vector{Bool}=fill(false,length(solvers)))
+@doc """
+    function BlockDiagonalSolver(
+      funcs   :: AbstractArray{<:Function},
+      trials  :: AbstractArray{<:FESpace},
+      tests   :: AbstractArray{<:FESpace},
+      solvers :: AbstractArray{<:LinearSolver};
+      is_nonlinear::Vector{Bool}=fill(false,length(solvers))
+    )
+  
+Create and instance of [`BlockDiagonalSolver`](@ref) where all blocks are given by 
+integral forms.
+"""
+function BlockDiagonalSolver(
+  funcs   :: AbstractArray{<:Function},
+  trials  :: AbstractArray{<:FESpace},
+  tests   :: AbstractArray{<:FESpace},
+  solvers :: AbstractArray{<:Gridap.Algebra.LinearSolver};
+  is_nonlinear::Vector{Bool}=fill(false,length(solvers))
+)
   blocks = map(funcs,trials,tests,is_nonlinear) do f,trial,test,nl
     nl ? TriformBlock(f,trial,test) : BiformBlock(f,trial,test)
   end
   return BlockDiagonalSolver(blocks,solvers)
 end
 
-function BlockDiagonalSolver(mats::AbstractVector{<:AbstractMatrix},
-                             solvers::AbstractVector{<:Gridap.Algebra.LinearSolver})
+@doc """
+    function BlockDiagonalSolver(
+      mats::AbstractVector{<:AbstractMatrix},
+      solvers::AbstractVector{<:LinearSolver}
+    )
+  
+Create and instance of [`BlockDiagonalSolver`](@ref) where all blocks are given by 
+external matrices.
+"""
+function BlockDiagonalSolver(
+  mats::AbstractVector{<:AbstractMatrix},
+  solvers::AbstractVector{<:Gridap.Algebra.LinearSolver}
+)
   blocks = map(MatrixBlock,mats)
   return BlockDiagonalSolver(blocks,solvers)
 end

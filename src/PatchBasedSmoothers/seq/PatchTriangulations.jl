@@ -1,4 +1,10 @@
+"""
+    struct PatchTriangulation{Dc,Dp} <: Triangulation{Dc,Dp}
+      ...
+    end
 
+Wrapper around a Triangulation, for patch-based assembly.
+"""
 struct PatchTriangulation{Dc,Dp,A,B,C,D,E} <: Gridap.Geometry.Triangulation{Dc,Dp}
   trian            :: A
   PD               :: B

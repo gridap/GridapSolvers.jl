@@ -3,8 +3,6 @@
       ...
     end
 
-    ElasticitySolver(space::FESpace; maxiter=500, atol=1.e-12, rtol=1.e-8)
-
   GMRES + AMG solver, specifically designed for linear elasticity problems.
 
   Follows PETSc's documentation for [PCAMG](https://petsc.org/release/manualpages/PC/PCGAMG.html) 
@@ -13,6 +11,12 @@
 struct ElasticitySolver{A} <: Algebra.LinearSolver
   space :: A
   tols  :: SolverTolerances{Float64}
+
+  @doc """
+      function ElasticitySolver(space::FESpace; maxiter=500, atol=1.e-12, rtol=1.e-8)
+
+    Returns an instance of [`ElasticitySolver`](@ref) from its underlying properties.
+  """
   function ElasticitySolver(space::FESpace;
                             maxiter=500,atol=1.e-12,rtol=1.e-8)
     tols = SolverTolerances{Float64}(;maxiter=maxiter,atol=atol,rtol=rtol)

@@ -1,3 +1,10 @@
+"""
+    struct GMGLinearSolverFromMatrices <: LinearSolver
+      ...
+    end
+
+Geometric MultiGrid solver, from algebraic parts.
+"""
 struct GMGLinearSolverFromMatrices{A,B,C,D,E,F,G} <: Algebra.LinearSolver
   mh              :: A
   smatrices       :: B
@@ -10,6 +17,29 @@ struct GMGLinearSolverFromMatrices{A,B,C,D,E,F,G} <: Algebra.LinearSolver
   log             :: ConvergenceLog{Float64}
 end
 
+@doc """
+    GMGLinearSolver(
+      mh::ModelHierarchy,
+      matrices::AbstractArray{<:AbstractMatrix},
+      prolongations,
+      restrictions;
+      pre_smoothers   = Fill(RichardsonSmoother(JacobiLinearSolver(),10),num_levels(mh)-1),
+      post_smoothers  = pre_smoothers,
+      coarsest_solver = LUSolver(),
+      mode::Symbol    = :preconditioner,
+      maxiter = 100, atol = 1.0e-14, rtol = 1.0e-08, verbose = false,
+    )
+
+Creates an instance of [`GMGLinearSolverFromMatrices`](@ref) from the underlying model 
+hierarchy, the system matrices at each level and the transfer operators and smoothers 
+at each level except the coarsest.
+
+The solver has two modes of operation, defined by the kwarg `mode`:
+
+- `:solver`: The GMG solver takes a rhs `b` and returns a solution `x`.
+- `:preconditioner`: The GMG solver takes a residual `r` and returns a correction `dx`.
+
+"""
 function GMGLinearSolver(
   mh::ModelHierarchy,
   smatrices::AbstractArray{<:AbstractMatrix},
@@ -29,6 +59,13 @@ function GMGLinearSolver(
   )
 end
 
+"""
+    struct GMGLinearSolverFromWeakForm <: LinearSolver
+      ...
+    end
+
+Geometric MultiGrid solver, from FE parts.
+"""
 struct GMGLinearSolverFromWeakform{A,B,C,D,E,F,G,H,I} <: Algebra.LinearSolver
   mh              :: A
   trials          :: B
@@ -45,6 +82,32 @@ struct GMGLinearSolverFromWeakform{A,B,C,D,E,F,G,H,I} <: Algebra.LinearSolver
   primal_restrictions
 end
 
+@doc """
+    GMGLinearSolver(
+      mh::ModelHierarchy,
+      trials::FESpaceHierarchy,
+      tests::FESpaceHierarchy,
+      biforms::AbstractArray{<:Function},
+      interp,
+      restrict;
+      pre_smoothers   = Fill(RichardsonSmoother(JacobiLinearSolver(),10),num_levels(mh)-1),
+      post_smoothers  = pre_smoothers,
+      coarsest_solver = Gridap.Algebra.LUSolver(),
+      mode::Symbol    = :preconditioner,
+      is_nonlinear    = false,
+      maxiter = 100, atol = 1.0e-14, rtol = 1.0e-08, verbose = false,
+    )
+
+Creates an instance of [`GMGLinearSolverFromMatrices`](@ref) from the underlying model 
+hierarchy, the trial and test FEspace hierarchies, the weakform lhs at each level 
+and the transfer operators and smoothers at each level except the coarsest.
+
+The solver has two modes of operation, defined by the kwarg `mode`:
+
+- `:solver`: The GMG solver takes a rhs `b` and returns a solution `x`.
+- `:preconditioner`: The GMG solver takes a residual `r` and returns a correction `dx`.
+
+"""
 function GMGLinearSolver(
   mh::ModelHierarchy,
   trials::FESpaceHierarchy,

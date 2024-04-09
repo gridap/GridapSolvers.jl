@@ -10,7 +10,6 @@ CurrentModule = GridapSolvers.MultilevelTools
 One of the main difficulties of multilevel algorithms is dealing with the complexity of having multiple subcommunicators. We provide some tools to deal with it. In particular we introduce `HierarchicalArray`s.
 
 ```@docs
-GridapDistributed.i_am_in
 generate_level_parts
 HierarchicalArray
 Base.map

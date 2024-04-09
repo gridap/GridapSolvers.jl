@@ -19,7 +19,7 @@ For this reason, we define the following abstract interface:
   NonlinearSolverBlock
 ```
 
-On top of this interface, we provide some useful block implementations: 
+On top of this interface, we provide some useful block implementations:
 
 ```@docs
   LinearSystemBlock
@@ -33,7 +33,19 @@ On top of this interface, we provide some useful block implementations:
 
 We can combine blocks to define a block solver. All block solvers take an array of blocks and a vector of solvers for the diagonal blocks (which need to be solved for). We provide two common types of block solvers:
 
+### BlockDiagonalSolvers
+
 ```@docs
   BlockDiagonalSolver
-  BlockTriangularSolver
+  BlockDiagonalSolver(blocks::AbstractVector{<:SolverBlock},solvers::AbstractVector{<:LinearSolver})
+  BlockDiagonalSolver(solvers::AbstractVector{<:LinearSolver})
+  BlockDiagonalSolver(funcs::AbstractArray{<:Function},trials::AbstractArray{<:FESpace},tests::AbstractArray{<:FESpace},solvers::AbstractArray{<:LinearSolver})
+```
+
+### BlockTriangularSolvers
+
+```@docs
+BlockTriangularSolver
+BlockTriangularSolver(blocks::AbstractMatrix{<:SolverBlock},solvers ::AbstractVector{<:LinearSolver},)
+BlockTriangularSolver(solvers::AbstractVector{<:LinearSolver})
 ```

@@ -1,19 +1,32 @@
 """
-    struct RichardsonSmoother <: LinearSolver
-      ...
+    struct RichardsonSmoother{A} <: LinearSolver
+      M     :: A
+      niter :: Int64
+      ω     :: Float64
     end
-
-    RichardsonSmoother(M::LinearSolver,niter::Int=1,ω::Float64=1.0)
-
-  Performs `niter` Richardson iterations with relaxation parameter `ω` 
-  using the linear solver `M`.
   
-  Updates both the solution `x` and the residual `r` in place.
+Iterative Richardson smoother. Given a solution `x` and a residual `r`, performs
+`niter` Richardson iterations with damping parameter `ω` using the linear solver `M`. 
+A Richardson iteration is given by:
+
+```
+dx = ω * inv(M) * r
+x  = x + dx
+r  = r - A * dx
+```
+
+Updates both the solution `x` and the residual `r` in place.
 """
 struct RichardsonSmoother{A} <: Gridap.Algebra.LinearSolver
   M     :: A
   niter :: Int64
   ω     :: Float64
+
+  @doc """
+      function RichardsonSmoother(M::LinearSolver,niter::Int=1,ω::Float64=1.0)
+
+  Returns an instance of [`RichardsonSmoother`](@ref) from its underlying properties.
+  """
   function RichardsonSmoother(
     M::Gridap.Algebra.LinearSolver,
     niter::Integer=1,

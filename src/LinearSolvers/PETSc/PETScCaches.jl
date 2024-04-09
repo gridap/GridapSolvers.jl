@@ -1,6 +1,8 @@
 
 """
     struct CachedPETScNS <: NumericalSetup
+      ...
+    end
 
   Wrapper around a PETSc NumericalSetup, providing highly efficiend reusable caches:
 
@@ -16,6 +18,14 @@ struct CachedPETScNS{TM,A}
   X      :: PETScVector
   B      :: PETScVector
   owners :: A
+
+  @doc """
+      function CachedPETScNS(ns::PETScLinearSolverNS,x::AbstractVector,b::AbstractVector)
+
+  Create a new instance of [`CachedPETScNS`](@ref) from its underlying properties.
+  Once this structure is created, you can **only** solve the system with the same vectors 
+  you used to create it.
+  """
   function CachedPETScNS(ns::GridapPETSc.PETScLinearSolverNS{TM},x::AbstractVector,b::AbstractVector) where TM
     X = convert(PETScVector,x)
     B = convert(PETScVector,b)

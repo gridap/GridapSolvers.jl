@@ -1,10 +1,23 @@
 
 ## PatchFESpace from MultiFieldFESpace
 
-function PatchFESpace(space::Gridap.MultiField.MultiFieldFESpace,
-                      patch_decomposition::PatchDecomposition,
-                      cell_conformity::Vector{<:CellConformity};
-                      kwargs...)
+@doc """
+    function PatchFESpace(
+      space::Gridap.MultiField.MultiFieldFESpace,
+      patch_decomposition::PatchDecomposition,
+      cell_conformity::Vector{<:CellConformity};
+      kwargs...
+    )
+
+`PatchFESpace` constructor for `MultiFieldFESpace`. 
+Returns a `MultiFieldFESpace` of `PatchFESpace`s .
+"""
+function PatchFESpace(
+  space::Gridap.MultiField.MultiFieldFESpace,
+  patch_decomposition::PatchDecomposition,
+  cell_conformity::Vector{<:CellConformity};
+  kwargs...
+)
   patch_spaces = map((s,c) -> PatchFESpace(s,patch_decomposition,c;kwargs...),space,cell_conformity)
   return MultiFieldFESpace(patch_spaces)
 end

@@ -1,14 +1,31 @@
+
+"""
+    abstract type PatchBoundaryStyle end
+    struct PatchBoundaryExclude  <: PatchBoundaryStyle end
+    struct PatchBoundaryInclude  <: PatchBoundaryStyle end
+  
+Controls the boundary consitions imposed at the patch boundaries for the sub-spaces.
+- `PatchBoundaryInclude`: No BCs are imposed at the patch boundaries. 
+- `PatchBoundaryExclude`: Zero dirichlet BCs are imposed at the patch boundaries.
+"""
 abstract type PatchBoundaryStyle end
 struct PatchBoundaryExclude  <: PatchBoundaryStyle end
 struct PatchBoundaryInclude  <: PatchBoundaryStyle end
 
 """
-PatchDecomposition{Dr,Dc,Dp} <: DiscreteModel{Dc,Dp}
+    struct PatchDecomposition{Dr,Dc,Dp} <: DiscreteModel{Dc,Dp}
 
-  Dr :: Dimension of the patch root
-  patch_cells                   :: [patch][local cell] -> cell
-  patch_cells_overlapped        :: [patch][local cell] -> overlapped cell
-  patch_cells_faces_on_boundary :: [d][overlapped cell][local face] -> face is on patch boundary
+Represents a patch decomposition of a discrete model, i.e an overlapping cell covering `{Ω_i}`
+of `Ω` such that `Ω = Σ_i Ω_i`.
+
+## Properties: 
+
+- `Dr::Integer` : Dimension of the patch root
+- `model::DiscreteModel{Dc,Dp}` : Underlying discrete model
+- `patch_cells::Table` : [patch][local cell] -> cell
+- `patch_cells_overlapped::Table`        : [patch][local cell] -> overlapped cell
+- `patch_cells_faces_on_boundary::Table` : [d][overlapped cell][local face] -> face is on patch boundary
+
 """
 struct PatchDecomposition{Dr,Dc,Dp} <: GridapType
   model                         :: DiscreteModel{Dc,Dp}
@@ -20,6 +37,16 @@ end
 num_patches(a::PatchDecomposition) = length(a.patch_cells)
 Gridap.Geometry.num_cells(a::PatchDecomposition) = length(a.patch_cells.data)
 
+@doc """
+    function PatchDecomposition(
+      model::DiscreteModel{Dc,Dp};
+      Dr=0,
+      patch_boundary_style::PatchBoundaryStyle=PatchBoundaryExclude(),
+      boundary_tag_names::AbstractArray{String}=["boundary"]
+    )
+
+Returns an instance of [`PatchDecomposition`](@ref) from a given discrete model.
+"""
 function PatchDecomposition(
   model::DiscreteModel{Dc,Dp};
   Dr=0,

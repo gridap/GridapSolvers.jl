@@ -1,4 +1,18 @@
 
+"""
+    struct PatchProlongationOperator end
+
+A `PatchProlongationOperator` is a modified prolongation operator such that given a coarse
+solution `xH` returns 
+
+```
+xh = Ih(xH) - yh
+```
+
+where `yh` is a subspace-based correction computed by solving local problems on coarse cells 
+within the fine mesh.
+
+"""
 struct PatchProlongationOperator{R,A,B,C}
   sh :: A
   PD :: B
@@ -13,6 +27,27 @@ struct PatchProlongationOperator{R,A,B,C}
   end
 end
 
+@doc """
+    function PatchProlongationOperator(
+      lev :: Integer,
+      sh  :: FESpaceHierarchy,
+      PD  :: PatchDecomposition,
+      lhs :: Function,
+      rhs :: Function;
+      is_nonlinear=false
+    )
+
+Returns an instance of `PatchProlongationOperator` for a given level `lev` and a given 
+FESpaceHierarchy `sh`. The subspace-based correction on a solution `uH` is computed 
+by solving local problems given by 
+
+```
+  lhs(u_i,v_i) = rhs(uH,v_i) ∀ v_i ∈ V_i
+```
+
+where `V_i` is the patch-local space indiced by the PatchDecomposition `PD`.
+
+"""
 function PatchProlongationOperator(lev,sh,PD,lhs,rhs;is_nonlinear=false)
 
   cache_refine = MultilevelTools._get_interpolation_cache(lev,sh,0,:residual)

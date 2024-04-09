@@ -1,4 +1,27 @@
+"""
+    struct PatchBasedLinearSolver <: LinearSolver
+      ...
+    end
 
+Sub-assembled linear solver for patch-based methods. Given a bilinear form `a` and
+a space decomposition `V = Σ_i V_i` given by a patch space, returns a global correction
+given by aggregated local corrections, i.e 
+
+```
+dx = Σ_i w_i I_i inv(A_i) (I_i)^* x 
+```
+
+where `A_i` is the patch-local system matrix defined by 
+
+```
+(A_i u_i, v_i) = a(u_i,v_i) ∀ v_i ∈ V_i
+```
+
+and `I_i` is the natural injection from the patch space
+to the global space. The aggregation can be un-weighted (i.e. `w_i = 1`) or weighted, where
+`w_i = 1/#(i)`.
+
+"""
 struct PatchBasedLinearSolver{A,B,C} <: Gridap.Algebra.LinearSolver
   biform       :: Function
   patch_space  :: A
@@ -7,6 +30,20 @@ struct PatchBasedLinearSolver{A,B,C} <: Gridap.Algebra.LinearSolver
   is_nonlinear :: Bool
   weighted     :: Bool
   
+  @doc """
+      function PatchBasedLinearSolver(
+        biform::Function, 
+        patch_space::FESpace, 
+        space::FESpace;
+        local_solver = LUSolver(),
+        is_nonlinear = false,
+        weighted = false
+      )
+    
+    Returns an instance of [`PatchBasedLinearSolver`](@ref) from its underlying properties.
+    Local patch-systems are solved with `local_solver`. If `weighted`, uses weighted 
+    patch aggregation to compute the global correction.
+  """
   function PatchBasedLinearSolver(
     biform::Function, patch_space::FESpace, space::FESpace;
     local_solver = LUSolver(),
