@@ -13,6 +13,7 @@ Solvers follow a modular design, where most blocks can be combined to produce PD
 
 - **Krylov solvers**: We provide a (short) list of Krylov solvers, with full preconditioner support and HPC-first implementation.
 - **Block preconditioners**: We provide full support for block assembly of multiphysics problems, and a generic API for building block-based preconditioners for block-assembled systems.
+- **Multilevel support**: We provide a generic API for building multilevel preconditioners.
 - **Geometric Multigrid**: We provide a full-fledged geometric multigrid solver. Highly scalable adaptivity and redistribution of meshes, provided by `p4est` through `GridapP4est.jl`.
 - **PETSc interface**: Full access to PETSc algebraic solvers, through `GridapPETSc.jl`, with full interoperability with the rest of the aforementioned solvers.
 
