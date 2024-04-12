@@ -69,11 +69,13 @@ function set_solver_tolerances!(s::Gridap.Algebra.LinearSolver;kwargs...)
   set_solver_tolerances!(get_solver_tolerances(s);kwargs...)
 end
 
-function set_solver_tolerances!(a::SolverTolerances{T};
-                                maxiter = 1000,
-                                atol   = eps(T),
-                                rtol   = T(1.e-5),
-                                dtol   = T(Inf)) where T
+function set_solver_tolerances!(
+  a::SolverTolerances{T};
+  maxiter = 1000,
+  atol   = eps(T),
+  rtol   = T(1.e-5),
+  dtol   = T(Inf)
+) where T
   a.maxiter = maxiter
   a.atol = atol
   a.rtol = rtol
