@@ -178,20 +178,20 @@ function Gridap.Algebra.solve!(x::AbstractBlockVector,ns::BlockTriangularSolverN
   mats = ns.block_caches
   for iB in 1:NB
     # Add lower off-diagonal contributions
-    wi  = w[Block(iB)]
-    copy!(wi,b[Block(iB)])
+    wi  = blocks(w)[iB]
+    copy!(wi,blocks(b)[iB])
     for jB in 1:iB-1
       cij = c[iB,jB]
       if abs(cij) > eps(cij)
-        xj = x[Block(jB)]
+        xj = blocks(x)[jB]
         mul!(wi,mats[iB,jB],xj,-cij,1.0)
       end
     end
 
     # Solve diagonal block
     nsi = ns.block_ns[iB]
-    xi  = x[Block(iB)]
-    yi  = y[Block(iB)]
+    xi  = blocks(x)[iB]
+    yi  = blocks(y)[iB]
     solve!(yi,nsi,wi)
     copy!(xi,yi)
   end
@@ -206,20 +206,20 @@ function Gridap.Algebra.solve!(x::AbstractBlockVector,ns::BlockTriangularSolverN
   mats = ns.block_caches
   for iB in NB:-1:1
     # Add upper off-diagonal contributions
-    wi  = w[Block(iB)]
-    copy!(wi,b[Block(iB)])
+    wi  = blocks(w)[iB]
+    copy!(wi,blocks(b)[iB])
     for jB in iB+1:NB
       cij = c[iB,jB]
       if abs(cij) > eps(cij)
-        xj = x[Block(jB)]
+        xj = blocks(x)[jB]
         mul!(wi,mats[iB,jB],xj,-cij,1.0)
       end
     end
 
     # Solve diagonal block
     nsi = ns.block_ns[iB]
-    xi  = x[Block(iB)]
-    yi  = y[Block(iB)]
+    xi  = blocks(x)[iB]
+    yi  = blocks(y)[iB]
     solve!(yi,nsi,wi)
     copy!(xi,yi) # Remove this with PA 0.4
   end

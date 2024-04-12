@@ -167,8 +167,8 @@ end
 function Gridap.Algebra.solve!(x::AbstractBlockVector,ns::BlockDiagonalSolverNS,b::AbstractBlockVector)
   @check blocklength(x) == blocklength(b) == length(ns.block_ns)
   for (iB,bns) in enumerate(ns.block_ns)
-    xi = x[Block(iB)]
-    bi = b[Block(iB)]
+    xi = blocks(x)[iB]
+    bi = blocks(b)[iB]
     solve!(xi,bns,bi)
   end
   return x
