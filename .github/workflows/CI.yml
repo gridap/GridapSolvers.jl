@@ -15,7 +15,7 @@ jobs:
     name: Julia ${{ matrix.version }} - ${{ matrix.os }} - ${{ matrix.arch }} - ${{ github.event_name }}
     runs-on: ${{ matrix.os }}
     env:
-      P4EST_ROOT_DIR: "/opt/p4est/2.2/"
+      P4EST_ROOT_DIR: "/opt/p4est/2.8.5/"
       JULIA_PETSC_LIBRARY: "/opt/petsc/3.18/lib/libpetsc"
     strategy:
       fail-fast: false
