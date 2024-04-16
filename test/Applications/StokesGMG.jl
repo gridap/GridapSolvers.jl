@@ -36,23 +36,10 @@ function get_bilinear_form(mh_lev,biform,qdegree)
   return (u,v) -> biform(u,v,dΩ)
 end
 
-function get_mesh_hierarchy(parts,nc,np_per_level)
-  Dc = length(nc)
-  domain = (Dc == 2) ? (0,1,0,1) : (0,1,0,1,0,1)
-  num_refs_coarse = 0#(Dc == 2) ? 1 : 0
-  
-  num_levels   = length(np_per_level)
-  cparts       = generate_subparts(parts,np_per_level[num_levels])
-  cmodel       = CartesianDiscreteModel(domain,nc)
-
-  labels = get_face_labeling(cmodel)
+function add_labels!(labels)
   add_tag_from_tags!(labels,"top",[3,4,6])
   add_tag_from_tags!(labels,"walls",[1,5,7])
   add_tag_from_tags!(labels,"right",[2,8])
-
-  coarse_model = OctreeDistributedDiscreteModel(cparts,cmodel,num_refs_coarse)
-  mh = ModelHierarchy(parts,coarse_model,np_per_level)
-  return mh
 end
 
 function main(distribute,np,nc)
@@ -60,7 +47,8 @@ function main(distribute,np,nc)
 
   # Geometry
   Dc = length(nc)
-  mh = get_mesh_hierarchy(parts,nc,[np,1])
+  domain = (Dc == 2) ? (0,1,0,1) : (0,1,0,1,0,1)
+  mh = CartesianModelHierarchy(parts,[np,1],domain,nc;add_labels!=add_labels!)
   model = get_model(mh,1)
 
   # FE spaces
