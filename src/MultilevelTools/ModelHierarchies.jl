@@ -41,6 +41,31 @@ has_refinement(a::ModelHierarchyLevel{A,B}) where {A,B} = true
 has_refinement(a::ModelHierarchyLevel{A,Nothing}) where A = false
 
 """
+    CartesianModelHierarchy(
+      ranks,np_per_level,domain,nc;
+      num_refs_coarse=0,
+      add_labels! = (labels -> nothing)
+    )
+  
+  Returns a `ModelHierarchy` with a Cartesian model as coarsest level. The i-th level 
+  will be distributed among `np_per_level[i]` processors. The seed model is given by
+  `cmodel = CartesianDiscreteModel(domain,nc)`.
+"""
+function CartesianModelHierarchy(
+  ranks,np_per_level,domain,nc;
+  num_refs_coarse=0,
+  add_labels! = (labels -> nothing)
+)
+  cparts       = generate_subparts(ranks,np_per_level[end])
+  cmodel       = CartesianDiscreteModel(domain,nc)
+  add_labels!(get_face_labeling(cmodel))
+
+  coarse_model = OctreeDistributedDiscreteModel(cparts,cmodel,num_refs_coarse)
+  mh = ModelHierarchy(ranks,coarse_model,np_per_level)
+  return mh
+end
+
+"""
     ModelHierarchy(root_parts,model,num_procs_x_level)
 
   - `root_parts`: Initial communicator. Will be used to generate subcommunicators.
