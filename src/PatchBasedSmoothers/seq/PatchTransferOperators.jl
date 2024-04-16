@@ -206,3 +206,111 @@ function get_coarse_node_mask(fmodel::DiscreteModel{Dc},glue) where Dc
 
   return is_coarse
 end
+
+# PatchRestrictionOperator
+
+struct PatchRestrictionOperator{R,A,B}
+  Ip :: A
+  rhs :: Union{Function,Nothing}
+  caches :: B
+
+  function PatchRestrictionOperator{R}(
+    Ip::PatchProlongationOperator{R},
+    rhs,
+    caches
+  ) where R
+    A = typeof(Ip)
+    B = typeof(caches)
+    new{R,A,B}(Ip,rhs,caches)
+  end
+end
+
+function PatchRestrictionOperator(lev,sh,Ip,rhs,qdegree;solver=LUSolver())
+
+  cache_refine = MultilevelTools._get_dual_projection_cache(lev,sh,qdegree,solver)
+  cache_redist = MultilevelTools._get_redistribution_cache(lev,sh,:residual,:restriction,:dual_projection,cache_refine)
+  cache_patch = Ip.caches[2]
+  caches = cache_refine, cache_patch, cache_redist
+
+  redist = has_redistribution(sh,lev)
+  R = typeof(Val(redist))
+  return PatchRestrictionOperator{R}(Ip,rhs,caches)
+end
+
+function MultilevelTools.update_transfer_operator!(op::PatchRestrictionOperator,x::Union{PVector,Nothing})
+  nothing
+end
+
+function setup_patch_restriction_operators(sh,patch_prolongations,rhs,qdegrees;kwargs...)
+  map(view(linear_indices(sh),1:num_levels(sh)-1)) do lev
+    qdegree = isa(qdegrees,Number) ? qdegrees : qdegrees[lev]
+    cparts = get_level_parts(sh,lev+1)
+    if i_am_in(cparts)
+      model = get_model_before_redist(sh,lev)
+      Ω  = Triangulation(model)
+      dΩ = Measure(Ω,qdegree)
+      rhs_i = (u,v) -> rhs(u,v,dΩ)
+    else
+      rhs_i = nothing
+    end
+    Ip = patch_prolongations[lev]
+    PatchRestrictionOperator(lev,sh,Ip,rhs_i,qdegree;kwargs...)
+  end
+end
+
+function LinearAlgebra.mul!(y::PVector,A::PatchRestrictionOperator{Val{false}},x::PVector)
+  cache_refine, cache_patch, _ = A.caches
+  model_h, Uh, VH, Mh_ns, rh, uh, assem, dΩhH = cache_refine
+  Ph, Ap_ns, Ap, dxh, dxp, rp = cache_patch
+  fv_h = get_free_dof_values(uh)
+
+  # Patch Correction
+  fill!(rp,0.0)
+  copy!(fv_h,x)
+  prolongate!(rp,Ph,fv_h)
+  map(solve!,partition(dxp),Ap_ns,partition(rp))
+  inject!(fv_h,Ph,dxp)
+
+  assemble_vector!(v->A.rhs(uh,v),dxh,Uh)
+  dxh .= x .- dxh
+
+  # Projection
+  solve!(rh,Mh_ns,dxh)
+  copy!(fv_h,rh)
+  consistent!(fv_h) |> fetch
+  v = get_fe_basis(VH)
+  assemble_vector!(y,assem,collect_cell_vector(VH,∫(v⋅uh)*dΩhH))
+  return y
+end
+
+function LinearAlgebra.mul!(y::Union{PVector,Nothing},A::PatchRestrictionOperator{Val{true}},x::PVector)
+  cache_refine, cache_patch, cache_redist = A.caches
+  model_h, Uh, VH, Mh_ns, rh, uh, assem, dΩhH = cache_refine
+  Ph, Ap_ns, Ap, dxh, dxp, rp = cache_patch
+  fv_h_red, dv_h_red, Uh_red, model_h_red, glue, cache_exchange = cache_redist
+  fv_h = isa(uh,Nothing) ? nothing : get_free_dof_values(uh)
+
+  copy!(fv_h_red,x)
+  consistent!(fv_h_red) |> fetch
+  GridapDistributed.redistribute_free_values!(cache_exchange,fv_h,Uh,fv_h_red,dv_h_red,Uh_red,model_h,glue;reverse=true)
+
+  if !isa(y,Nothing)
+    fill!(rp,0.0)
+    prolongate!(rp,Ph,fv_h)
+    map(solve!,partition(dxp),Ap_ns,partition(rp))
+    inject!(dxh,Ph,dxp)
+  
+    uh_bis = FEFunction(Uh,dxh)
+    assemble_vector!(v->A.rhs(uh_bis,v),rh,Uh)
+    fv_h .= fv_h .- rh
+    consistent!(fv_h) |> fetch
+
+    solve!(rh,Mh_ns,fv_h)
+    copy!(fv_h,rh)
+    consistent!(fv_h) |> fetch
+    v = get_fe_basis(VH)
+    assemble_vector!(y,assem,collect_cell_vector(VH,∫(v⋅uh)*dΩhH))
+  end
+
+  return y
+end

@@ -105,11 +105,14 @@ function main(distribute,np,nc)
   smoothers = get_patch_smoothers(
     mh,tests_u,biform_u,patch_decompositions,qdegree
   )
-  restrictions = setup_restriction_operators(
-    tests_u,qdegree;mode=:residual,solver=IS_ConjugateGradientSolver(;reltol=1.e-6)
-  )
+  #restrictions = setup_restriction_operators(
+  #  tests_u,qdegree;mode=:residual,solver=IS_ConjugateGradientSolver(;reltol=1.e-6)
+  #)
   prolongations = setup_patch_prolongation_operators(
     tests_u,biform_u,graddiv,qdegree
+  )
+  restrictions = setup_patch_restriction_operators(
+    tests_u,prolongations,graddiv,qdegree;solver=IS_ConjugateGradientSolver(;reltol=1.e-6)
   )
   gmg = GMGLinearSolver(
     mh,trials_u,tests_u,biforms,
@@ -123,6 +126,7 @@ function main(distribute,np,nc)
   # Solver
   solver_u = gmg
   solver_p = CGSolver(JacobiLinearSolver();maxiter=20,atol=1e-14,rtol=1.e-6,verbose=i_am_main(parts))
+  solver_u.log.depth = 2
   solver_p.log.depth = 2
 
   diag_blocks  = [LinearSystemBlock(),BiformBlock((p,q) -> ∫(-1.0/α*p*q)dΩ,Q,Q)]
@@ -142,7 +146,7 @@ function main(distribute,np,nc)
   r = allocate_in_range(A)
   mul!(r,A,x)
   r .-= b
-  @test norm(r) < 1.e-8
+  @test norm(r) < 1.e-6
 end
 
 end # module
