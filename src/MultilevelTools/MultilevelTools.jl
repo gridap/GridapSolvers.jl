@@ -43,7 +43,6 @@ export MultiFieldTransferOperator
 
 include("SubpartitioningTools.jl")
 include("HierarchicalArrays.jl")
-include("GridapFixes.jl")
 include("RefinementTools.jl")
 
 include("ModelHierarchies.jl")
