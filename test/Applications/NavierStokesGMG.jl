@@ -118,11 +118,14 @@ function main(distribute,np,nc)
   smoothers = get_patch_smoothers(
     mh,tests_u,jac_u,patch_decompositions,qdegree
   )
-  restrictions = setup_restriction_operators(
-    tests_u,qdegree;mode=:residual,solver=IS_ConjugateGradientSolver(;reltol=1.e-6)
-  )
+  #restrictions = setup_restriction_operators(
+  #  tests_u,qdegree;mode=:residual,solver=IS_ConjugateGradientSolver(;reltol=1.e-6)
+  #)
   prolongations = setup_patch_prolongation_operators(
     tests_u,jac_u,graddiv,qdegree;is_nonlinear=true
+  )
+  restrictions = setup_patch_restriction_operators(
+    tests_u,prolongations,graddiv,qdegree;solver=IS_ConjugateGradientSolver(;reltol=1.e-6)
   )
   gmg = GMGLinearSolver(
     mh,trials_u,tests_u,biforms,

@@ -23,6 +23,7 @@ This objects are the multilevel counterparts of Gridap's `DiscreteModel` and `FE
 ```@docs
 ModelHierarchy
 ModelHierarchyLevel
+CartesianModelHierarchy
 FESpaceHierarchy
 ```
 
