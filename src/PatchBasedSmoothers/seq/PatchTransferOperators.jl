@@ -269,10 +269,12 @@ function LinearAlgebra.mul!(y::PVector,A::PatchRestrictionOperator{Val{false}},x
   copy!(fv_h,x)
   prolongate!(rp,Ph,fv_h)
   map(solve!,partition(dxp),Ap_ns,partition(rp))
+  fill!(fv_h,0.0)
   inject!(fv_h,Ph,dxp)
 
   assemble_vector!(v->A.rhs(uh,v),dxh,Uh)
   dxh .= x .- dxh
+  consistent!(dxh) |> fetch
 
   # Projection
   solve!(rh,Mh_ns,dxh)
