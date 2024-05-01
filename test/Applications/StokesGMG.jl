@@ -141,7 +141,7 @@ function main(distribute,np,nc,np_per_level)
   r = allocate_in_range(A)
   mul!(r,A,x)
   r .-= b
-  #@test norm(r) < 1.e-6
+  @test norm(r) < 1.e-6
 end
 
 end # module
