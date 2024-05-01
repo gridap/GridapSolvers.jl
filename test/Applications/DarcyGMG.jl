@@ -36,13 +36,13 @@ function get_bilinear_form(mh_lev,biform,qdegree)
   return (u,v) -> biform(u,v,dΩ)
 end
 
-function main(distribute,np,nc)
+function main(distribute,np,nc,np_per_level)
   parts = distribute(LinearIndices((prod(np),)))
 
   # Geometry
   Dc = length(nc)
   domain = (Dc == 2) ? (0,1,0,1) : (0,1,0,1,0,1)
-  mh = CartesianModelHierarchy(parts,[np,1],domain,nc)
+  mh = CartesianModelHierarchy(parts,np_per_level,domain,nc)
   model = get_model(mh,1)
 
   # FE spaces
@@ -98,7 +98,7 @@ function main(distribute,np,nc)
     pre_smoothers=smoothers,
     post_smoothers=smoothers,
     coarsest_solver=LUSolver(),
-    maxiter=2,mode=:preconditioner,verbose=i_am_main(parts)
+    maxiter=3,mode=:preconditioner,verbose=i_am_main(parts)
   )
 
   # Solver
@@ -113,7 +113,7 @@ function main(distribute,np,nc)
   coeffs = [1.0 1.0;
             0.0 1.0]  
   P = BlockTriangularSolver(bblocks,[solver_u,solver_p],coeffs,:upper)
-  solver = FGMRESSolver(20,P;atol=1e-14,rtol=1.e-8,verbose=i_am_main(parts))
+  solver = FGMRESSolver(20,P;atol=1e-14,rtol=1.e-10,verbose=i_am_main(parts))
   ns = numerical_setup(symbolic_setup(solver,A),A)
 
   x = allocate_in_domain(A); fill!(x,0.0)

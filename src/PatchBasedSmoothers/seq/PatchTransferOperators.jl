@@ -83,9 +83,9 @@ function _get_patch_cache(lev,sh,PD,lhs,rhs,is_nonlinear,cache_refine)
     end |> tuple_of_arrays
     Ap = is_nonlinear ? Ap : nothing
 
-    dxh = zero_free_values(Uh)
+    duh = zero(Uh)
     dxp, rp = zero_free_values(Ph), zero_free_values(Ph)
-    return  Ph, Ap_ns, Ap, dxh, dxp, rp
+    return  Ph, Ap_ns, Ap, duh, dxp, rp
   else
     return nothing, nothing, nothing, nothing, nothing, nothing
   end
@@ -95,7 +95,7 @@ end
 function MultilevelTools.update_transfer_operator!(op::PatchProlongationOperator,x::Union{PVector,Nothing})
   cache_refine, cache_patch, cache_redist = op.caches
   model_h, Uh, fv_h, dv_h, UH, fv_H, dv_H = cache_refine
-  Ph, Ap_ns, Ap, dxh, dxp, rp = cache_patch
+  Ph, Ap_ns, Ap, duh, dxp, rp = cache_patch
 
   if !isa(cache_redist,Nothing)
     fv_h_red, dv_h_red, Uh_red, model_h_red, glue, cache_exchange = cache_redist
@@ -121,7 +121,8 @@ end
 function LinearAlgebra.mul!(y::PVector,A::PatchProlongationOperator{Val{false}},x::PVector)
   cache_refine, cache_patch, cache_redist = A.caches
   model_h, Uh, fv_h, dv_h, UH, fv_H, dv_H = cache_refine
-  Ph, Ap_ns, Ap, dxh, dxp, rp = cache_patch
+  Ph, Ap_ns, Ap, duh, dxp, rp = cache_patch
+  dxh = get_free_dof_values(duh)
 
   copy!(fv_H,x) # Matrix layout -> FE layout
   uH = FEFunction(UH,fv_H,dv_H)
@@ -140,7 +141,8 @@ function LinearAlgebra.mul!(y::PVector,A::PatchProlongationOperator{Val{true}},x
   cache_refine, cache_patch, cache_redist = A.caches
   model_h, Uh, fv_h, dv_h, UH, fv_H, dv_H = cache_refine
   fv_h_red, dv_h_red, Uh_red, model_h_red, glue, cache_exchange = cache_redist
-  Ph, Ap_ns, Ap, dxh, dxp, rp = cache_patch
+  Ph, Ap_ns, Ap, duh, dxp, rp = cache_patch
+  dxh  = isa(duh,Nothing) ? nothing : get_free_dof_values(duh)
 
   # 1 - Interpolate in coarse partition
   if !isa(x,Nothing)
@@ -183,7 +185,7 @@ function get_coarse_node_mask(fmodel::GridapDistributed.DistributedDiscreteModel
   gids = get_face_gids(fmodel,0)
   mask = map(local_views(fmodel),glue,partition(gids)) do fmodel, glue, gids
     mask = get_coarse_node_mask(fmodel,glue)
-    mask[ghost_to_local(gids)] .= false # Mask ghost nodes as well
+    mask[ghost_to_local(gids)] .= true # Mask ghost nodes as well
     return mask
   end
   return mask
@@ -261,36 +263,37 @@ end
 function LinearAlgebra.mul!(y::PVector,A::PatchRestrictionOperator{Val{false}},x::PVector)
   cache_refine, cache_patch, _ = A.caches
   model_h, Uh, VH, Mh_ns, rh, uh, assem, dΩhH = cache_refine
-  Ph, Ap_ns, Ap, dxh, dxp, rp = cache_patch
+  Ph, Ap_ns, Ap, duh, dxp, rp = cache_patch
   fv_h = get_free_dof_values(uh)
+  dxh = get_free_dof_values(duh)
 
-  # Patch Correction
-  fill!(rp,0.0)
   copy!(fv_h,x)
+  fill!(rp,0.0)
   prolongate!(rp,Ph,fv_h)
   map(solve!,partition(dxp),Ap_ns,partition(rp))
-  fill!(fv_h,0.0)
-  inject!(fv_h,Ph,dxp)
-
-  assemble_vector!(v->A.rhs(uh,v),dxh,Uh)
-  dxh .= x .- dxh
+  inject!(dxh,Ph,dxp)
   consistent!(dxh) |> fetch
 
-  # Projection
-  solve!(rh,Mh_ns,dxh)
+  assemble_vector!(v->A.rhs(duh,v),rh,Uh)
+  fv_h .= fv_h .- rh
+  consistent!(fv_h) |> fetch
+
+  solve!(rh,Mh_ns,fv_h)
   copy!(fv_h,rh)
   consistent!(fv_h) |> fetch
   v = get_fe_basis(VH)
   assemble_vector!(y,assem,collect_cell_vector(VH,∫(v⋅uh)*dΩhH))
+
   return y
 end
 
 function LinearAlgebra.mul!(y::Union{PVector,Nothing},A::PatchRestrictionOperator{Val{true}},x::PVector)
   cache_refine, cache_patch, cache_redist = A.caches
   model_h, Uh, VH, Mh_ns, rh, uh, assem, dΩhH = cache_refine
-  Ph, Ap_ns, Ap, dxh, dxp, rp = cache_patch
+  Ph, Ap_ns, Ap, duh, dxp, rp = cache_patch
   fv_h_red, dv_h_red, Uh_red, model_h_red, glue, cache_exchange = cache_redist
   fv_h = isa(uh,Nothing) ? nothing : get_free_dof_values(uh)
+  dxh  = isa(duh,Nothing) ? nothing : get_free_dof_values(duh)
 
   copy!(fv_h_red,x)
   consistent!(fv_h_red) |> fetch
@@ -298,12 +301,12 @@ function LinearAlgebra.mul!(y::Union{PVector,Nothing},A::PatchRestrictionOperato
 
   if !isa(y,Nothing)
     fill!(rp,0.0)
-    prolongate!(rp,Ph,fv_h)
+    prolongate!(rp,Ph,fv_h;is_consistent=true)
     map(solve!,partition(dxp),Ap_ns,partition(rp))
     inject!(dxh,Ph,dxp)
+    consistent!(dxh) |> fetch
   
-    uh_bis = FEFunction(Uh,dxh)
-    assemble_vector!(v->A.rhs(uh_bis,v),rh,Uh)
+    assemble_vector!(v->A.rhs(duh,v),rh,Uh)
     fv_h .= fv_h .- rh
     consistent!(fv_h) |> fetch
 
