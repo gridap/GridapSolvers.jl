@@ -75,6 +75,7 @@ function Gridap.Algebra.solve!(x::AbstractVector,ns::RichardsonSmootherNumerical
   niter, ω = ns.smoother.niter, ns.smoother.ω
 
   iter = 1
+  fill!(dx,0.0)
   while iter <= niter
     solve!(dx,Mns,r)
     dx .= ω .* dx
