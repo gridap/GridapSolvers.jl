@@ -16,14 +16,14 @@ using GridapSolvers.BlockSolvers: LinearSystemBlock, BiformBlock, BlockTriangula
 
 function add_labels_2d!(labels)
   add_tag_from_tags!(labels,"top",[3,4,6])
-  add_tag_from_tags!(labels,"walls",[1,5,7])
-  add_tag_from_tags!(labels,"right",[2,8])
+  add_tag_from_tags!(labels,"bottom",[1,2,5])
+  add_tag_from_tags!(labels,"walls",[7,8])
 end
 
 function add_labels_3d!(labels)
   add_tag_from_tags!(labels,"top",[5,6,7,8,11,12,15,16,22])
-  add_tag_from_tags!(labels,"walls",[1,2,9,13,14,17,18,21,23,25,26])
-  add_tag_from_tags!(labels,"right",[3,4,10,19,20,24])
+  add_tag_from_tags!(labels,"bottom",[1,2,3,4,9,10,13,14,21])
+  add_tag_from_tags!(labels,"walls",[17,18,23,25,26])
 end
 
 function main(distribute,np,nc)
@@ -43,12 +43,11 @@ function main(distribute,np,nc)
   reffe_u = ReferenceFE(lagrangian,VectorValue{Dc,Float64},order)
   reffe_p = ReferenceFE(lagrangian,Float64,order-1;space=:P)
 
-  u_wall = (Dc==2) ? VectorValue(0.0,0.0) : VectorValue(0.0,0.0,0.0)
+  u_bottom = (Dc==2) ? VectorValue(0.0,0.0) : VectorValue(0.0,0.0,0.0)
   u_top = (Dc==2) ? VectorValue(1.0,0.0) : VectorValue(1.0,0.0,0.0)
-  u_right = (Dc==2) ? VectorValue(0.0,0.0) : VectorValue(0.0,0.0,0.0)
 
-  V = TestFESpace(model,reffe_u,dirichlet_tags=["walls","top","right"]);
-  U = TrialFESpace(V,[u_wall,u_top,u_right]);
+  V = TestFESpace(model,reffe_u,dirichlet_tags=["bottom","top"]);
+  U = TrialFESpace(V,[u_bottom,u_top]);
   Q = TestFESpace(model,reffe_p;conformity=:L2,constraint=:zeromean) 
 
   mfs = Gridap.MultiField.BlockMultiFieldStyle()
