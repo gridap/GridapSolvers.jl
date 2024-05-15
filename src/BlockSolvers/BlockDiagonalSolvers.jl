@@ -139,7 +139,7 @@ function Gridap.Algebra.numerical_setup(ss::BlockDiagonalSolverSS,mat::AbstractB
   solver     = ss.solver
   block_ns   = map(numerical_setup,ss.block_ss,ss.block_caches)
 
-  y = mortar(map(allocate_in_domain,diag(ss.block_caches))); fill!(y,0.0)
+  y = mortar(map(allocate_in_domain,ss.block_caches)); fill!(y,0.0)
   work_caches = y
   return BlockDiagonalSolverNS(solver,block_ns,ss.block_caches,work_caches)
 end
@@ -149,7 +149,7 @@ function Gridap.Algebra.numerical_setup(ss::BlockDiagonalSolverSS,mat::AbstractB
   vec_blocks = blocks(x)
   block_ns   = map(numerical_setup,ss.block_ss,ss.block_caches,vec_blocks)
 
-  y = mortar(map(allocate_in_domain,diag(ss.block_caches))); fill!(y,0.0)
+  y = mortar(map(allocate_in_domain,ss.block_caches)); fill!(y,0.0)
   work_caches = y
   return BlockDiagonalSolverNS(solver,block_ns,ss.block_caches,work_caches)
 end
