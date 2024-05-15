@@ -128,23 +128,30 @@ end
 
 # Numerical setup
 
-struct BlockDiagonalSolverNS{A,B,C} <: Gridap.Algebra.NumericalSetup
+struct BlockDiagonalSolverNS{A,B,C,D} <: Gridap.Algebra.NumericalSetup
   solver       :: A
   block_ns     :: B
   block_caches :: C
+  work_caches  :: D
 end
 
 function Gridap.Algebra.numerical_setup(ss::BlockDiagonalSolverSS,mat::AbstractBlockMatrix)
   solver     = ss.solver
   block_ns   = map(numerical_setup,ss.block_ss,ss.block_caches)
-  return BlockDiagonalSolverNS(solver,block_ns,ss.block_caches)
+
+  y = mortar(map(allocate_in_domain,diag(ss.block_caches))); fill!(y,0.0)
+  work_caches = y
+  return BlockDiagonalSolverNS(solver,block_ns,ss.block_caches,work_caches)
 end
 
 function Gridap.Algebra.numerical_setup(ss::BlockDiagonalSolverSS,mat::AbstractBlockMatrix,x::AbstractBlockVector)
   solver     = ss.solver
   vec_blocks = blocks(x)
   block_ns   = map(numerical_setup,ss.block_ss,ss.block_caches,vec_blocks)
-  return BlockDiagonalSolverNS(solver,block_ns,ss.block_caches)
+
+  y = mortar(map(allocate_in_domain,diag(ss.block_caches))); fill!(y,0.0)
+  work_caches = y
+  return BlockDiagonalSolverNS(solver,block_ns,ss.block_caches,work_caches)
 end
 
 function Gridap.Algebra.numerical_setup!(ns::BlockDiagonalSolverNS,mat::AbstractBlockMatrix)
@@ -166,10 +173,14 @@ end
 
 function Gridap.Algebra.solve!(x::AbstractBlockVector,ns::BlockDiagonalSolverNS,b::AbstractBlockVector)
   @check blocklength(x) == blocklength(b) == length(ns.block_ns)
+  y = ns.work_caches
+
   for (iB,bns) in enumerate(ns.block_ns)
     xi = blocks(x)[iB]
     bi = blocks(b)[iB]
-    solve!(xi,bns,bi)
+    yi = blocks(y)[iB]
+    solve!(yi,bns,bi)
+    copy!(xi,yi)
   end
   return x
 end
