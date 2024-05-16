@@ -1,11 +1,11 @@
 ---
-title: 'GridapSolvers.jl: A Julia package for scalable FE solvers'
+title: 'GridapSolvers.jl: Scalable multiphysics finite element solvers in Julia'
 tags:
   - Julia
-  - astronomy
-  - dynamics
-  - galactic dynamics
-  - milky way
+  - pdes
+  - finite elements
+  - hpc
+  - solvers
 authors:
   - name: Jordi Manyer
     orcid: 0000-0002-0178-3890
@@ -41,14 +41,13 @@ One of the biggest scalability bottlenecks within Finite Element (FE) parallel c
 The implementation of exact factorization-based solvers in parallel environments is an extremely challenging task, and even state-of-the-art libraries such as MUMPS [@MUMPS] or PARDISO [@PARDISO] have severe limitations in terms of scalability and memory consumption above a certain number of CPU cores.
 Hence the use of iterative methods is crucial to maintain scalability of FE codes. Unfortunately, the convergence of iterative methods is not guaranteed and rapidly deteriorates as the size of the linear system increases. To retain performance, the use of highly scalable preconditioners is mandatory.
 For most problems, algebraic solvers and preconditioners (i.e based uniquelly on the algebraic system) are enough to obtain robust convergence. Many well-known libraries providing algebraic solvers already exist, such as PETSc [@petsc-user-ref], Trilinos [@trilinos], or Hypre [@hypre]. However, algebraic solvers are not always suited to deal with some of the most challenging problems.
-In these cases, geometric solvers (i.e., solvers that exploit the geometry and physics of the particular problem) are required. To this end, GridapSolvers is a registered Julia [@Bezanson2017] software package which provides highly scalable geometric solvers tailored for the FE numerical solution of PDEs on parallel computers.
+In these cases, geometric solvers (i.e., solvers that exploit the geometry and physics of the particular problem) are required. This is the case of many multiphysics problems, such as Navier-Stokes, Darcy or MHD. To this end, GridapSolvers is a registered Julia [@Bezanson2017] software package which provides highly scalable geometric solvers tailored for the FE numerical solution of PDEs on parallel computers.
 
 # Building blocks and composability
 
 \autoref{fig:packages} depicts the relation among GridapDistributed and other packages in the Julia package ecosystem.
 
-At the core, Gridap provides all necessary abstraction and interfaces needed for the FE solution of PDEs (see @Verdugo:2021). It also provides realizations (implementations) of these abstractions tailored to serial/multi-threaded computing environments.
-GridapDistributed provides distributed-memory counterparts for these abstractions, while leveraging the serial implementations in Gridap and associated methods to handle the local portion on each parallel task. GridapDistributed relies on PartitionedArrays [@parrays] in order to handle the parallel execution model (e.g., message-passing via the Message Passing Interface (MPI) [@mpi40]), global data distribution layout, and communication among tasks. PartitionedArrays also provides a parallel implementation of partitioned global linear systems (i.e., linear algebra vectors and sparse matrices) as needed in grid-based numerical simulations.
+The core library Gridap provides all necessary abstraction and interfaces needed for the FE solution of PDEs (see @Verdugo:2021) for serial computing. GridapDistributed provides distributed-memory counterparts for these abstractions, while leveraging the serial implementations in Gridap to handle the local portion on each parallel task. GridapDistributed relies on PartitionedArrays [@parrays] in order to handle the parallel execution model (e.g., message-passing via the Message Passing Interface (MPI) [@mpi40]), global data distribution layout, and communication among tasks. PartitionedArrays also provides a parallel implementation of partitioned global linear systems (i.e., linear algebra vectors and sparse matrices) as needed in grid-based numerical simulations.
 This parallel framework does however not include any performant solver for the resulting linear systems. This was delegated to GridapPETSc, which provides a plethora of highly-scalable and efficient algebraic solvers through a high-level interface to the Portable, Extensible Toolkit for Scientific Computation (PETSc) [@petsc-user-ref].
 
 GridapSolvers complements GridapPETSc with a modular and extensible interface for the design of geometric solvers. Some of the highlights of the library are:
@@ -62,7 +61,13 @@ GridapSolvers complements GridapPETSc with a modular and extensible interface fo
 
 # Demo
 
+The following code snippet shows how to solve a 2D Stokes cavity problem in a cartesian domain $\Omega = [0,1]^2$. We discretize the velocity and pressure in $H^1(\Omega)$ and $L^2(\Omega)$ respectively, and use the well known stable element pair $Q_k \times P_{k-1}$ with $k=2$. For the cavity problem, we fix the velocity to $u_b = \vec{0}$ and $u_t = \hat{x}$ on the bottom and top boundaries respectively, and homogeneous Neumann boundary conditions elsewhere.
+The system is block-assembled and solved using a GMRES solver, right-preconditioned with block-triangular Shur-complement-based preconditioner. The Shur complement is approximated by a mass matrix, and solved using a CG solver with Jacobi preconditioner. The eliminated velocity block is approximated by a 2-level V-cycle Geometric Multigrid solver.
+The code is setup to run in parallel with 4 MPI tasks and can be executed with the following command: `mpiexec -n 4 julia --project=. demo.jl`.
+
+```julia
 Code in `demo.jl`.
+```
 
 # Parallel scaling benchmark
 
