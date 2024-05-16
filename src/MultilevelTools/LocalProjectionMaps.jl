@@ -4,7 +4,7 @@
   Map that projects a field/field-basis onto another local reference space 
   given by a `ReferenceFE`.
 
-  Usage:
+  Example:
 
   ```julia
   model = CartesianDiscreteModel((0,1,0,1),(2,2))

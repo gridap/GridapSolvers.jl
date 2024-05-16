@@ -1,4 +1,18 @@
 
+"""
+    struct PatchProlongationOperator end
+
+A `PatchProlongationOperator` is a modified prolongation operator such that given a coarse
+solution `xH` returns 
+
+```
+xh = Ih(xH) - yh
+```
+
+where `yh` is a subspace-based correction computed by solving local problems on coarse cells 
+within the fine mesh.
+
+"""
 struct PatchProlongationOperator{R,A,B,C}
   sh :: A
   PD :: B
@@ -13,6 +27,27 @@ struct PatchProlongationOperator{R,A,B,C}
   end
 end
 
+@doc """
+    function PatchProlongationOperator(
+      lev :: Integer,
+      sh  :: FESpaceHierarchy,
+      PD  :: PatchDecomposition,
+      lhs :: Function,
+      rhs :: Function;
+      is_nonlinear=false
+    )
+
+Returns an instance of `PatchProlongationOperator` for a given level `lev` and a given 
+FESpaceHierarchy `sh`. The subspace-based correction on a solution `uH` is computed 
+by solving local problems given by 
+
+```
+  lhs(u_i,v_i) = rhs(uH,v_i) ∀ v_i ∈ V_i
+```
+
+where `V_i` is the patch-local space indiced by the PatchDecomposition `PD`.
+
+"""
 function PatchProlongationOperator(lev,sh,PD,lhs,rhs;is_nonlinear=false)
 
   cache_refine = MultilevelTools._get_interpolation_cache(lev,sh,0,:residual)
@@ -48,9 +83,9 @@ function _get_patch_cache(lev,sh,PD,lhs,rhs,is_nonlinear,cache_refine)
     end |> tuple_of_arrays
     Ap = is_nonlinear ? Ap : nothing
 
-    dxh = zero_free_values(Uh)
+    duh = zero(Uh)
     dxp, rp = zero_free_values(Ph), zero_free_values(Ph)
-    return  Ph, Ap_ns, Ap, dxh, dxp, rp
+    return  Ph, Ap_ns, Ap, duh, dxp, rp
   else
     return nothing, nothing, nothing, nothing, nothing, nothing
   end
@@ -60,7 +95,7 @@ end
 function MultilevelTools.update_transfer_operator!(op::PatchProlongationOperator,x::Union{PVector,Nothing})
   cache_refine, cache_patch, cache_redist = op.caches
   model_h, Uh, fv_h, dv_h, UH, fv_H, dv_H = cache_refine
-  Ph, Ap_ns, Ap, dxh, dxp, rp = cache_patch
+  Ph, Ap_ns, Ap, duh, dxp, rp = cache_patch
 
   if !isa(cache_redist,Nothing)
     fv_h_red, dv_h_red, Uh_red, model_h_red, glue, cache_exchange = cache_redist
@@ -86,7 +121,8 @@ end
 function LinearAlgebra.mul!(y::PVector,A::PatchProlongationOperator{Val{false}},x::PVector)
   cache_refine, cache_patch, cache_redist = A.caches
   model_h, Uh, fv_h, dv_h, UH, fv_H, dv_H = cache_refine
-  Ph, Ap_ns, Ap, dxh, dxp, rp = cache_patch
+  Ph, Ap_ns, Ap, duh, dxp, rp = cache_patch
+  dxh = get_free_dof_values(duh)
 
   copy!(fv_H,x) # Matrix layout -> FE layout
   uH = FEFunction(UH,fv_H,dv_H)
@@ -105,7 +141,8 @@ function LinearAlgebra.mul!(y::PVector,A::PatchProlongationOperator{Val{true}},x
   cache_refine, cache_patch, cache_redist = A.caches
   model_h, Uh, fv_h, dv_h, UH, fv_H, dv_H = cache_refine
   fv_h_red, dv_h_red, Uh_red, model_h_red, glue, cache_exchange = cache_redist
-  Ph, Ap_ns, Ap, dxh, dxp, rp = cache_patch
+  Ph, Ap_ns, Ap, duh, dxp, rp = cache_patch
+  dxh  = isa(duh,Nothing) ? nothing : get_free_dof_values(duh)
 
   # 1 - Interpolate in coarse partition
   if !isa(x,Nothing)
@@ -148,7 +185,7 @@ function get_coarse_node_mask(fmodel::GridapDistributed.DistributedDiscreteModel
   gids = get_face_gids(fmodel,0)
   mask = map(local_views(fmodel),glue,partition(gids)) do fmodel, glue, gids
     mask = get_coarse_node_mask(fmodel,glue)
-    mask[ghost_to_local(gids)] .= false # Mask ghost nodes as well
+    mask[ghost_to_local(gids)] .= true # Mask ghost nodes as well
     return mask
   end
   return mask
@@ -170,4 +207,115 @@ function get_coarse_node_mask(fmodel::DiscreteModel{Dc},glue) where Dc
   end
 
   return is_coarse
+end
+
+# PatchRestrictionOperator
+
+struct PatchRestrictionOperator{R,A,B}
+  Ip :: A
+  rhs :: Union{Function,Nothing}
+  caches :: B
+
+  function PatchRestrictionOperator{R}(
+    Ip::PatchProlongationOperator{R},
+    rhs,
+    caches
+  ) where R
+    A = typeof(Ip)
+    B = typeof(caches)
+    new{R,A,B}(Ip,rhs,caches)
+  end
+end
+
+function PatchRestrictionOperator(lev,sh,Ip,rhs,qdegree;solver=LUSolver())
+
+  cache_refine = MultilevelTools._get_dual_projection_cache(lev,sh,qdegree,solver)
+  cache_redist = MultilevelTools._get_redistribution_cache(lev,sh,:residual,:restriction,:dual_projection,cache_refine)
+  cache_patch = Ip.caches[2]
+  caches = cache_refine, cache_patch, cache_redist
+
+  redist = has_redistribution(sh,lev)
+  R = typeof(Val(redist))
+  return PatchRestrictionOperator{R}(Ip,rhs,caches)
+end
+
+function MultilevelTools.update_transfer_operator!(op::PatchRestrictionOperator,x::Union{PVector,Nothing})
+  nothing
+end
+
+function setup_patch_restriction_operators(sh,patch_prolongations,rhs,qdegrees;kwargs...)
+  map(view(linear_indices(sh),1:num_levels(sh)-1)) do lev
+    qdegree = isa(qdegrees,Number) ? qdegrees : qdegrees[lev]
+    cparts = get_level_parts(sh,lev+1)
+    if i_am_in(cparts)
+      model = get_model_before_redist(sh,lev)
+      Ω  = Triangulation(model)
+      dΩ = Measure(Ω,qdegree)
+      rhs_i = (u,v) -> rhs(u,v,dΩ)
+    else
+      rhs_i = nothing
+    end
+    Ip = patch_prolongations[lev]
+    PatchRestrictionOperator(lev,sh,Ip,rhs_i,qdegree;kwargs...)
+  end
+end
+
+function LinearAlgebra.mul!(y::PVector,A::PatchRestrictionOperator{Val{false}},x::PVector)
+  cache_refine, cache_patch, _ = A.caches
+  model_h, Uh, VH, Mh_ns, rh, uh, assem, dΩhH = cache_refine
+  Ph, Ap_ns, Ap, duh, dxp, rp = cache_patch
+  fv_h = get_free_dof_values(uh)
+  dxh = get_free_dof_values(duh)
+
+  copy!(fv_h,x)
+  fill!(rp,0.0)
+  prolongate!(rp,Ph,fv_h)
+  map(solve!,partition(dxp),Ap_ns,partition(rp))
+  inject!(dxh,Ph,dxp)
+  consistent!(dxh) |> fetch
+
+  assemble_vector!(v->A.rhs(duh,v),rh,Uh)
+  fv_h .= fv_h .- rh
+  consistent!(fv_h) |> fetch
+
+  solve!(rh,Mh_ns,fv_h)
+  copy!(fv_h,rh)
+  consistent!(fv_h) |> fetch
+  v = get_fe_basis(VH)
+  assemble_vector!(y,assem,collect_cell_vector(VH,∫(v⋅uh)*dΩhH))
+
+  return y
+end
+
+function LinearAlgebra.mul!(y::Union{PVector,Nothing},A::PatchRestrictionOperator{Val{true}},x::PVector)
+  cache_refine, cache_patch, cache_redist = A.caches
+  model_h, Uh, VH, Mh_ns, rh, uh, assem, dΩhH = cache_refine
+  Ph, Ap_ns, Ap, duh, dxp, rp = cache_patch
+  fv_h_red, dv_h_red, Uh_red, model_h_red, glue, cache_exchange = cache_redist
+  fv_h = isa(uh,Nothing) ? nothing : get_free_dof_values(uh)
+  dxh  = isa(duh,Nothing) ? nothing : get_free_dof_values(duh)
+
+  copy!(fv_h_red,x)
+  consistent!(fv_h_red) |> fetch
+  GridapDistributed.redistribute_free_values!(cache_exchange,fv_h,Uh,fv_h_red,dv_h_red,Uh_red,model_h,glue;reverse=true)
+
+  if !isa(y,Nothing)
+    fill!(rp,0.0)
+    prolongate!(rp,Ph,fv_h;is_consistent=true)
+    map(solve!,partition(dxp),Ap_ns,partition(rp))
+    inject!(dxh,Ph,dxp)
+    consistent!(dxh) |> fetch
+  
+    assemble_vector!(v->A.rhs(duh,v),rh,Uh)
+    fv_h .= fv_h .- rh
+    consistent!(fv_h) |> fetch
+
+    solve!(rh,Mh_ns,fv_h)
+    copy!(fv_h,rh)
+    consistent!(fv_h) |> fetch
+    v = get_fe_basis(VH)
+    assemble_vector!(y,assem,collect_cell_vector(VH,∫(v⋅uh)*dΩhH))
+  end
+
+  return y
 end

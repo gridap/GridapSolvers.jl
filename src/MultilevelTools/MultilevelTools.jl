@@ -18,13 +18,15 @@ using GridapDistributed: redistribute_fe_function
 using GridapDistributed: get_old_and_new_parts
 using GridapDistributed: i_am_in, num_parts, change_parts, generate_subparts, local_views
 
+using GridapP4est
+
 export change_parts, num_parts, i_am_in
 export generate_level_parts, generate_subparts
 
 export HierarchicalArray
 export num_levels, get_level_parts, with_level, matching_level_parts
 
-export ModelHierarchy
+export ModelHierarchy, CartesianModelHierarchy
 export num_levels, get_level, get_level_parts
 export get_model, get_model_before_redist, has_refinement, has_redistribution
 

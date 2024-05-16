@@ -4,7 +4,7 @@ using Documenter
 DocMeta.setdocmeta!(GridapSolvers, :DocTestSetup, :(using GridapSolvers); recursive=true)
 
 makedocs(;
-    modules=[GridapSolvers],
+    modules=[GridapSolvers,GridapSolvers.BlockSolvers],
     authors="Santiago Badia <santiago.badia@monash.edu>, Jordi Manyer <jordi.manyer@monash.edu>, Alberto F. Martin <alberto.martin@monash.edu>",
     repo="https://github.com/gridap/GridapSolvers.jl/blob/{commit}{path}#{line}",
     sitename="GridapSolvers.jl",

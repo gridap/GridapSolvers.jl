@@ -1,35 +1,50 @@
 """
-    struct BlockTriangularSolver <: Gridap.Algebra.LinearSolver
+    struct BlockTriangularSolver{T,N} <: LinearSolver
 
-  Solver representing a block-triangular (upper/lower) solver, i.e 
+Solver representing a block-triangular (upper/lower) solver, i.e 
 
-  ```
-  [ A11  c12⋅A12  c13⋅A13 ] [ x1 ] = [ r1 ] \\
-  [  0       A22  c23⋅A23 ] [ x2 ] = [ r2 ] \\
-  [  0      0       A33   ] [ x3 ] = [ r3 ] \\
-  ```
+```
+│ A11  c12⋅A12  c13⋅A13 │   │ x1 │   │ r1 │
+│  0       A22  c23⋅A23 │ ⋅ │ x2 │ = │ r2 │
+│  0      0         A33 │   │ x3 │   │ r3 │
+```
 
-  # Parameters: 
-  - `blocks::AbstractMatrix{<:SolverBlock}`: Matrix of solver blocks, indicating how 
-      each block of the preconditioner is obtained. 
-  - `solvers::AbstractVector{<:Gridap.Algebra.LinearSolver}`: Vector of solvers, 
-      one for each diagonal block.
-  - `coeffs::AbstractMatrix{<:Real}`: Matrix of coefficients, indicating the 
-      contribution of the off-diagonal blocks to the right-hand side of each 
-      diagonal. In particular, blocks can be turned off by setting the corresponding 
-      coefficient to zero.
-  - `half::Symbol`: Either `:upper` or `:lower`.
+where `N` is the number of diagonal blocks and `T` is either `Val{:upper}` or `Val{:lower}`.
+
+# Properties: 
+
+- `blocks::AbstractMatrix{<:SolverBlock}`: Matrix of solver blocks, indicating how 
+    each block of the preconditioner is obtained. 
+- `solvers::AbstractVector{<:LinearSolver}`: Vector of solvers, 
+    one for each diagonal block.
+- `coeffs::AbstractMatrix{<:Real}`: Matrix of coefficients, indicating the 
+    contribution of the off-diagonal blocks to the right-hand side of each 
+    diagonal. In particular, blocks can be turned off by setting the corresponding 
+    coefficient to zero.
+
 """
 struct BlockTriangularSolver{T,N,A,B,C} <: Gridap.Algebra.LinearSolver
   blocks  :: A
   solvers :: B
   coeffs  :: C
+
+  @doc """
+      function BlockTriangularSolver(
+        blocks  :: AbstractMatrix{<:SolverBlock},
+        solvers :: AbstractVector{<:LinearSolver},
+        coeffs = fill(1.0,size(blocks)),
+        half   = :upper
+      )
+    
+  Create and instance of [`BlockTriangularSolver`](@ref) from its underlying properties.
+  The kwarg `half` can have values `:upper` or `:lower`.
+  """
   function BlockTriangularSolver(
     blocks  :: AbstractMatrix{<:SolverBlock},
     solvers :: AbstractVector{<:Gridap.Algebra.LinearSolver},
     coeffs = fill(1.0,size(blocks)),
     half   = :upper
-    )
+  )
     N = length(solvers)
     @check size(blocks,1) == size(blocks,2) == N
     @check size(coeffs,1) == size(coeffs,2) == N
@@ -42,10 +57,24 @@ struct BlockTriangularSolver{T,N,A,B,C} <: Gridap.Algebra.LinearSolver
   end
 end
 
-function BlockTriangularSolver(solvers::AbstractVector{<:Gridap.Algebra.LinearSolver}; 
-                               is_nonlinear::Matrix{Bool}=fill(false,(length(solvers),length(solvers))),
-                               coeffs=fill(1.0,size(is_nonlinear)),
-                               half=:upper)
+@doc """
+    function BlockTriangularSolver(
+      solvers::AbstractVector{<:LinearSolver}; 
+      is_nonlinear::Matrix{Bool}=fill(false,(length(solvers),length(solvers))),
+      coeffs=fill(1.0,size(is_nonlinear)),
+      half=:upper
+    )
+
+Create and instance of [`BlockTriangularSolver`](@ref) where all blocks are extracted from 
+the linear system.
+The kwarg `half` can have values `:upper` or `:lower`.
+"""
+function BlockTriangularSolver(
+  solvers::AbstractVector{<:Gridap.Algebra.LinearSolver}; 
+  is_nonlinear::Matrix{Bool}=fill(false,(length(solvers),length(solvers))),
+  coeffs=fill(1.0,size(is_nonlinear)),
+  half=:upper
+)
   blocks = map(nl -> nl ? NonlinearSystemBlock() : LinearSystemBlock(),is_nonlinear)
   return BlockTriangularSolver(blocks,solvers,coeffs,half)
 end
@@ -149,20 +178,20 @@ function Gridap.Algebra.solve!(x::AbstractBlockVector,ns::BlockTriangularSolverN
   mats = ns.block_caches
   for iB in 1:NB
     # Add lower off-diagonal contributions
-    wi  = w[Block(iB)]
-    copy!(wi,b[Block(iB)])
+    wi  = blocks(w)[iB]
+    copy!(wi,blocks(b)[iB])
     for jB in 1:iB-1
       cij = c[iB,jB]
       if abs(cij) > eps(cij)
-        xj = x[Block(jB)]
+        xj = blocks(x)[jB]
         mul!(wi,mats[iB,jB],xj,-cij,1.0)
       end
     end
 
     # Solve diagonal block
     nsi = ns.block_ns[iB]
-    xi  = x[Block(iB)]
-    yi  = y[Block(iB)]
+    xi  = blocks(x)[iB]
+    yi  = blocks(y)[iB]
     solve!(yi,nsi,wi)
     copy!(xi,yi)
   end
@@ -177,20 +206,20 @@ function Gridap.Algebra.solve!(x::AbstractBlockVector,ns::BlockTriangularSolverN
   mats = ns.block_caches
   for iB in NB:-1:1
     # Add upper off-diagonal contributions
-    wi  = w[Block(iB)]
-    copy!(wi,b[Block(iB)])
+    wi  = blocks(w)[iB]
+    copy!(wi,blocks(b)[iB])
     for jB in iB+1:NB
       cij = c[iB,jB]
       if abs(cij) > eps(cij)
-        xj = x[Block(jB)]
+        xj = blocks(x)[jB]
         mul!(wi,mats[iB,jB],xj,-cij,1.0)
       end
     end
 
     # Solve diagonal block
     nsi = ns.block_ns[iB]
-    xi  = x[Block(iB)]
-    yi  = y[Block(iB)]
+    xi  = blocks(x)[iB]
+    yi  = blocks(y)[iB]
     solve!(yi,nsi,wi)
     copy!(xi,yi) # Remove this with PA 0.4
   end

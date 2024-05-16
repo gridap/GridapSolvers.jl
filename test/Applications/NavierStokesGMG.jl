@@ -37,23 +37,16 @@ function get_trilinear_form(mh_lev,triform,qdegree)
   return (u,du,dv) -> triform(u,du,dv,dΩ)
 end
 
-function get_mesh_hierarchy(parts,nc,np_per_level)
-  Dc = length(nc)
-  domain = (Dc == 2) ? (0,1,0,1) : (0,1,0,1,0,1)
-  num_refs_coarse = 0#(Dc == 2) ? 1 : 0
-  
-  num_levels   = length(np_per_level)
-  cparts       = generate_subparts(parts,np_per_level[num_levels])
-  cmodel       = CartesianDiscreteModel(domain,nc)
-
-  labels = get_face_labeling(cmodel)
+function add_labels_2d!(labels)
   add_tag_from_tags!(labels,"top",[3,4,6])
-  add_tag_from_tags!(labels,"walls",[1,5,7])
-  add_tag_from_tags!(labels,"right",[2,8])
+  add_tag_from_tags!(labels,"bottom",[1,2,5])
+  add_tag_from_tags!(labels,"walls",[7,8])
+end
 
-  coarse_model = OctreeDistributedDiscreteModel(cparts,cmodel,num_refs_coarse)
-  mh = ModelHierarchy(parts,coarse_model,np_per_level)
-  return mh
+function add_labels_3d!(labels)
+  add_tag_from_tags!(labels,"top",[5,6,7,8,11,12,15,16,22])
+  add_tag_from_tags!(labels,"bottom",[1,2,3,4,9,10,13,14,21])
+  add_tag_from_tags!(labels,"walls",[17,18,23,25,26])
 end
 
 function main(distribute,np,nc)
@@ -61,7 +54,9 @@ function main(distribute,np,nc)
 
   # Geometry
   Dc = length(nc)
-  mh = get_mesh_hierarchy(parts,nc,[np,1])
+  domain = (Dc == 2) ? (0,1,0,1) : (0,1,0,1,0,1)
+  add_labels! = (Dc == 2) ? add_labels_2d! : add_labels_3d!
+  mh = CartesianModelHierarchy(parts,[np,1],domain,nc;add_labels! = add_labels!)
   model = get_model(mh,1)
 
   # FE spaces
@@ -70,11 +65,11 @@ function main(distribute,np,nc)
   reffe_u = ReferenceFE(lagrangian,VectorValue{Dc,Float64},order)
   reffe_p = ReferenceFE(lagrangian,Float64,order-1;space=:P)
 
-  u_wall = (Dc==2) ? VectorValue(0.0,0.0) : VectorValue(0.0,0.0,0.0)
+  u_bottom = (Dc==2) ? VectorValue(0.0,0.0) : VectorValue(0.0,0.0,0.0)
   u_top = (Dc==2) ? VectorValue(1.0,0.0) : VectorValue(1.0,0.0,0.0)
 
-  tests_u  = TestFESpace(mh,reffe_u,dirichlet_tags=["walls","top"]);
-  trials_u = TrialFESpace(tests_u,[u_wall,u_top]);
+  tests_u  = TestFESpace(mh,reffe_u,dirichlet_tags=["bottom","top"]);
+  trials_u = TrialFESpace(tests_u,[u_bottom,u_top]);
   U, V = get_fe_space(trials_u,1), get_fe_space(tests_u,1)
   Q = TestFESpace(model,reffe_p;conformity=:L2) 
 
@@ -118,11 +113,14 @@ function main(distribute,np,nc)
   smoothers = get_patch_smoothers(
     mh,tests_u,jac_u,patch_decompositions,qdegree
   )
-  restrictions = setup_restriction_operators(
-    tests_u,qdegree;mode=:residual,solver=IS_ConjugateGradientSolver(;reltol=1.e-6)
-  )
+  #restrictions = setup_restriction_operators(
+  #  tests_u,qdegree;mode=:residual,solver=IS_ConjugateGradientSolver(;reltol=1.e-6)
+  #)
   prolongations = setup_patch_prolongation_operators(
     tests_u,jac_u,graddiv,qdegree;is_nonlinear=true
+  )
+  restrictions = setup_patch_restriction_operators(
+    tests_u,prolongations,graddiv,qdegree;solver=IS_ConjugateGradientSolver(;reltol=1.e-6)
   )
   gmg = GMGLinearSolver(
     mh,trials_u,tests_u,biforms,

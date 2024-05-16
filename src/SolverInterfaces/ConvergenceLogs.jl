@@ -49,12 +49,13 @@ mutable struct ConvergenceLog{T<:Real}
   depth     :: Int
 end
 
-function ConvergenceLog(name :: String,
-                        tols :: SolverTolerances{T};
-                        verbose = SOLVER_VERBOSE_NONE,
-                        nested  = false,
-                        depth   = 0
-                        ) where T
+function ConvergenceLog(
+  name :: String,
+  tols :: SolverTolerances{T};
+  verbose = SOLVER_VERBOSE_NONE,
+  nested  = false,
+  depth   = 0
+) where T
   residuals = Vector{T}(undef,tols.maxiter+1)
   verbose = SolverVerboseLevel(verbose)
   if nested

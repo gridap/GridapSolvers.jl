@@ -31,6 +31,13 @@
 # [[6, 7], [7, -2]]
 # [[8, -2]]
 
+"""
+    struct PatchFESpace <: SingleFieldFESpace
+      ...
+    end
+
+FESpace representing a patch-based subspace decomposition `V = Σ_i V_i` of a global space `V`.
+"""
 struct PatchFESpace  <: FESpaces.SingleFieldFESpace
   Vh                  :: FESpaces.SingleFieldFESpace
   patch_decomposition :: PatchDecomposition
@@ -39,10 +46,21 @@ struct PatchFESpace  <: FESpaces.SingleFieldFESpace
   dof_to_pdof         :: Arrays.Table
 end
 
-# Issue: I have to pass model, reffe, and conformity, so that I can
-#        build the cell_conformity instance. I would have liked to
-#        avoid that, given that these were already used in order to
-#        build Vh. However, I cannot extract this info out of Vh!!! :-(
+@doc """
+    function PatchFESpace(
+      space::FESpaces.SingleFieldFESpace,
+      patch_decomposition::PatchDecomposition,
+      reffe::Union{ReferenceFE,Tuple{<:ReferenceFEs.ReferenceFEName,Any,Any}};
+      conformity=nothing,
+      patches_mask=Fill(false,num_patches(patch_decomposition))
+    )
+
+Constructs a `PatchFESpace` from a global `SingleFieldFESpace` and a `PatchDecomposition`.
+The conformity of the FESpace is deduced from `reffe` and `conformity`, which need to be 
+the same as the ones used to construct the global FESpace.
+
+If `patches_mask[p] = true`, the patch `p` is ignored. Used in parallel.
+"""
 function PatchFESpace(
   space::FESpaces.SingleFieldFESpace,
   patch_decomposition::PatchDecomposition,
@@ -54,6 +72,19 @@ function PatchFESpace(
   return PatchFESpace(space,patch_decomposition,cell_conformity;patches_mask=patches_mask)
 end
 
+@doc """
+    function PatchFESpace(
+      space::FESpaces.SingleFieldFESpace,
+      patch_decomposition::PatchDecomposition,
+      cell_conformity::CellConformity;
+      patches_mask=Fill(false,num_patches(patch_decomposition))
+    )
+
+Constructs a `PatchFESpace` from a global `SingleFieldFESpace`, a `PatchDecomposition`
+and a `CellConformity` instance.
+
+If `patches_mask[p] = true`, the patch `p` is ignored. Used in parallel.
+"""
 function PatchFESpace(
   space::FESpaces.SingleFieldFESpace,
   patch_decomposition::PatchDecomposition,
