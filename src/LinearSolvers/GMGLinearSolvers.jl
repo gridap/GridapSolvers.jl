@@ -305,10 +305,8 @@ function apply_GMG_level!(lev::Integer,xh::Union{PVector,Nothing},rh::Union{PVec
       restrict, interp = ns.solver.restrict[lev], ns.solver.interp[lev]
       dxh, Adxh, dxH, rH = ns.work_vectors[lev]
 
-      i_am_main(parts) && println("Initial = ",norm(rh))
       # Pre-smooth current solution
       solve!(xh, ns.pre_smoothers_caches[lev], rh)
-      i_am_main(parts) && println("Pre-smoother = ",norm(rh))
 
       # Restrict the residual
       mul!(rH,restrict,rh)
@@ -324,11 +322,9 @@ function apply_GMG_level!(lev::Integer,xh::Union{PVector,Nothing},rh::Union{PVec
       xh .= xh .+ dxh
       mul!(Adxh, Ah, dxh)
       rh .= rh .- Adxh
-      i_am_main(parts) && println("Coarse correction = ",norm(rh))
 
       # Post-smooth current solution
       solve!(xh, ns.post_smoothers_caches[lev], rh)
-      i_am_main(parts) && println("Post-Smoother = ",norm(rh))
     end
   end
 end
@@ -336,8 +332,6 @@ end
 function Gridap.Algebra.solve!(x::AbstractVector,ns::GMGNumericalSetup,b::AbstractVector)
   mode = ns.solver.mode
   log  = ns.solver.log
-  mh   = ns.solver.mh
-  parts = get_level_parts(mh,1)
 
   rh = ns.finest_level_cache
   if (mode == :preconditioner)
@@ -354,7 +348,6 @@ function Gridap.Algebra.solve!(x::AbstractVector,ns::GMGNumericalSetup,b::Abstra
   while !done
     apply_GMG_level!(1,x,rh,ns)
     res  = norm(rh)
-    i_am_main(parts) && println("Final = ",norm(b - ns.smatrices[1]*x))
     done = update!(log,res)
   end
 
