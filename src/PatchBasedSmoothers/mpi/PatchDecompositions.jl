@@ -1,53 +1,61 @@
 
-struct DistributedPatchDecomposition{Dc,Dp,A,B} <: GridapType
+struct DistributedPatchDecomposition{Dr,Dc,Dp,A,B} <: GridapType
   patch_decompositions::A
   model::B
 end
 
 GridapDistributed.local_views(a::DistributedPatchDecomposition) = a.patch_decompositions
 
-function PatchDecomposition(model::GridapDistributed.DistributedDiscreteModel{Dc,Dp};
-                            Dr=0,
-                            patch_boundary_style::PatchBoundaryStyle=PatchBoundaryExclude()) where {Dc,Dp}
+function PatchDecomposition(
+  model::GridapDistributed.DistributedDiscreteModel{Dc,Dp};
+  Dr=0,
+  patch_boundary_style::PatchBoundaryStyle=PatchBoundaryExclude()
+) where {Dc,Dp}
   mark_interface_facets!(model)
   patch_decompositions = map(local_views(model)) do lmodel
-    PatchDecomposition(lmodel;
-                       Dr=Dr,
-                       patch_boundary_style=patch_boundary_style,
-                       boundary_tag_names=["boundary","interface"])
+    PatchDecomposition(
+      lmodel;
+      Dr=Dr,
+      patch_boundary_style=patch_boundary_style,
+      boundary_tag_names=["boundary","interface"]
+    )
   end
   A = typeof(patch_decompositions)
   B = typeof(model)
-  return DistributedPatchDecomposition{Dc,Dp,A,B}(patch_decompositions,model)
+  return DistributedPatchDecomposition{Dr,Dc,Dp,A,B}(patch_decompositions,model)
 end
 
 function PatchDecomposition(mh::ModelHierarchy;kwargs...)
   nlevs = num_levels(mh)
-  decompositions = Vector{DistributedPatchDecomposition}(undef,nlevs-1)
-  for lev in 1:nlevs-1
-    parts = get_level_parts(mh,lev)
-    if i_am_in(parts)
-      model = get_model(mh,lev)
-      decompositions[lev] = PatchDecomposition(model;kwargs...)
-    end
+  decomps = map(view(mh,1:nlevs-1)) do mhl
+    model = get_model(mhl)
+    PatchDecomposition(model;kwargs...)
   end
-  return decompositions
+  return decomps
 end
 
-function Gridap.Geometry.Triangulation(a::DistributedPatchDecomposition)
-  trians = map(a.patch_decompositions) do a
+function Geometry.Triangulation(a::DistributedPatchDecomposition)
+  trians = map(local_views(a)) do a
     Triangulation(a)
   end
   return GridapDistributed.DistributedTriangulation(trians,a.model)
 end
 
-function get_patch_root_dim(a::DistributedPatchDecomposition)
-  patch_root_dim = -1
-  map(a.patch_decompositions) do patch_decomposition
-    patch_root_dim = patch_decomposition.Dr
+function Geometry.BoundaryTriangulation(a::DistributedPatchDecomposition,args...;kwargs...)
+  trians = map(local_views(a)) do a
+    BoundaryTriangulation(a,args...;kwargs...)
   end
-  return patch_root_dim
+  return GridapDistributed.DistributedTriangulation(trians,a.model)
 end
+
+function Geometry.SkeletonTriangulation(a::DistributedPatchDecomposition,args...;kwargs...)
+  trians = map(local_views(a)) do a
+    SkeletonTriangulation(a,args...;kwargs...)
+  end
+  return GridapDistributed.DistributedTriangulation(trians,a.model)
+end
+
+get_patch_root_dim(::DistributedPatchDecomposition{Dr}) where Dr = Dr
 
 function mark_interface_facets!(model::GridapDistributed.DistributedDiscreteModel{Dc,Dp}) where {Dc,Dp}
   face_labeling = get_face_labeling(model)

@@ -1,97 +1,136 @@
-# Rationale behind distributed PatchFESpace:
-# 1. Patches have an owner. Only owners compute subspace correction.
-#    If am not owner of a patch, all dofs in my patch become -1. [DONE]
-# 2. Subspace correction on an owned patch may affect DoFs  which
-#    are non-owned. These corrections should be sent to the owner
-#    process. I.e., NO -> O (reversed) communication. [PENDING]
-# 3. Each processor needs to know how many patches "touch" its owned DoFs.
-#    This requires NO->O communication as well. [PENDING]
 
-function PatchFESpace(model::GridapDistributed.DistributedDiscreteModel,
-                      reffe::Tuple{<:Gridap.FESpaces.ReferenceFEName,Any,Any},
-                      conformity::Gridap.FESpaces.Conformity,
-                      patch_decomposition::DistributedPatchDecomposition,
-                      Vh::GridapDistributed.DistributedSingleFieldFESpace)
-  root_gids = get_face_gids(model,get_patch_root_dim(patch_decomposition))
+const DistributedPatchFESpace = GridapDistributed.DistributedSingleFieldFESpace{<:AbstractVector{<:PatchFESpace}}
 
-  spaces = map(local_views(model),
-               local_views(patch_decomposition),
-               local_views(Vh),
-               partition(root_gids)) do model, patch_decomposition, Vh, partition
-    patches_mask = fill(false,local_length(partition))
-    patches_mask[ghost_to_local(partition)] .= true # Mask ghost patch roots
-    PatchFESpace(model,reffe,conformity,patch_decomposition,Vh;patches_mask=patches_mask)
+function PatchFESpace(
+  space::GridapDistributed.DistributedSingleFieldFESpace,
+  patch_decomposition::DistributedPatchDecomposition,
+  reffe::Union{ReferenceFE,Tuple{<:ReferenceFEs.ReferenceFEName,Any,Any}};
+  conformity=nothing
+)
+  cell_conformity = MultilevelTools._cell_conformity(patch_decomposition.model,reffe;conformity=conformity)
+  return PatchFESpace(space,patch_decomposition,cell_conformity)
+end
+
+function PatchFESpace(
+  space::GridapDistributed.DistributedSingleFieldFESpace,
+  patch_decomposition::DistributedPatchDecomposition,
+  cell_conformity::AbstractArray{<:CellConformity};
+  patches_mask = default_patches_mask(patch_decomposition)
+)
+  spaces = map(
+    local_views(space), local_views(patch_decomposition), cell_conformity, patches_mask
+  ) do space, patch_decomposition, cell_conformity, patches_mask
+    PatchFESpace(space,patch_decomposition,cell_conformity;patches_mask)
   end
   
   # This PRange has no ghost dofs
   local_ndofs  = map(num_free_dofs,spaces)
   global_ndofs = sum(local_ndofs)
   patch_partition = variable_partition(local_ndofs,global_ndofs,false)
+  trian = Triangulation(patch_decomposition)
   gids = PRange(patch_partition)
-  return GridapDistributed.DistributedSingleFieldFESpace(spaces,gids,get_vector_type(Vh))
+  return GridapDistributed.DistributedSingleFieldFESpace(spaces,gids,trian,get_vector_type(space))
 end
 
-function PatchFESpace(mh::ModelHierarchy,
-                      reffe::Tuple{<:Gridap.FESpaces.ReferenceFEName,Any,Any},
-                      conformity::Gridap.FESpaces.Conformity,
-                      patch_decompositions::AbstractArray{<:DistributedPatchDecomposition},
-                      sh::FESpaceHierarchy)
-  nlevs = num_levels(mh)
-  levels = Vector{MultilevelTools.FESpaceHierarchyLevel}(undef,nlevs)
-  for lev in 1:nlevs-1
-    parts = get_level_parts(mh,lev)
-    if i_am_in(parts)
-      model  = get_model(mh,lev)
-      space  = MultilevelTools.get_fe_space(sh,lev)
-      decomp = patch_decompositions[lev]
-      patch_space = PatchFESpace(model,reffe,conformity,decomp,space)
-      levels[lev] = MultilevelTools.FESpaceHierarchyLevel(lev,nothing,patch_space)
-    end
+function default_patches_mask(patch_decomposition::DistributedPatchDecomposition)
+  model = patch_decomposition.model
+  root_gids = get_face_gids(model,get_patch_root_dim(patch_decomposition))
+  patches_mask = map(partition(root_gids)) do partition
+    patches_mask = fill(false,local_length(partition))
+    patches_mask[ghost_to_local(partition)] .= true # Mask ghost patch roots
+    return patches_mask
   end
-  return FESpaceHierarchy(mh,levels)
+  return patches_mask
+end
+
+function PatchFESpace(
+  sh::FESpaceHierarchy,
+  patch_decompositions::AbstractArray{<:DistributedPatchDecomposition}
+)
+  nlevs = num_levels(sh)
+  psh = map(view(sh,1:nlevs-1),patch_decompositions) do shl,decomp
+    space = MultilevelTools.get_fe_space(shl)
+    cell_conformity = MultilevelTools.get_cell_conformity(shl)
+    return PatchFESpace(space,decomp,cell_conformity)
+  end
+  return psh
 end
 
 # x \in  PatchFESpace
 # y \in  SingleFESpace
-function prolongate!(x::PVector,
-                     Ph::GridapDistributed.DistributedSingleFieldFESpace,
-                     y::PVector)
-   map(partition(x),local_views(Ph),partition(y)) do x,Ph,y
-     prolongate!(x,Ph,y)
-   end
-   consistent!(x) |> fetch
+# x is always consistent at the end since Ph has no ghosts
+function prolongate!(
+  x::PVector,
+  Ph::DistributedPatchFESpace,
+  y::PVector;
+  is_consistent::Bool=false
+)
+  if is_consistent 
+    map(prolongate!,partition(x),local_views(Ph),partition(y))
+  else
+    # Transfer ghosts while copying owned dofs
+    rows = axes(y,1)
+    t = consistent!(y)
+    map(partition(x),local_views(Ph),partition(y),own_to_local(rows)) do x,Ph,y,ids
+      prolongate!(x,Ph,y;dof_ids=ids)
+    end
+    # Wait for transfer to end and copy ghost dofs
+    wait(t)
+    map(partition(x),local_views(Ph),partition(y),ghost_to_local(rows)) do x,Ph,y,ids
+      prolongate!(x,Ph,y;dof_ids=ids)
+    end
+  end
 end
 
 # x \in  SingleFESpace
 # y \in  PatchFESpace
-function inject!(x::PVector,
-                 Ph::GridapDistributed.DistributedSingleFieldFESpace,
-                 y::PVector,
-                 w::PVector,
-                 w_sums::PVector)
+# y is always consistent at the start since Ph has no ghosts
+function inject!(
+  x::PVector,
+  Ph::DistributedPatchFESpace,
+  y::PVector;
+  make_consistent::Bool=true
+)
+  map(partition(x),local_views(Ph),partition(y)) do x,Ph,y
+    inject!(x,Ph,y)
+  end
 
-  #consistent!(y)
+  # Exchange local contributions 
+  assemble!(x) |> fetch
+  if make_consistent
+    consistent!(x) |> fetch
+  end
+  return x
+end
+
+function inject!(
+  x::PVector,
+  Ph::DistributedPatchFESpace,
+  y::PVector,
+  w::PVector,
+  w_sums::PVector;
+  make_consistent::Bool=true
+)
   map(partition(x),local_views(Ph),partition(y),partition(w),partition(w_sums)) do x,Ph,y,w,w_sums
     inject!(x,Ph,y,w,w_sums)
   end
 
   # Exchange local contributions 
   assemble!(x) |> fetch
-  consistent!(x) |> fetch # TO CONSIDER: Is this necessary? Do we need ghosts for later?
+  if make_consistent
+    consistent!(x) |> fetch
+  end
   return x
 end
 
-function compute_weight_operators(Ph::GridapDistributed.DistributedSingleFieldFESpace,Vh)
+function compute_weight_operators(Ph::DistributedPatchFESpace,Vh)
   # Local weights and partial sums
-  w = pfill(0.0,partition(Ph.gids))
-  w_sums = pfill(0.0,partition(Vh.gids))
-  map(partition(w),partition(w_sums),local_views(Ph)) do w, w_sums, Ph
-    compute_weight_operators!(Ph,Ph.Vh,w,w_sums)
-  end
-  
-  # partial sums -> global sums
-  assemble!(w_sums) |> fetch# ghost -> owners
-  consistent!(w_sums) |> fetch # repopulate ghosts with owner info
+  w_values, w_sums_values = map(compute_weight_operators,local_views(Ph),local_views(Vh)) |> tuple_of_arrays
+  w      = PVector(w_values,partition(Ph.gids))
+  w_sums = PVector(w_sums_values,partition(Vh.gids))
 
+  # partial sums -> global sums
+  assemble!(w_sums) |> fetch   # ghost -> owners
+  consistent!(w_sums) |> fetch # repopulate ghosts with owner info
   return w, w_sums
 end

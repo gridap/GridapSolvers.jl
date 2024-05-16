@@ -1,167 +1,170 @@
-struct FESpaceHierarchyLevel{A,B}
-  level        :: Int
-  fe_space     :: A
-  fe_space_red :: B
+struct FESpaceHierarchyLevel{A,B,C,D,E}
+  level               :: Int
+  fe_space            :: A
+  fe_space_red        :: B
+  cell_conformity     :: C
+  cell_conformity_red :: D
+  mh_level            :: E
 end
 
-struct FESpaceHierarchy
-  mh     :: ModelHierarchy
-  levels :: Vector{FESpaceHierarchyLevel}
-end
+"""
+    const FESpaceHierarchy = HierarchicalArray{<:FESpaceHierarchyLevel}
+  
+  A `FESpaceHierarchy` is a hierarchical array of `FESpaceHierarchyLevel` objects. It stores the 
+  adapted/redistributed fe spaces and the corresponding subcommunicators.
 
+  For convenience, implements some of the API of `FESpace`.
+"""
+const FESpaceHierarchy = HierarchicalArray{<:FESpaceHierarchyLevel}
 
-function Base.getindex(fh::FESpaceHierarchy,level::Integer)
-  fh.levels[level]
-end
+FESpaces.get_fe_space(sh::FESpaceHierarchy,lev::Int) = get_fe_space(sh[lev])
+FESpaces.get_fe_space(a::FESpaceHierarchyLevel{A,Nothing}) where {A} = a.fe_space
+FESpaces.get_fe_space(a::FESpaceHierarchyLevel{A,B}) where {A,B} = a.fe_space_red
 
-function Base.length(fh::FESpaceHierarchy)
-  length(fh.levels)
-end
+get_fe_space_before_redist(sh::FESpaceHierarchy,lev::Int) = get_fe_space_before_redist(sh[lev])
+get_fe_space_before_redist(a::FESpaceHierarchyLevel) = a.fe_space
 
-function num_levels(fh::FESpaceHierarchy)
-  length(fh)
-end
+get_cell_conformity(sh::FESpaceHierarchy,lev::Int) = get_cell_conformity(sh[lev])
+get_cell_conformity(a::FESpaceHierarchyLevel{A,Nothing}) where A = a.cell_conformity
+get_cell_conformity(a::FESpaceHierarchyLevel{A,B}) where {A,B} = a.cell_conformity_red
 
-function get_fe_space(a::FESpaceHierarchyLevel{A,Nothing}) where {A}
-  a.fe_space
-end
+get_cell_conformity_before_redist(sh::FESpaceHierarchy,lev::Int) = get_cell_conformity_before_redist(sh[lev])
+get_cell_conformity_before_redist(a::FESpaceHierarchyLevel) = a.cell_conformity
 
-function get_fe_space(a::FESpaceHierarchyLevel{A,B}) where {A,B}
-  a.fe_space_red
-end
+get_model(sh::FESpaceHierarchy,level::Integer) = get_model(sh[level])
+get_model(a::FESpaceHierarchyLevel) = get_model(a.mh_level)
 
-function get_fe_space(fh::FESpaceHierarchy,lev::Int)
-  get_fe_space(fh[lev])
-end
+get_model_before_redist(a::FESpaceHierarchy,level::Integer) = get_model_before_redist(a[level])
+get_model_before_redist(a::FESpaceHierarchyLevel) = get_model_before_redist(a.mh_level)
 
-function get_fe_space_before_redist(a::FESpaceHierarchyLevel)
-  a.fe_space
-end
+has_redistribution(sh::FESpaceHierarchy,level::Integer) = has_redistribution(sh[level])
+has_redistribution(a::FESpaceHierarchyLevel) = has_redistribution(a.mh_level)
 
-function get_fe_space_before_redist(fh::FESpaceHierarchy,lev::Int)
-  get_fe_space_before_redist(fh[lev])
-end
+has_refinement(sh::FESpaceHierarchy,level::Integer) = has_refinement(sh[level])
+has_refinement(a::FESpaceHierarchyLevel) = has_refinement(a.mh_level)
 
 # Test/Trial FESpaces for ModelHierarchyLevels
 
-function Gridap.FESpaces.FESpace(
-      mh::ModelHierarchyLevel{A,B,C,Nothing},args...;kwargs...) where {A,B,C}
-  Vh = FESpace(get_model(mh),args...;kwargs...)
-  FESpaceHierarchyLevel(mh.level,Vh,nothing)
+function _cell_conformity(
+  model::DiscreteModel,
+  reffe::Tuple{<:Gridap.FESpaces.ReferenceFEName,Any,Any}; 
+  conformity=nothing, kwargs...
+)
+  basis, reffe_args, reffe_kwargs = reffe
+  cell_reffe = ReferenceFE(model,basis,reffe_args...;reffe_kwargs...)
+  conformity = Conformity(Gridap.Arrays.testitem(cell_reffe),conformity)
+  return CellConformity(cell_reffe,conformity)
 end
 
-function Gridap.FESpaces.FESpace(mh::ModelHierarchyLevel{A,B,C,D},args...;kwargs...) where {A,B,C,D}
-  cparts, _ = get_old_and_new_parts(mh.red_glue,Val(false))
-  Vh     = i_am_in(cparts) ? FESpace(get_model_before_redist(mh),args...;kwargs...) : nothing
-  Vh_red = FESpace(get_model(mh),args...;kwargs...)
-  FESpaceHierarchyLevel(mh.level,Vh,Vh_red)
+function _cell_conformity(model::GridapDistributed.DistributedDiscreteModel,args...;kwargs...)
+  cell_conformities = map(local_views(model)) do model
+    _cell_conformity(model,args...;kwargs...)
+  end
+  return cell_conformities
 end
 
-function Gridap.FESpaces.TrialFESpace(a::FESpaceHierarchyLevel,args...;kwargs...)
+function FESpaces.FESpace(mh::ModelHierarchyLevel,args...;kwargs...)
+  if has_redistribution(mh)
+    cparts, _ = get_old_and_new_parts(mh.red_glue,Val(false))
+    Vh     = i_am_in(cparts) ? FESpace(get_model_before_redist(mh),args...;kwargs...) : nothing
+    Vh_red = FESpace(get_model(mh),args...;kwargs...)
+    cell_conformity = i_am_in(cparts) ? _cell_conformity(get_model_before_redist(mh),args...;kwargs...) : nothing
+    cell_conformity_red = _cell_conformity(get_model(mh),args...;kwargs...)
+  else
+    Vh = FESpace(get_model(mh),args...;kwargs...)
+    Vh_red = nothing
+    cell_conformity = _cell_conformity(get_model(mh),args...;kwargs...)
+    cell_conformity_red = nothing
+  end
+  return FESpaceHierarchyLevel(mh.level,Vh,Vh_red,cell_conformity,cell_conformity_red,mh)
+end
+
+function FESpaces.TrialFESpace(a::FESpaceHierarchyLevel,args...;kwargs...)
   Uh     = !isa(a.fe_space,Nothing) ? TrialFESpace(a.fe_space,args...;kwargs...) : nothing
   Uh_red = !isa(a.fe_space_red,Nothing) ? TrialFESpace(a.fe_space_red,args...;kwargs...) : nothing
-  FESpaceHierarchyLevel(a.level,Uh,Uh_red)
+  return FESpaceHierarchyLevel(a.level,Uh,Uh_red,a.cell_conformity,a.cell_conformity_red,a.mh_level)
 end
 
 # Test/Trial FESpaces for ModelHierarchies/FESpaceHierarchy
 
-function Gridap.FESpaces.FESpace(mh::ModelHierarchy,args...;kwargs...)
-  test_spaces = Vector{FESpaceHierarchyLevel}(undef,num_levels(mh))
-  for i = 1:num_levels(mh)
-    parts = get_level_parts(mh,i)
-    if i_am_in(parts)
-      Vh = TestFESpace(get_level(mh,i),args...;kwargs...)
-      test_spaces[i] = Vh
-    end
+function FESpaces.FESpace(mh::ModelHierarchy,args...;kwargs...)
+  map(mh) do mhl
+    TestFESpace(mhl,args...;kwargs...)
   end
-  FESpaceHierarchy(mh,test_spaces)
 end
 
-function Gridap.FESpaces.FESpace(
-                      mh::ModelHierarchy,
-                      arg_vector::AbstractVector{<:Union{ReferenceFE,Tuple{<:Gridap.ReferenceFEs.ReferenceFEName,Any,Any}}};
-                      kwargs...)
-  @check length(arg_vector) == num_levels(mh)
-  test_spaces = Vector{FESpaceHierarchyLevel}(undef,num_levels(mh))
-  for i = 1:num_levels(mh)
-    parts = get_level_parts(mh,i)
-    if i_am_in(parts)
-      args = arg_vector[i]
-      Vh   = TestFESpace(get_level(mh,i),args;kwargs...)
-      test_spaces[i] = Vh
-    end
+function FESpaces.FESpace(
+  mh::ModelHierarchy,
+  arg_vector::AbstractVector{<:Union{ReferenceFE,Tuple{<:ReferenceFEs.ReferenceFEName,Any,Any}}};
+  kwargs...
+)
+  map(linear_indices(mh),mh) do l, mhl
+    args = arg_vector[l]
+    TestFESpace(mhl,args...;kwargs...)
   end
-  FESpaceHierarchy(mh,test_spaces)
 end
 
-function Gridap.FESpaces.TrialFESpace(a::FESpaceHierarchy,u)
-  trial_spaces = Vector{FESpaceHierarchyLevel}(undef,num_levels(a.mh))
-  for i = 1:num_levels(a.mh)
-    parts = get_level_parts(a.mh,i)
-    if i_am_in(parts)
-      Uh = TrialFESpace(a[i],u)
-      trial_spaces[i] = Uh
-    end
+function FESpaces.TrialFESpace(sh::FESpaceHierarchy,u)
+  map(sh) do shl
+    TrialFESpace(shl,u)
   end
-  FESpaceHierarchy(a.mh,trial_spaces)
 end
 
-function Gridap.FESpaces.TrialFESpace(a::FESpaceHierarchy)
-  trial_spaces = Vector{FESpaceHierarchyLevel}(undef,num_levels(a.mh))
-  for i = 1:num_levels(a.mh)
-    parts = get_level_parts(a.mh,i)
-    if i_am_in(parts)
-      Uh = TrialFESpace(a[i])
-      trial_spaces[i] = Uh
-    end
+function FESpaces.TrialFESpace(sh::FESpaceHierarchy)
+  map(TrialFESpace,sh)
+end
+
+# MultiField support
+
+function Gridap.MultiField.MultiFieldFESpace(spaces::Vector{<:FESpaceHierarchyLevel};kwargs...)
+  level  = spaces[1].level
+  Uh     = all(map(s -> !isa(s.fe_space,Nothing),spaces)) ? MultiFieldFESpace(map(s -> s.fe_space, spaces); kwargs...) : nothing
+  Uh_red = all(map(s -> !isa(s.fe_space_red,Nothing),spaces)) ? MultiFieldFESpace(map(s -> s.fe_space_red, spaces); kwargs...) : nothing
+  cell_conformity = map(s -> s.cell_conformity, spaces)
+  cell_conformity_red = map(s -> s.cell_conformity_red, spaces)
+  return FESpaceHierarchyLevel(level,Uh,Uh_red,cell_conformity,cell_conformity_red,first(spaces).mh_level)
+end
+
+function Gridap.MultiField.MultiFieldFESpace(spaces::Vector{<:HierarchicalArray};kwargs...)
+  @check all(s -> isa(s,FESpaceHierarchy),spaces)
+  map(spaces...) do spaces_i...
+    MultiFieldFESpace([spaces_i...];kwargs...)
   end
-  FESpaceHierarchy(a.mh,trial_spaces)
 end
 
 # Computing system matrices
 
-function compute_hierarchy_matrices(trials::FESpaceHierarchy,a::Function,l::Function,qdegree::Integer)
-  return compute_hierarchy_matrices(trials,a,l,Fill(qdegree,num_levels(trials)))
+function compute_hierarchy_matrices(
+  trials::FESpaceHierarchy,
+  tests::FESpaceHierarchy,
+  a::Function,
+  l::Function,
+  qdegree::Integer
+)
+  return compute_hierarchy_matrices(trials,tests,a,l,Fill(qdegree,num_levels(trials)))
 end
 
-function compute_hierarchy_matrices(trials::FESpaceHierarchy,a::Function,l::Function,qdegree::AbstractArray{<:Integer})
-  nlevs = num_levels(trials)
-  mh    = trials.mh
-
-  @check length(qdegree) == nlevs
-
-  A = nothing
-  b = nothing
-  mats = Vector{PSparseMatrix}(undef,nlevs)
-  for lev in 1:nlevs
-    parts = get_level_parts(mh,lev)
-    if i_am_in(parts)
-      model = get_model(mh,lev)
-      U = get_fe_space(trials,lev)
-      V = get_test_space(U)
-      Ω = Triangulation(model)
-      dΩ = Measure(Ω,qdegree[lev])
-      ai(u,v) = a(u,v,dΩ)
-      if lev == 1
-        li(v) = l(v,dΩ)
-        op    = AffineFEOperator(ai,li,U,V)
-        A, b  = get_matrix(op), get_vector(op)
-        mats[lev] = A
-      else
-        mats[lev] = assemble_matrix(ai,U,V)
-      end
-    end
-  end
-  return mats, A, b
-end
-
-function get_test_space(U::GridapDistributed.DistributedSingleFieldFESpace)
-  spaces = map(local_views(U)) do U
-    if isa(U,Gridap.FESpaces.UnconstrainedFESpace)
-      U
+function compute_hierarchy_matrices(
+  trials::FESpaceHierarchy,
+  tests::FESpaceHierarchy,
+  a::Function,
+  l::Function,
+  qdegree::AbstractArray{<:Integer}
+)
+  mats, vecs = map(linear_indices(trials)) do lev
+    model = get_model(trials,lev)
+    U = get_fe_space(trials,lev)
+    V = get_fe_space(tests,lev)
+    Ω = Triangulation(model)
+    dΩ = Measure(Ω,qdegree[lev])
+    ai(u,v) = a(u,v,dΩ)
+    if lev == 1
+      li(v) = l(v,dΩ)
+      op    = AffineFEOperator(ai,li,U,V)
+      return get_matrix(op), get_vector(op)
     else
-      U.space
+      return assemble_matrix(ai,U,V), nothing
     end
-  end
-  return GridapDistributed.DistributedSingleFieldFESpace(spaces,U.gids,U.vector_type)
+  end |> tuple_of_arrays
+  return mats, mats[1], vecs[1]
 end
