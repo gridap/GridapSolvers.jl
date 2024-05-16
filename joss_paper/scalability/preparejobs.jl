@@ -45,6 +45,7 @@ function jobdict(params)
     "projectdir" => driverdir(),
     "datadir"    => datadir(),
     "modules"    => projectdir("modules.sh"),
+    "driverdir"  => projectdir(),
     "title"      => datadir(jobname(fparams)),
     "sysimage"   => projectdir("GridapSolvers.so")
   )

@@ -12,11 +12,14 @@
 source {{{modules}}}
 
 mpiexec -n {{ncpus}} julia --project={{{projectdir}}} -O3 --check-bounds=no -e\
-  'include({{{driver}}});
-   main(;
-     nr={{nr}},
-     np={{np}},
-     nc={{nc}},
-     np_per_level={{np_per_level}},
-     title="{{title}}",
-  )'
+  '
+  push!(Base.LOAD_PATH, "{{driverdir}}");
+  include({{{driver}}});
+  main(;
+    nr={{nr}},
+    np={{np}},
+    nc={{nc}},
+    np_per_level={{np_per_level}},
+    title="{{title}}",
+  )
+  '
