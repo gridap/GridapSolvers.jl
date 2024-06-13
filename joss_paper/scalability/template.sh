@@ -13,9 +13,8 @@ source {{{modules}}}
 
 mpiexec -n {{ncpus}} julia --project={{{projectdir}}} -O3 --check-bounds=no -e\
   '
-  push!(Base.LOAD_PATH, "{{driverdir}}");
-  include({{{driver}}});
-  main(;
+  using Scalability;
+  stokes_main(;
     nr={{nr}},
     np={{np}},
     nc={{nc}},

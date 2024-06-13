@@ -1,21 +1,9 @@
-using FileIO
-using Gridap, Gridap.Algebra, Gridap.MultiField
-using PartitionedArrays, GridapDistributed, GridapSolvers, GridapPETSc
-using GridapSolvers.LinearSolvers, GridapSolvers.MultilevelTools, GridapSolvers.BlockSolvers
 
-function get_bilinear_form(mh_lev,biform,qdegree)
-  model = get_model(mh_lev)
-  Ω = Triangulation(model)
-  dΩ = Measure(Ω,qdegree)
-  return (u,v) -> biform(u,v,dΩ)
-end
-
-function add_labels!(labels)
-  add_tag_from_tags!(labels,"top",[3,4,6])
-  add_tag_from_tags!(labels,"bottom",[1,2,5])
-end
-
-function driver(parts,np_per_level,nc)
+function stokes_driver(
+  parts,
+  np_per_level,
+  nc
+)
   t = PTimer(parts;verbose=true)
 
   tic!(t;barrier=true)
@@ -101,7 +89,7 @@ function driver(parts,np_per_level,nc)
   return output
 end
 
-function main(;
+function stokes_main(;
   nr = 1,
   np = 1,
   np_per_level = [np,1],

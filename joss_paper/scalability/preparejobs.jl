@@ -8,7 +8,6 @@ function jobname(args...)
   s = "stokes_$s"
   return s
 end
-driverdir(args...) = normpath(projectdir("../../",args...))
 
 function clean_params(d)
   o = Dict()
@@ -41,8 +40,7 @@ function jobdict(params)
     "np" => prod(np),
     "nc" => nc,
     "np_per_level" => Int[prod(np),prod(np)],
-    "driver" => projectdir("driver.jl"),
-    "projectdir" => driverdir(),
+    "projectdir" => projectdir(),
     "datadir"    => datadir(),
     "modules"    => projectdir("modules.sh"),
     "driverdir"  => projectdir(),
