@@ -43,13 +43,13 @@ function jobdict(params)
     "nr" => 5,
     "np" => prod(np),
     "nc" => nc,
-    "np_per_level" => Int[prod(np),prod(np)],
+    "np_per_level" => fill(prod(np),nl),
     "projectdir" => projectdir(),
     "datadir"    => datadir(),
     "modules"    => projectdir("modules.sh"),
     "driverdir"  => projectdir(),
     "title"      => datadir(jobname(fparams)),
-    "sysimage"   => projectdir("GridapSolvers.so")
+    "sysimage"   => projectdir("Scalability.so")
   )
 end
 

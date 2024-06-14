@@ -18,7 +18,6 @@ authors:
     affiliation: "2"
   - name: Santiago Badia
     orcid: 0000-0003-2391-4086
-    corresponding: true
     affiliation: "1,3"
 affiliations:
  - name: School of Mathematics, Monash University, Clayton, Victoria, 3800, Australia.

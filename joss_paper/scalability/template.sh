@@ -11,7 +11,7 @@
 
 source {{{modules}}}
 
-mpiexec -n {{ncpus}} julia --project={{{projectdir}}} -O3 --check-bounds=no -e\
+mpiexec -n {{ncpus}} julia --project={{{projectdir}}} -O3 --check-bounds=no -J{{{sysimage}}} -e\
   '
   using Scalability;
   stokes_main(;

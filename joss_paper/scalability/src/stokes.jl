@@ -36,7 +36,7 @@ function stokes_driver(parts,mh)
   biforms = map(mhl -> get_bilinear_form(mhl,biform_u,qdegree),mh)
   smoothers = map(mhl -> RichardsonSmoother(JacobiLinearSolver(),10,2.0/3.0), view(mh,1:num_levels(mh)-1))
   restrictions, prolongations = setup_transfer_operators(
-    trials_u, qdegree; mode=:residual, solver=CGSolver(JacobiLinearSolver(),verbose=i_am_main(parts))
+    trials_u, qdegree; mode=:residual, solver=CGSolver(JacobiLinearSolver(),verbose=false)
   )
   solver_u = GMGLinearSolver(
     mh,trials_u,tests_u,biforms,
@@ -67,8 +67,7 @@ function stokes_driver(parts,mh)
 
   # Cleanup PETSc C-allocated objects
   nlevs = num_levels(mh)
-  cparts = get_parts(get_model(mh,nlevs))
-  if i_am_in(cparts)
+  GridapSolvers.MultilevelTools.with_level(mh,nlevs) do mhl
     P_ns   = ns.Pr_ns
     gmg_ns = P_ns.block_ns[1]
     finalize(gmg_ns.coarsest_solver_cache.X)
@@ -107,7 +106,7 @@ function stokes_main(;
   mh = CartesianModelHierarchy(parts,np_per_level,(0,1,0,1),nc;add_labels!)
 
   GridapPETSc.with(;args=split(petsc_options)) do
-    driver(parts,mh)
+    stokes_driver(parts,mh)
     for ir in 1:nr
       map_main(parts) do p
         println(repeat('-',28))
