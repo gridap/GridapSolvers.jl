@@ -1,14 +1,8 @@
 
-function stokes_driver(
-  parts,
-  np_per_level,
-  nc
-)
+function stokes_driver(parts,mh)
   t = PTimer(parts;verbose=true)
 
   tic!(t;barrier=true)
-  # Geometry
-  mh = CartesianModelHierarchy(parts,np_per_level,(0,1,0,1),nc;add_labels!)
   model = get_model(mh,1)
 
   # FE spaces
@@ -42,15 +36,15 @@ function stokes_driver(
   biforms = map(mhl -> get_bilinear_form(mhl,biform_u,qdegree),mh)
   smoothers = map(mhl -> RichardsonSmoother(JacobiLinearSolver(),10,2.0/3.0), view(mh,1:num_levels(mh)-1))
   restrictions, prolongations = setup_transfer_operators(
-    trials_u, qdegree; mode=:residual, solver=CGSolver(JacobiLinearSolver())
+    trials_u, qdegree; mode=:residual, solver=CGSolver(JacobiLinearSolver(),verbose=i_am_main(parts))
   )
   solver_u = GMGLinearSolver(
     mh,trials_u,tests_u,biforms,
     prolongations,restrictions,
     pre_smoothers=smoothers,
     post_smoothers=smoothers,
-    coarsest_solver=LUSolver(),
-    maxiter=2,mode=:preconditioner,verbose=i_am_main(parts)
+    coarsest_solver=PETScLinearSolver(petsc_mumps_setup),
+    maxiter=3,mode=:preconditioner,verbose=i_am_main(parts)
   )
   solver_u.log.depth = 4
 
@@ -71,15 +65,24 @@ function stokes_driver(
   solve!(x,ns,b)
   toc!(t,"Solver")
 
+  # Cleanup PETSc C-allocated objects
+  nlevs = num_levels(mh)
+  cparts = get_parts(get_model(mh,nlevs))
+  if i_am_in(cparts)
+    P_ns   = ns.Pr_ns
+    gmg_ns = P_ns.block_ns[1]
+    finalize(gmg_ns.coarsest_solver_cache.X)
+    finalize(gmg_ns.coarsest_solver_cache.B)
+    finalize(gmg_ns.coarsest_solver_cache)
+    GridapPETSc.gridap_petsc_gc()
+  end
+
   # Postprocess
   ncells  = num_cells(model)
   ndofs_u = num_free_dofs(U)
   ndofs_p = num_free_dofs(Q)
   output = Dict{String,Any}()
   map_main(t.data) do timer_data
-    output["np"] = np_per_level[1]
-    output["nc"] = nc
-    output["np_per_level"] = np_per_level
     output["ncells"]  = ncells
     output["ndofs_u"] = ndofs_u
     output["ndofs_p"] = ndofs_p
@@ -100,20 +103,27 @@ function stokes_main(;
   parts = with_mpi() do distribute
     distribute(LinearIndices((prod(np),)))
   end
+
+  mh = CartesianModelHierarchy(parts,np_per_level,(0,1,0,1),nc;add_labels!)
+
   GridapPETSc.with(;args=split(petsc_options)) do
-    driver(parts,np_per_level,nc)
+    driver(parts,mh)
     for ir in 1:nr
-      if i_am_main(parts)
+      map_main(parts) do p
         println(repeat('-',28))
         println(" ------- ITERATION $(ir) ------- ")
         println(repeat('-',28))
       end
-      title_ir = "$(title)_$(ir)"
-      output = driver(parts,np_per_level,nc)
+      output = stokes_driver(parts,mh)
       map_main(parts) do p
         output["ir"] = ir
-        save("$title_ir.bson",output)
+        output["np"] = np
+        output["nc"] = nc
+        output["nl"] = length(np_per_level)
+        output["np_per_level"] = np_per_level
+        save("$(title)_$(ir).bson",output)
       end
+      GridapPETSc.gridap_petsc_gc()
     end
   end
 end

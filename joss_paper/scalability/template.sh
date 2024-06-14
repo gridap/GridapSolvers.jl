@@ -19,6 +19,6 @@ mpiexec -n {{ncpus}} julia --project={{{projectdir}}} -O3 --check-bounds=no -e\
     np={{np}},
     nc={{nc}},
     np_per_level={{np_per_level}},
-    title="{{title}}",
+    title="{{{title}}}",
   )
   '
