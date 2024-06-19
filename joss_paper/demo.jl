@@ -74,7 +74,7 @@ with_mpi() do distribute
   blocks = [LinearSystemBlock() LinearSystemBlock();
             LinearSystemBlock() BiformBlock((p,q) -> ∫(p*q)dΩ,Q,Q)]
   P = BlockTriangularSolver(blocks,[solver_u,solver_p])
-  solver = FGMRESSolver(10;Pr=P,rtol=1.e-8,verbose=i_am_main(parts))
+  solver = GMRESSolver(10;Pr=P,rtol=1.e-8,verbose=i_am_main(parts))
   ns = numerical_setup(symbolic_setup(solver,A),A)
 
   x = allocate_in_domain(A); fill!(x,0.0)

@@ -57,7 +57,7 @@ GridapSolvers complements GridapPETSc with a modular and extensible interface fo
 - A modular implementation of geometric multigrid (GMG) solvers, allowing different types of smoothers and restriction/prolongation operators.
 - A generic interface for patch-based subdomain decomposition methods, and an implementation of patch-based smoothers for geometric multigrid solvers.
 
-![GridapSolvers and its relation to other packages in the Julia package ecosystem. In this diagram, each node represents  a Julia package, while the (directed) arrows represent relations (dependencies) among packages. Dashed arrows mean the package can be used, but is not necessary. \label{fig:packages}](packages.png){ width=60% }
+![GridapSolvers and its relation to other packages in the Julia package ecosystem. In this diagram, each node represents  a Julia package, while the (directed) arrows represent relations (dependencies) among packages. Dashed arrows mean the package can be used, but is not required. \label{fig:packages}](packages.png){ width=60% }
 
 # Demo
 

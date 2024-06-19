@@ -28,7 +28,7 @@ begin
 			n_dofs_u = df.ndofs_u[1],
 			n_dofs_p = df.ndofs_p[1],
 			n_dofs   = df.ndofs_u[1] + df.ndofs_p[1],
-			n_cells  = df.nc[1]
+			n_cells  = df.ncells[1]
 		)
 	end
 	sort!(df,:np)
@@ -37,7 +37,6 @@ end
 # ╔═╡ a10880e9-680b-46f0-9bda-44e53a7196ce
 begin
 	plt = plot(xlabel="N processors",ylabel="walltime (s)",legend=false)
-	plot!(df[!,:np],df[!,:t_solver][1]*df[!,:np]./df[!,:np][1]) # Perfect scaling
 	plot!(df[!,:np],df[!,:t_solver])
 end
 
