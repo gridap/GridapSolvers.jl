@@ -11,7 +11,14 @@
 
 source {{{modules}}}
 
-mpiexec -n {{ncpus}} julia --project={{{projectdir}}} -O3 --check-bounds=no -J{{{sysimage}}} -e\
+julia --project={{{projectdir}}} -O3 -J{{{sysimage}}} -e\
+  '
+  using Scalability
+  using Gridap, GridapDistributed, PartitionedArrays, GridapSolvers, GridapPETSc
+  using FileIO, BSON
+  '
+
+mpiexec -n {{ncpus}} julia --project={{{projectdir}}} -O3 -J{{{sysimage}}} -e\
   '
   using Scalability;
   stokes_main(;

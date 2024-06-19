@@ -53,7 +53,8 @@ GridapSolvers complements GridapPETSc with a modular and extensible interface fo
 
 - A set of HPC-first implementations for popular Krylov-based iterative solvers. These solvers extend Gridap's API and are fully compatible with PartitionedArrays.
 - A modular, high-level interface for designing block-based preconditioners for multiphysics problems. These preconditioners can be used together with any solver compliant with Gridap's API, including those provided by GridapPETSc.
-- A generic interface to handle multi-level distributed meshes, with full support for Adaptative Mesh Refinement (AMR) through GridapP4est. It also provides a modular implementation of geometric multigrid (GMG) solvers, allowing different types of smoothers and restriction/prolongation operators.
+- A generic interface to handle multi-level distributed meshes, with full support for Adaptative Mesh Refinement (AMR) using p4est [p4est] through GridapP4est. 
+- A modular implementation of geometric multigrid (GMG) solvers, allowing different types of smoothers and restriction/prolongation operators.
 - A generic interface for patch-based subdomain decomposition methods, and an implementation of patch-based smoothers for geometric multigrid solvers.
 
 ![GridapSolvers and its relation to other packages in the Julia package ecosystem. In this diagram, each node represents  a Julia package, while the (directed) arrows represent relations (dependencies) among packages. Dashed arrows mean the package can be used, but is not necessary. \label{fig:packages}](packages.png){ width=60% }
@@ -61,7 +62,7 @@ GridapSolvers complements GridapPETSc with a modular and extensible interface fo
 # Demo
 
 The following code snippet shows how to solve a 2D Stokes cavity problem in a cartesian domain $\Omega = [0,1]^2$. We discretize the velocity and pressure in $H^1(\Omega)$ and $L^2(\Omega)$ respectively, and use the well known stable element pair $Q_k \times P_{k-1}$ with $k=2$. For the cavity problem, we fix the velocity to $u_b = \vec{0}$ and $u_t = \hat{x}$ on the bottom and top boundaries respectively, and homogeneous Neumann boundary conditions elsewhere.
-The system is block-assembled and solved using a GMRES solver, right-preconditioned with block-triangular Shur-complement-based preconditioner. The Shur complement is approximated by a mass matrix, and solved using a CG solver with Jacobi preconditioner. The eliminated velocity block is approximated by a 2-level V-cycle Geometric Multigrid solver.
+The system is block-assembled and solved using a GMRES solver, right-preconditioned with block-triangular Shur-complement-based preconditioner. The Shur complement is approximated by a mass matrix, and solved using a CG solver with Jacobi preconditioner. The eliminated velocity block is approximated by a 2-level V-cycle Geometric Multigrid solver. The coarsest-level system is solved exactly using MUMPS [@MUMPS], provided by PETSc [@petsc-user-ref] though the package GridapPETSc.jl. 
 The code is setup to run in parallel with 4 MPI tasks and can be executed with the following command: `mpiexec -n 4 julia --project=. demo.jl`.
 
 ```julia
@@ -70,8 +71,10 @@ Code in `demo.jl`.
 
 # Parallel scaling benchmark
 
+The following section shows scalability results for the demo problem discussed above. We run our code on the Gadi supercomputer, which is part of the Australian National Computational Infrastructure. We use Intel's Cascade Lake 2x24-core Xeon Platinum 8274 nodes. Scalability is shown for up to XXX cores, for a fixed local problem size of XXX quadrangle cells per processor. This amounts to a maximum size of XXX cells and XXX degrees of freedom distributed amongst XXX processors. The code used to create these results can be found together with the submiteed paper (LINK).
+
 # Acknowledgements
 
-This research was partially funded by the Australian Government through the Australian Research Council (project number DP210103092), the European Commission under the FET-HPC ExaQUte project (Grant agreement ID: 800898) within the Horizon 2020 Framework Program and the project RTI2018-096898-B-I00 from the “FEDER/Ministerio de Ciencia e Innovación (MCIN) – Agencia Estatal de Investigación (AEI)”. F. Verdugo acknowledges support from the “Severo Ochoa Program for Centers of Excellence in R&D (2019-2023)" under the grant CEX2018-000797-S funded by MCIN/AEI/10.13039/501100011033. This work was also supported by computational resources provided by the Australian Government through NCI under the National Computational Merit Allocation Scheme (NCMAS).
+This research was partially funded by the Australian Government through the Australian Research Council (project number DP210103092). This work was also supported by computational resources provided by the Australian Government through NCI under the National Computational Merit Allocation Scheme (NCMAS).
 
 # References

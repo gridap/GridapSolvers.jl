@@ -1,0 +1,210 @@
+@techreport{petsc-user-ref,
+  author = {Satish Balay and Shrirang Abhyankar and Mark~F. Adams and Steven Benson and Jed Brown
+    and Peter Brune and Kris Buschelman and Emil Constantinescu and Lisandro Dalcin and Alp Dener
+    and Victor Eijkhout and William~D. Gropp and V\'{a}clav Hapla and Tobin Isaac and Pierre Jolivet
+    and Dmitry Karpeev and Dinesh Kaushik and Matthew~G. Knepley and Fande Kong and Scott Kruger
+    and Dave~A. May and Lois Curfman McInnes and Richard Tran Mills and Lawrence Mitchell and Todd Munson
+    and Jose~E. Roman and Karl Rupp and Patrick Sanan and Jason Sarich and Barry~F. Smith
+    and Stefano Zampini and Hong Zhang and Hong Zhang and Junchao Zhang},
+  title       = {{PETSc/TAO} Users Manual},
+  institution = {Argonne National Laboratory},
+  number      = {ANL-21/39 - Revision 3.16},
+  year        = {2021},
+}
+
+@manual{mpi40,
+    author = "{Message Passing Interface Forum}",
+    title  = "{MPI}: A Message-Passing Interface Standard Version 4.0",
+    url    = "https://www.mpi-forum.org/docs/mpi-4.0/mpi40-report.pdf",
+    year   = 2021,
+    month  = jun
+}
+
+@article{Verdugo:2021,
+  doi = {10.1016/j.cpc.2022.108341},
+  url = {https://doi.org/10.1016/j.cpc.2022.108341},
+  year = {2022},
+  month = jul,
+  publisher = {Elsevier {BV}},
+  volume = {276},
+  pages = {108341},
+  author = {Francesc Verdugo and Santiago Badia},
+  title = {The software design of {G}ridap: a finite element package based on the {J}ulia {JIT} compiler},
+  journal = {Computer Physics Communications}
+}
+
+@misc{gridapetsc,
+  author = {Verdugo, F. and  Sande, V. and  Martin, A. F.},
+  title = {GridapPETSc},
+  year = {2021},
+  publisher = {GitHub},
+  journal = {GitHub repository},
+  url = {https://github.com/gridap/GridapPETSc.jl}
+}
+
+@misc{gridap4est,
+  author = {Martin, A. F.},
+  title = {GridapP4est},
+  year = {2021},
+  publisher = {GitHub},
+  journal = {GitHub repository},
+  url = {https://github.com/gridap/GridapP4est.jl}
+}
+
+@misc{parrays,
+  author = {Verdugo, F.},
+  title = {PartitionedArrays},
+  year = {2021},
+  publisher = {GitHub},
+  journal = {GitHub repository},
+  url = {https://github.com/fverdugo/PartitionedArrays.jl}
+}
+
+@article{Bezanson2017,
+abstract = {Bridging cultures that have often been distant, Julia combines expertise from the diverse fields of computer science and computational science to create a new approach to numerical computing. Julia...},
+archivePrefix = {arXiv},
+arxivId = {1411.1607},
+author = {Bezanson, Jeff and Edelman, Alan and Karpinski, Stefan and Shah, Viral B.},
+doi = {10.1137/141000671},
+eprint = {1411.1607},
+issn = {00361445},
+journal = {SIAM Review},
+keywords = {65Y05,68N15,97P40,Julia,numerical,parallel,scientific computing},
+month = {feb},
+number = {1},
+pages = {65--98},
+publisher = {Society for Industrial and Applied Mathematics},
+title = {{Julia: a fresh approach to numerical computing}},
+volume = {59},
+year = {2017}
+}
+
+@article{Badia2020,
+abstract = {Gridap is a new Finite Element (FE) framework, exclusively written in the Julia programming language, for the numerical simulation of a wide range of mathematical models governed by partial differential equations (PDEs). The library provides a feature-rich set of discretization techniques, including continuous and discontinuous FE methods with Lagrangian, Raviart-Thomas, or N{\'{e}}d{\'{e}}lec interpolations, and supports a wide range of problem types including linear, nonlinear, single-field, and multi-field PDEs (see (Badia, Mart{\'{i}}n, {\&} Principe, 2018, Section 3) for a detailed presentation of the mathematical abstractions behind the implementation of these FE methods). Gridap is designed to help application experts to easily simulate real-world problems, to help researchers improve productivity when developing new FE-related techniques, and also for its usage in numerical PDE courses. The main motivation behind Gridap is to find an improved balance between computational performance, user-experience, and work-flow productivity when working with FE libraries. Previous FE frameworks, e.g., FEniCS (Alnaes et al., 2015) or Deal.II (Bangerth, Hartmann, {\&} Kanschat, 2007) usually provides a high-level user front-end to facilitate the use of the library and a computational back-end to achieve performance. The user front-end is usually programmable in an interpreted language like Python, whereas the computational back-end is usually coded in a compiled language like C/C++ or Fortran. Users can benefit from the high-level front-end (i.e., for rapid prototyping) and simultaneously enjoy the performance of the compiled back-end. This approach reaches a compromise between performance and productivity when the back-end provides all the functionality required by the user. However, it does not satisfactorily address the needs of researchers on numerical methods willing to extend the library with new techniques or features. These extensions usually need to be done at the level of the computational back-end for performance reasons.},
+author = {Badia, Santiago and Verdugo, Francesc},
+doi = {10.21105/JOSS.02520},
+file = {:home/amartin/.local/share/data/Mendeley Ltd./Mendeley Desktop/Downloaded/Badia, Verdugo - 2020 - Gridap An extensible Finite Element toolbox in Julia.pdf:pdf},
+issn = {2475-9066},
+journal = {Journal of Open Source Software},
+month = {aug},
+number = {52},
+pages = {2520},
+publisher = {The Open Journal},
+title = {{Gridap: an extensible finite element toolbox in Julia}},
+url = {https://joss.theoj.org/papers/10.21105/joss.02520},
+volume = {5},
+year = {2020}
+}
+
+@article{Badia2020a,
+abstract = {In this work we formally derive and prove the correctness of the algorithms and data structures in a parallel, distributed-memory, generic finite element framework that supports {\$}h{\$}-adaptivity on c...},
+archivePrefix = {arXiv},
+arxivId = {1907.03709},
+author = {Badia, Santiago and Mart{\'{i}}n, Alberto F. and Neiva, Eric and Verdugo, Francesc},
+doi = {10.1137/20M1328786},
+eprint = {1907.03709},
+issn = {10957197},
+journal = {SIAM Journal on Scientific Computing},
+keywords = {65M50,65N30,65Y05,65Y20,adaptive mesh refinement,finite elements,forest of trees,parallel algorithms,partial differential equations,scientific software},
+month = {dec},
+number = {6},
+pages = {C436--C468},
+publisher = {Society for Industrial and Applied Mathematics},
+title = {{A generic finite element framework on parallel tree-based adaptive meshes}},
+volume = {42},
+year = {2020}
+}
+
+@article{p4est,
+abstract = {We present scalable algorithms for parallel adaptive mesh refinement and coarsening (AMR), partitioning, and 2:1 balancing on computational domains composed of multiple connected two-dimensional qu...},
+author = {Burstedde, Carsten and Wilcox, Lucas C. and Ghattas, Omar},
+doi = {10.1137/100791634},
+issn = {10648275},
+journal = {SIAM Journal on Scientific Computing},
+keywords = {65D18,65M50,65Y05,68W10,Morton code,forest of octrees,large-scale scientific computing,parallel adaptive mesh refinement,scalable algorithms},
+month = {may},
+number = {3},
+pages = {1103--1133},
+publisher = {Society for Industrial and Applied Mathematics},
+title = {{p4est: scalable algorithms for parallel adaptive mesh refinement on forests of octrees}},
+volume = {33},
+year = {2011}
+}
+
+@article{mfem,
+  title = {{MFEM}: A modular finite element methods library},
+  author = {R. Anderson and J. Andrej and A. Barker and J. Bramwell and J.-S. Camier and
+            J. Cerveny V. Dobrev and Y. Dudouit and A. Fisher and Tz. Kolev and W. Pazner and
+            M. Stowell and V. Tomov and I. Akkerman and J. Dahm and D. Medina and S. Zampini},
+  journal = {Computers \& Mathematics with Applications},
+  doi = {10.1016/j.camwa.2020.06.009},
+  volume = {81},
+  pages = {42-74},
+  year = {2021}
+}
+
+@article {freefem,
+    doi    = {10.1515/jnum-2012-0013},
+    AUTHOR = {Hecht, F.}, TITLE = {New development in {FreeFem++}},
+   JOURNAL = {J. Numer. Math.},  FJOURNAL = {Journal of Numerical Mathematics},
+    VOLUME = {20}, YEAR = {2012},
+    NUMBER = {3-4}, PAGES = {251--265},
+      ISSN = {1570-2820}, MRCLASS = {65Y15}, MRNUMBER = {3043640},
+}
+
+@Article{libMeshPaper,
+  doi     = {10.1007/s00366-006-0049-3},
+  author  = {B.~S.~Kirk and J.~W.~Peterson and R.~H.~Stogner and G.~F.~Carey},
+  title   = {{\texttt{libMesh}: A C++ library for parallel adaptive mesh refinement/coarsening simulations}},
+  journal = {Engineering with Computers},
+  volume  = 22,
+  number  = {3--4},
+  pages   = {237--254},
+  year    = 2006,
+  note    = {\url{http://dx.doi.org/10.1007/s00366-006-0049-3}}
+}
+
+@article{dealII93,
+  title     = {The \texttt{deal.II} Library, Version 9.3},
+  author    = {Daniel Arndt and Wolfgang Bangerth and Bruno Blais and
+               Marc Fehling and Rene Gassm{\"o}ller and Timo Heister
+               and Luca Heltai and Uwe K{\"o}cher and Martin
+               Kronbichler and Matthias Maier and Peter Munch and
+               Jean-Paul Pelteret and Sebastian Proell and Konrad
+               Simon and Bruno Turcksin and David Wells and Jiaqi
+               Zhang},
+  journal   = {Journal of Numerical Mathematics},
+  year      = {2021},
+  url       = {https://dealii.org/deal93-preprint.pdf},
+  doi       = {10.1515/jnma-2021-0081},
+  volume    = {29},
+  number    = {3},
+  pages     = {171--186}
+}
+
+@article{Kirby2006,
+abstract = {As a key step towards a complete automation of the finite element method, we present a new algorithm for automatic and efficient evaluation of multilinear variational forms. The algorithm has been implemented in the form of a compiler, the FEniCS Form Compiler (FFC). We present benchmark results for a series of standard variational forms, including the incompressible Navier-Stokes equations and linear elasticity. The speedup compared to the standard quadrature-based approach is impressive; in some cases the speedup is as large as a factor of 1000. {\textcopyright} 2006 ACM.},
+archivePrefix = {arXiv},
+arxivId = {1112.0402},
+author = {Kirby, Robert C and Logg, Anders},
+doi = {10.1145/1163641.1163644},
+eprint = {1112.0402},
+file = {:home/fverdugo/.local/share/data/Mendeley Ltd./Mendeley Desktop/Downloaded/Kirby - Unknown - A Compiler for Variational Forms.pdf:pdf},
+issn = {00983500},
+journal = {ACM Transactions on Mathematical Software},
+keywords = {Automation,Compiler,Finite element,Variational form},
+number = {3},
+pages = {417--444},
+title = {{A compiler for variational forms}},
+volume = {32},
+year = {2006}
+}
+
+@book{fenics-book,
+  doi = {10.1007/978-3-642-23099-8},
+  url = {https://doi.org/10.1007/978-3-642-23099-8},
+  year = {2012},
+  publisher = {Springer Berlin Heidelberg},
+  editor = {Anders Logg and Kent-Andre Mardal and Garth Wells},
+  title = {Automated Solution of Differential Equations by the Finite Element Method}
+}
