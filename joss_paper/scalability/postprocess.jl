@@ -40,7 +40,11 @@ begin
 	plot!(df[!,:np],df[!,:t_solver])
 end
 
+# ╔═╡ 8d1b090e-2548-48fe-afb9-92f044442a80
+
+
 # ╔═╡ Cell order:
 # ╠═f0aae79e-13d9-11ef-263f-b720d8f10878
 # ╠═4725bb5d-8973-436b-af96-74cc90e7f354
 # ╠═a10880e9-680b-46f0-9bda-44e53a7196ce
+# ╠═8d1b090e-2548-48fe-afb9-92f044442a80
