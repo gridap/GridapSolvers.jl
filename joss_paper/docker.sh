@@ -1,0 +1,1 @@
+sudo docker run -it --rm -v $(pwd):/data -u $(id -u):$(id -g) openjournals/inara -o pdf,crossref paper.md
