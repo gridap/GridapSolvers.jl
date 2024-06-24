@@ -97,9 +97,7 @@ end
 function Gridap.Algebra.symbolic_setup(solver::BlockTriangularSolver{T,N},mat::AbstractBlockMatrix,x::AbstractBlockVector) where {T,N}
   mat_blocks   = blocks(mat)
   vec_blocks   = blocks(x)
-  block_caches = map(CartesianIndices(solver.blocks)) do I
-    instantiate_block_cache(solver.blocks[I],mat_blocks[I],vec_blocks[I[2]])
-  end
+  block_caches = map((b,m) -> instantiate_block_cache(b,m,x),solver.blocks,mat_blocks)
   block_ss     = map(symbolic_setup,solver.solvers,diag(block_caches),vec_blocks)
   return BlockTriangularSolverSS(solver,block_ss,block_caches)
 end
@@ -159,9 +157,7 @@ function Gridap.Algebra.numerical_setup!(ns::BlockTriangularSolverNS,mat::Abstra
   solver       = ns.solver
   mat_blocks   = blocks(mat)
   vec_blocks   = blocks(x)
-  block_caches = map(CartesianIndices(solver.blocks)) do I
-    update_block_cache!(ns.block_caches[I],solver.blocks[I],mat_blocks[I],vec_blocks[I[2]])
-  end
+  block_caches = map((c,b,m) -> update_block_cache!(c,b,m,x),ns.block_caches,solver.blocks,mat_blocks)
   map(diag(solver.blocks),ns.block_ns,diag(block_caches),vec_blocks) do bi, nsi, ci, xi
     if is_nonlinear(bi)
       numerical_setup!(nsi,ci,xi)
