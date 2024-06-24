@@ -106,10 +106,12 @@ struct BiformBlock <: LinearSolverBlock
   trial :: FESpace
   test  :: FESpace
   assem :: Assembler
-  function BiformBlock(f::Function,
-                       trial::FESpace,
-                       test::FESpace,
-                       assem=SparseMatrixAssembler(trial,test))
+  function BiformBlock(
+    f::Function,
+    trial::FESpace,
+    test::FESpace,
+    assem=SparseMatrixAssembler(trial,test)
+  )
     return new(f,trial,test,assem)
   end
 end
@@ -129,15 +131,28 @@ end
 """
 struct TriformBlock <: NonlinearSolverBlock
   f     :: Function
+  param :: FESpace
   trial :: FESpace
   test  :: FESpace
   assem :: Assembler
-  function TriformBlock(f::Function,
-                        trial::FESpace,
-                        test::FESpace,
-                        assem=SparseMatrixAssembler(trial,test))
-    return new(f,trial,test,assem)
+  function TriformBlock(
+    f::Function,
+    param::FESpace,
+    trial::FESpace,
+    test::FESpace,
+    assem=SparseMatrixAssembler(trial,test)
+  )
+    return new(f,param,trial,test,assem)
   end
+end
+
+function TriformBlock(
+  f::Function,
+  trial::FESpace,
+  test::FESpace,
+  assem=SparseMatrixAssembler(trial,test)
+)
+  return TriformBlock(f,trial,trial,test,assem)
 end
 
 function instantiate_block_cache(block::BiformBlock,mat::AbstractMatrix)
@@ -145,13 +160,13 @@ function instantiate_block_cache(block::BiformBlock,mat::AbstractMatrix)
 end
 
 function instantiate_block_cache(block::TriformBlock,mat::AbstractMatrix,x::AbstractVector)
-  uh = FEFunction(block.trial,x)
+  uh = FEFunction(block.param,x)
   f(u,v) = block.f(uh,u,v)
   return assemble_matrix(f,block.assem,block.trial,block.test)
 end
 
 function update_block_cache!(cache,block::TriformBlock,mat::AbstractMatrix,x::AbstractVector)
-  uh = FEFunction(block.trial,x)
+  uh = FEFunction(block.param,x)
   f(u,v) = block.f(uh,u,v)
   return assemble_matrix!(f,cache,block.assem,block.trial,block.test)
 end
