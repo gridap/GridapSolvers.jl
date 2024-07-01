@@ -137,10 +137,8 @@ function main(distribute,np,nc)
   solver_u.log.depth = 3
   solver_p.log.depth = 3
 
-  diag_blocks  = [NonlinearSystemBlock(),BiformBlock((p,q) -> ∫(-1.0/α*p*q)dΩ,Q,Q)]
-  bblocks = map(CartesianIndices((2,2))) do I
-    (I[1] == I[2]) ? diag_blocks[I[1]] : LinearSystemBlock()
-  end
+  bblocks  = [NonlinearSystemBlock([1]) LinearSystemBlock();
+              LinearSystemBlock()       BiformBlock((p,q) -> ∫(-(1.0/α)*p*q)dΩ,Q,Q)]
   coeffs = [1.0 1.0;
             0.0 1.0]  
   P = BlockTriangularSolver(bblocks,[solver_u,solver_p],coeffs,:upper)
@@ -148,7 +146,9 @@ function main(distribute,np,nc)
   solver.log.depth = 2
 
   nlsolver = NewtonSolver(solver;maxiter=20,atol=1e-14,rtol=1.e-7,verbose=i_am_main(parts))
-  xh = solve(nlsolver,op);
+  xh = solve(nlsolver,op)
+
+  @test true
 end
 
 end # module
