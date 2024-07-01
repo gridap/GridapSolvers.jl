@@ -85,8 +85,8 @@ function Gridap.Algebra.numerical_setup(ss::PatchBasedSymbolicSetup,A::AbstractM
   Ap_ns = numerical_setup(symbolic_setup(solver.local_solver,Ap),Ap)
 
   # Caches
-  rp     = allocate_in_range(Ap)
-  dxp    = allocate_in_domain(Ap)
+  rp     = allocate_in_range(Ap); fill!(rp,0.0)
+  dxp    = allocate_in_domain(Ap); fill!(dxp,0.0)
   caches = (rp,dxp)
   
   Ap = solver.is_nonlinear ? Ap : nothing # If linear, we don't need to keep the matrix

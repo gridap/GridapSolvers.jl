@@ -12,9 +12,11 @@ struct PatchTriangulation{Dc,Dp,A,B,C,D,E} <: Gridap.Geometry.Triangulation{Dc,D
   pfaces_to_pcells :: D
   mface_to_tface   :: E
 
-  function PatchTriangulation(trian::Triangulation{Dc,Dp},
-                              PD::PatchDecomposition,
-                              patch_faces,pfaces_to_pcells,mface_to_tface) where {Dc,Dp}
+  function PatchTriangulation(
+    trian::Triangulation{Dc,Dp},
+    PD::PatchDecomposition,
+    patch_faces,pfaces_to_pcells,mface_to_tface
+  ) where {Dc,Dp}
     A = typeof(trian)
     B = typeof(PD)
     C = typeof(patch_faces)

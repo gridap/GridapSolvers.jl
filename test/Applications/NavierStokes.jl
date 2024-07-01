@@ -100,6 +100,8 @@ function main(distribute,np,nc)
   
   nlsolver = NewtonSolver(solver;maxiter=20,atol=1e-14,rtol=1.e-7,verbose=i_am_main(parts))
   xh = solve(nlsolver,op)
+
+  @test true
 end
 
 end # module

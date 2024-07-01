@@ -64,10 +64,14 @@ end
 
 function Gridap.Algebra.numerical_setup!(ns::RichardsonSmootherNumericalSetup, A::AbstractMatrix)
   numerical_setup!(ns.Mns,A)
+  ns.A = A
+  return ns
 end
 
 function Gridap.Algebra.numerical_setup!(ns::RichardsonSmootherNumericalSetup, A::AbstractMatrix, x::AbstractVector)
   numerical_setup!(ns.Mns,A,x)
+  ns.A = A
+  return ns
 end
 
 function Gridap.Algebra.solve!(x::AbstractVector,ns::RichardsonSmootherNumericalSetup,r::AbstractVector)
