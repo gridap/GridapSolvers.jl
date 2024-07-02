@@ -100,9 +100,6 @@ function main(distribute,np,nc,np_per_level)
   smoothers = get_patch_smoothers(
     mh,tests_u,biform_u,patch_decompositions,qdegree
   )
-  #restrictions = setup_restriction_operators(
-  #  tests_u,qdegree;mode=:residual,solver=IS_ConjugateGradientSolver(;reltol=1.e-6)
-  #)
   prolongations = setup_patch_prolongation_operators(
     tests_u,biform_u,graddiv,qdegree
   )

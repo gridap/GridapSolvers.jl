@@ -30,7 +30,7 @@ function Algebra.solve!(x::AbstractVector,nls::NewtonSolver,op::NonlinearOperato
   b  = residual(op, x)
   A  = jacobian(op, x)
   dx = allocate_in_domain(A); fill!(dx,zero(eltype(dx)))
-  ss = symbolic_setup(nls.ls, A)
+  ss = symbolic_setup(nls.ls,A)
   ns = numerical_setup(ss,A,x)
   _solve_nr!(x,A,b,dx,ns,nls,op)
   return NewtonCache(A,b,dx,ns)

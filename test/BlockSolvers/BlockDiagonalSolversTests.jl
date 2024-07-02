@@ -1,9 +1,11 @@
 module BlockDiagonalSolversTests
 
+using Test
 using BlockArrays, LinearAlgebra
 using Gridap, Gridap.MultiField, Gridap.Algebra
 using PartitionedArrays, GridapDistributed
 using GridapSolvers
+using GridapSolvers.LinearSolvers
 
 function main(distribute,parts)
   ranks = distribute(LinearIndices((prod(parts),)))
@@ -25,6 +27,12 @@ function main(distribute,parts)
 
   op = AffineFEOperator(a,l,Y,Y)
   A, b = get_matrix(op), get_vector(op);
+  s  = GMRESSolver(10;rtol=1.e-10)
+  ss = symbolic_setup(s,A)
+  ns = numerical_setup(ss,A)
+
+  x  = allocate_in_domain(A); fill!(x,0.0)
+  solve!(x,ns,b)
 
   # 1) From system blocks
   s1  = BlockDiagonalSolver([LUSolver(),LUSolver()])
@@ -34,6 +42,7 @@ function main(distribute,parts)
 
   x1  = allocate_in_domain(A); fill!(x1,0.0)
   solve!(x1,ns1,b)
+  @test norm(x1-x) < 1.e-8
 
   # 2) From matrix blocks
   s2  = BlockDiagonalSolver([A[Block(1,1)],A[Block(2,2)]],[LUSolver(),LUSolver()])
@@ -43,6 +52,7 @@ function main(distribute,parts)
 
   x2  = allocate_in_domain(A); fill!(x2,0.0)
   solve!(x2,ns2,b)
+  @test norm(x2-x) < 1.e-8
 
   # 3) From weakform blocks
   aii = (u,v) -> ∫(u⋅v)*dΩ
@@ -53,6 +63,7 @@ function main(distribute,parts)
 
   x3  = allocate_in_domain(A); fill!(x3,0.0)
   solve!(x3,ns3,b)
+  @test norm(x3-x) < 1.e-8
 end
 
 end # module

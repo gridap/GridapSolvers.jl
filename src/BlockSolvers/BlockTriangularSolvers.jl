@@ -82,74 +82,88 @@ end
 # Symbolic setup
 
 struct BlockTriangularSolverSS{A,B,C} <: Gridap.Algebra.SymbolicSetup
-  solver       :: A
-  block_ss     :: B
-  block_caches :: C
+  solver    :: A
+  block_ss  :: B
+  block_off :: C
 end
 
 function Gridap.Algebra.symbolic_setup(solver::BlockTriangularSolver,mat::AbstractBlockMatrix)
-  mat_blocks   = blocks(mat)
-  block_caches = map(instantiate_block_cache,solver.blocks,mat_blocks)
-  block_ss     = map(symbolic_setup,solver.solvers,diag(block_caches))
-  return BlockTriangularSolverSS(solver,block_ss,block_caches)
+  mat_blocks = blocks(mat)
+  block_ss   = map(block_symbolic_setup,diag(solver.blocks),solver.solvers,diag(mat_blocks))
+  block_off  = map(CartesianIndices(mat_blocks)) do I
+    if I[1] != I[2]
+      block_offdiagonal_setup(solver.blocks[I],mat_blocks[I])
+    else
+      mat_blocks[I]
+    end
+  end
+  return BlockTriangularSolverSS(solver,block_ss,block_off)
 end
 
 function Gridap.Algebra.symbolic_setup(solver::BlockTriangularSolver{T,N},mat::AbstractBlockMatrix,x::AbstractBlockVector) where {T,N}
-  mat_blocks   = blocks(mat)
-  vec_blocks   = blocks(x)
-  block_caches = map(CartesianIndices(solver.blocks)) do I
-    instantiate_block_cache(solver.blocks[I],mat_blocks[I],vec_blocks[I[2]])
+  mat_blocks = blocks(mat)
+  block_ss   = map((b,s,m) -> block_symbolic_setup(b,s,m,x),diag(solver.blocks),solver.solvers,diag(mat_blocks))
+  block_off  = map(CartesianIndices(mat_blocks)) do I
+    if I[1] != I[2]
+      block_offdiagonal_setup(solver.blocks[I],mat_blocks[I],x)
+    else
+      mat_blocks[I]
+    end
   end
-  block_ss     = map(symbolic_setup,solver.solvers,diag(block_caches),vec_blocks)
-  return BlockTriangularSolverSS(solver,block_ss,block_caches)
+  return BlockTriangularSolverSS(solver,block_ss,block_off)
 end
 
 # Numerical setup
 
 struct BlockTriangularSolverNS{T,A,B,C,D} <: Gridap.Algebra.NumericalSetup
-  solver       :: A
-  block_ns     :: B
-  block_caches :: C
-  work_caches  :: D
+  solver      :: A
+  block_ns    :: B
+  block_off   :: C
+  work_caches :: D
   function BlockTriangularSolverNS(
     solver::BlockTriangularSolver{T},
-    block_ns,block_caches,work_caches
+    block_ns,block_off,work_caches
   ) where T
     A = typeof(solver) 
     B = typeof(block_ns)
-    C = typeof(block_caches)
+    C = typeof(block_off)
     D = typeof(work_caches)
-    return new{T,A,B,C,D}(solver,block_ns,block_caches,work_caches)
+    return new{T,A,B,C,D}(solver,block_ns,block_off,work_caches)
   end
 end
 
 function Gridap.Algebra.numerical_setup(ss::BlockTriangularSolverSS,mat::AbstractBlockMatrix)
-  solver      = ss.solver
-  block_ns    = map(numerical_setup,ss.block_ss,diag(ss.block_caches))
+  solver   = ss.solver
+  block_ns = map(block_numerical_setup,ss.block_ss,diag(blocks(mat)))
   
-  y = mortar(map(allocate_in_domain,diag(ss.block_caches))); fill!(y,0.0) # This should be removed with PA 0.4
+  y = mortar(map(allocate_in_domain,block_ns)); fill!(y,0.0) # This should be removed with PA 0.4
   w = allocate_in_range(mat); fill!(w,0.0)
   work_caches = w, y
-  return BlockTriangularSolverNS(solver,block_ns,ss.block_caches,work_caches)
+  return BlockTriangularSolverNS(solver,block_ns,ss.block_off,work_caches)
 end
 
 function Gridap.Algebra.numerical_setup(ss::BlockTriangularSolverSS,mat::AbstractBlockMatrix,x::AbstractBlockVector)
-  solver      = ss.solver
-  block_ns    = map(numerical_setup,ss.block_ss,diag(ss.block_caches),blocks(x))
+  solver     = ss.solver
+  mat_blocks = blocks(mat)
+  block_ns   = map((b,m) -> block_numerical_setup(b,m,x),ss.block_ss,diag(mat_blocks))
 
-  y = mortar(map(allocate_in_domain,diag(ss.block_caches))); fill!(y,0.0)
+  y = mortar(map(allocate_in_domain,block_ns)); fill!(y,0.0)
   w = allocate_in_range(mat); fill!(w,0.0)
   work_caches = w, y
-  return BlockTriangularSolverNS(solver,block_ns,ss.block_caches,work_caches)
+  return BlockTriangularSolverNS(solver,block_ns,ss.block_off,work_caches)
 end
 
 function Gridap.Algebra.numerical_setup!(ns::BlockTriangularSolverNS,mat::AbstractBlockMatrix)
   solver       = ns.solver
   mat_blocks   = blocks(mat)
-  block_caches = map(update_block_cache!,ns.block_caches,solver.blocks,mat_blocks)
-  map(diag(solver.blocks),ns.block_ns,diag(block_caches)) do bi, nsi, ci
-    if is_nonlinear(bi)
-      numerical_setup!(nsi,ci)
+  map(ns.block_ns,diag(mat_blocks)) do nsi, mi
+    if is_nonlinear(nsi)
+      block_numerical_setup!(nsi,mi)
+    end
+  end
+  map(CartesianIndices(mat_blocks)) do I
+    if (I[1] != I[2]) && is_nonlinear(solver.blocks[I])
+      block_offdiagonal_setup!(ns.block_off[I],solver.blocks[I],mat_blocks[I])
     end
   end
   return ns
@@ -158,13 +172,14 @@ end
 function Gridap.Algebra.numerical_setup!(ns::BlockTriangularSolverNS,mat::AbstractBlockMatrix,x::AbstractBlockVector)
   solver       = ns.solver
   mat_blocks   = blocks(mat)
-  vec_blocks   = blocks(x)
-  block_caches = map(CartesianIndices(solver.blocks)) do I
-    update_block_cache!(ns.block_caches[I],solver.blocks[I],mat_blocks[I],vec_blocks[I[2]])
+  map(ns.block_ns,diag(mat_blocks)) do nsi, mi
+    if is_nonlinear(nsi)
+      block_numerical_setup!(nsi,mi,x)
+    end
   end
-  map(diag(solver.blocks),ns.block_ns,diag(block_caches),vec_blocks) do bi, nsi, ci, xi
-    if is_nonlinear(bi)
-      numerical_setup!(nsi,ci,xi)
+  map(CartesianIndices(mat_blocks)) do I
+    if (I[1] != I[2]) && is_nonlinear(solver.blocks[I])
+      block_offdiagonal_setup!(ns.block_off[I],solver.blocks[I],mat_blocks[I],x)
     end
   end
   return ns
@@ -175,7 +190,7 @@ function Gridap.Algebra.solve!(x::AbstractBlockVector,ns::BlockTriangularSolverN
   NB = length(ns.block_ns)
   c = ns.solver.coeffs
   w, y = ns.work_caches
-  mats = ns.block_caches
+  mats = ns.block_off
   for iB in 1:NB
     # Add lower off-diagonal contributions
     wi  = blocks(w)[iB]
@@ -189,7 +204,7 @@ function Gridap.Algebra.solve!(x::AbstractBlockVector,ns::BlockTriangularSolverN
     end
 
     # Solve diagonal block
-    nsi = ns.block_ns[iB]
+    nsi = ns.block_ns[iB].ns
     xi  = blocks(x)[iB]
     yi  = blocks(y)[iB]
     solve!(yi,nsi,wi)
@@ -203,7 +218,7 @@ function Gridap.Algebra.solve!(x::AbstractBlockVector,ns::BlockTriangularSolverN
   NB = length(ns.block_ns)
   c = ns.solver.coeffs
   w, y = ns.work_caches
-  mats = ns.block_caches
+  mats = ns.block_off
   for iB in NB:-1:1
     # Add upper off-diagonal contributions
     wi  = blocks(w)[iB]
@@ -217,7 +232,7 @@ function Gridap.Algebra.solve!(x::AbstractBlockVector,ns::BlockTriangularSolverN
     end
 
     # Solve diagonal block
-    nsi = ns.block_ns[iB]
+    nsi = ns.block_ns[iB].ns
     xi  = blocks(x)[iB]
     yi  = blocks(y)[iB]
     solve!(yi,nsi,wi)

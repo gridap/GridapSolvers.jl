@@ -68,3 +68,6 @@ v = get_fe_basis(Ph)
 cm1 = collect_cell_matrix(Ph,Ph,ap1(u,v))
 cm2 = collect_cell_matrix(Ph,Ph,ap2(u,v))
 cm3 = collect_cell_matrix(Ph,Ph,ap3(u,v))
+
+
+

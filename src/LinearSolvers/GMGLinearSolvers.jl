@@ -216,7 +216,7 @@ function Gridap.Algebra.numerical_setup!(
       ah(u,v) = s.is_nonlinear ? s.biforms[lev](uh,u,v) : s.biforms[lev](u,v)
       assemble_matrix!(ah,Ah,Uh,Vh)
     end
-    if lev != num_levels(mh)
+    if lev != nlevs
       if isa(s.interp[lev],PatchProlongationOperator) || isa(s.interp[lev],MultiFieldTransferOperator)
         MultilevelTools.update_transfer_operator!(s.interp[lev],xh[lev])
       end
