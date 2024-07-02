@@ -310,21 +310,13 @@ struct TriformBlock <: NonlinearSolverBlock
 end
 
 function TriformBlock(
-  f::Function,
-  trial::FESpace,
-  test::FESpace,
-  ids::Vector{<:Integer},
-  assem=SparseMatrixAssembler(trial,test)
+  f::Function,trial::FESpace,test::FESpace,ids::Vector{<:Integer},assem=SparseMatrixAssembler(trial,test)
 )
   return TriformBlock(f,trial,trial,test,ids,assem)
 end
 
 function TriformBlock(
-  f::Function,
-  trial::FESpace,
-  test::FESpace,
-  id::Integer,
-  assem=SparseMatrixAssembler(trial,test)
+  f::Function,trial::FESpace,test::FESpace,id::Integer,assem=SparseMatrixAssembler(trial,test)
 )
   return TriformBlock(f,trial,trial,test,[Int8(id)],assem)
 end
