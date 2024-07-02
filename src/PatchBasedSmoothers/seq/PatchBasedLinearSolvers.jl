@@ -74,12 +74,12 @@ struct PatchBasedSmootherNumericalSetup{A,B,C,D} <: Gridap.Algebra.NumericalSetu
 end
 
 function Gridap.Algebra.numerical_setup(ss::PatchBasedSymbolicSetup,A::AbstractMatrix)
+  @check !ss.solver.is_nonlinear
   solver = ss.solver
   Ph, Vh = solver.patch_space, solver.space
   weights = solver.weighted ? compute_weight_operators(Ph,Vh) : nothing
   
-  ap(u,v) = solver.is_nonlinear ? solver.biform(zero(Vh),u,v) : solver.biform(u,v)
-
+  ap(u,v) = solver.biform(u,v)
   assem = SparseMatrixAssembler(Ph,Ph)
   Ap    = assemble_matrix(ap,assem,Ph,Ph)
   Ap_ns = numerical_setup(symbolic_setup(solver.local_solver,Ap),Ap)
@@ -88,20 +88,40 @@ function Gridap.Algebra.numerical_setup(ss::PatchBasedSymbolicSetup,A::AbstractM
   rp     = allocate_in_range(Ap); fill!(rp,0.0)
   dxp    = allocate_in_domain(Ap); fill!(dxp,0.0)
   caches = (rp,dxp)
+
+  return PatchBasedSmootherNumericalSetup(solver,nothing,Ap_ns,weights,caches)
+end
+
+function Gridap.Algebra.numerical_setup(ss::PatchBasedSymbolicSetup,A::AbstractMatrix,x::AbstractVector)
+  @check ss.solver.is_nonlinear
+  solver = ss.solver
+  Ph, Vh = solver.patch_space, solver.space
+  weights = solver.weighted ? compute_weight_operators(Ph,Vh) : nothing
   
-  Ap = solver.is_nonlinear ? Ap : nothing # If linear, we don't need to keep the matrix
+  u0 = FEFunction(Vh,x)
+  ap(u,v) = solver.biform(u0,u,v)
+  assem = SparseMatrixAssembler(Ph,Ph)
+  Ap    = assemble_matrix(ap,assem,Ph,Ph)
+  Ap_ns = numerical_setup(symbolic_setup(solver.local_solver,Ap),Ap)
+
+  # Caches
+  rp     = allocate_in_range(Ap); fill!(rp,0.0)
+  dxp    = allocate_in_domain(Ap); fill!(dxp,0.0)
+  caches = (rp,dxp)
+
   return PatchBasedSmootherNumericalSetup(solver,Ap,Ap_ns,weights,caches)
 end
 
 function Gridap.Algebra.numerical_setup(ss::PatchBasedSymbolicSetup,A::PSparseMatrix)
+  @check !ss.solver.is_nonlinear
   solver = ss.solver
   Ph, Vh = solver.patch_space, solver.space
   weights = solver.weighted ? compute_weight_operators(Ph,Vh) : nothing
 
   # Patch system solver (only local systems need to be solved)
-  ap(u,v) = solver.is_nonlinear ? solver.biform(zero(Vh),u,v) : solver.biform(u,v)
-  u, v = get_trial_fe_basis(Vh), get_fe_basis(Vh)
-  matdata = collect_cell_matrix(Ph,Ph,ap(u,v))
+  u, v  = get_trial_fe_basis(Vh), get_fe_basis(Vh)
+  contr = solver.biform(u,v)
+  matdata = collect_cell_matrix(Ph,Ph,contr)
   Ap, Ap_ns = map(local_views(Ph),matdata) do Ph, matdata
     assem = SparseMatrixAssembler(Ph,Ph)
     Ap    = assemble_matrix(assem,matdata)
@@ -116,11 +136,36 @@ function Gridap.Algebra.numerical_setup(ss::PatchBasedSymbolicSetup,A::PSparseMa
   x      = pfill(0.0,partition(Vh.gids))
   caches = (rp,dxp,r,x)
   
-  Ap = solver.is_nonlinear ? Ap : nothing
+  return PatchBasedSmootherNumericalSetup(solver,nothing,Ap_ns,weights,caches)
+end
+
+function Gridap.Algebra.numerical_setup(ss::PatchBasedSymbolicSetup,A::PSparseMatrix,x::PVector)
+  @check ss.solver.is_nonlinear
+  solver = ss.solver
+  Ph, Vh = solver.patch_space, solver.space
+  weights = solver.weighted ? compute_weight_operators(Ph,Vh) : nothing
+
+  # Patch system solver (only local systems need to be solved)
+  u0, u, v = FEFunction(Vh,x), get_trial_fe_basis(Vh), get_fe_basis(Vh)
+  contr = solver.biform(u0,u,v)
+  matdata = collect_cell_matrix(Ph,Ph,contr)
+  Ap, Ap_ns = map(local_views(Ph),matdata) do Ph, matdata
+    assem = SparseMatrixAssembler(Ph,Ph)
+    Ap    = assemble_matrix(assem,matdata)
+    Ap_ns = numerical_setup(symbolic_setup(solver.local_solver,Ap),Ap)
+    return Ap, Ap_ns
+  end |> PartitionedArrays.tuple_of_arrays
+
+  # Caches
+  rp     = pfill(0.0,partition(Ph.gids))
+  dxp    = pfill(0.0,partition(Ph.gids))
+  r      = pfill(0.0,partition(Vh.gids))
+  x      = pfill(0.0,partition(Vh.gids))
+  caches = (rp,dxp,r,x)
   return PatchBasedSmootherNumericalSetup(solver,Ap,Ap_ns,weights,caches)
 end
 
-function Gridap.Algebra.numerical_setup!(ns::PatchBasedSmootherNumericalSetup, A::PSparseMatrix, x::PVector)
+function Gridap.Algebra.numerical_setup!(ns::PatchBasedSmootherNumericalSetup,A::PSparseMatrix,x::PVector)
   @check ns.solver.is_nonlinear
   solver = ns.solver
   Ph, Vh = solver.patch_space, solver.space

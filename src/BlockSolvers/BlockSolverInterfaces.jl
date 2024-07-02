@@ -50,6 +50,8 @@ end
 function restrict_blocks(x::AbstractBlockVector,ids::Vector{Int8})
   if isempty(ids)
     return x
+  elseif length(ids) == 1
+    return blocks(x)[ids[1]]
   else
     return mortar(blocks(x)[ids])
   end
@@ -209,6 +211,7 @@ struct NonlinearSystemBlock <: NonlinearSolverBlock
 end
 
 NonlinearSystemBlock() = NonlinearSystemBlock(Int8[])
+NonlinearSystemBlock(id::Integer) = NonlinearSystemBlock([Int8(id)])
 
 function block_symbolic_setup(block::LinearSystemBlock,solver::LinearSolver,mat::AbstractMatrix)
   return BlockSS(block,symbolic_setup(solver,mat),mat)
@@ -314,6 +317,16 @@ function TriformBlock(
   assem=SparseMatrixAssembler(trial,test)
 )
   return TriformBlock(f,trial,trial,test,ids,assem)
+end
+
+function TriformBlock(
+  f::Function,
+  trial::FESpace,
+  test::FESpace,
+  id::Integer,
+  assem=SparseMatrixAssembler(trial,test)
+)
+  return TriformBlock(f,trial,trial,test,[Int8(id)],assem)
 end
 
 function block_symbolic_setup(block::BiformBlock,solver::LinearSolver,mat::AbstractMatrix)
