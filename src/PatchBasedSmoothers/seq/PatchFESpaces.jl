@@ -115,7 +115,7 @@ function Gridap.CellData.get_triangulation(a::PatchFESpace)
   PD = a.patch_decomposition
   patch_cells = Gridap.Arrays.Table(PD.patch_cells)
   trian = get_triangulation(a.Vh)
-  return PatchTriangulation(trian,PD,patch_cells,nothing,nothing)
+  return PatchTriangulation(trian,PD,patch_cells,nothing)
 end
 
 # get_cell_dof_ids
