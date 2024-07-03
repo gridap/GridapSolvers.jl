@@ -47,6 +47,11 @@ function Base.setindex!(a::HierarchicalArray,v,i::Integer)
   return v
 end
 
+# Unsafe getindex: Returns the value without 
+# checking if the processor belongs to the subcommunicator.
+unsafe_getindex(a::HierarchicalArray,i::Integer) = getindex(a.array,i)
+unsafe_getindex(a::AbstractArray,i::Integer) = getindex(a,i)
+
 function Base.view(a::HierarchicalArray{T},I) where T
   return HierarchicalArray{T}(view(a.array,I),view(a.ranks,I))
 end

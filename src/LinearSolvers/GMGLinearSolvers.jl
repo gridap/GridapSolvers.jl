@@ -144,7 +144,7 @@ function Algebra.symbolic_setup(solver::GMGLinearSolverFromWeakform,::AbstractMa
   return GMGSymbolicSetup(solver)
 end
 
-struct GMGNumericalSetup{A,B,C,D,E,F,G} <: Algebra.NumericalSetup
+struct GMGNumericalSetup{A,B,C,D,E,F,G,H} <: Algebra.NumericalSetup
   solver                 :: A
   smatrices              :: B
   finest_level_cache     :: C
@@ -152,11 +152,12 @@ struct GMGNumericalSetup{A,B,C,D,E,F,G} <: Algebra.NumericalSetup
   post_smoothers_caches  :: E
   coarsest_solver_cache  :: F
   work_vectors           :: G
+  system_caches          :: H
 end
 
 function Algebra.numerical_setup(ss::GMGSymbolicSetup,mat::AbstractMatrix)
   s = ss.solver
-  smatrices = gmg_compute_smatrices(s,mat)
+  smatrices = gmg_compute_matrices(s,mat)
 
   finest_level_cache = gmg_finest_level_cache(smatrices)
   work_vectors = gmg_work_vectors(smatrices)
@@ -169,11 +170,31 @@ function Algebra.numerical_setup(ss::GMGSymbolicSetup,mat::AbstractMatrix)
   coarsest_solver_cache = gmg_coarse_solver_caches(s.coarsest_solver,smatrices,work_vectors)
 
   return GMGNumericalSetup(
-    s,smatrices,finest_level_cache,pre_smoothers_caches,post_smoothers_caches,coarsest_solver_cache,work_vectors
+    s,smatrices,finest_level_cache,pre_smoothers_caches,post_smoothers_caches,coarsest_solver_cache,work_vectors,nothing
   )
 end
 
-function Gridap.Algebra.numerical_setup!(
+function Algebra.numerical_setup(ss::GMGSymbolicSetup,mat::AbstractMatrix,x::AbstractVector)
+  s = ss.solver
+  smatrices, svectors = gmg_compute_matrices(s,mat,x)
+  system_caches = (smatrices,svectors)
+
+  finest_level_cache = gmg_finest_level_cache(smatrices)
+  work_vectors = gmg_work_vectors(smatrices)
+  pre_smoothers_caches = gmg_smoothers_caches(s.pre_smoothers,smatrices,svectors)
+  if !(s.pre_smoothers === s.post_smoothers)
+    post_smoothers_caches = gmg_smoothers_caches(s.post_smoothers,smatrices,svectors)
+  else
+    post_smoothers_caches = pre_smoothers_caches
+  end
+  coarsest_solver_cache = gmg_coarse_solver_caches(s.coarsest_solver,smatrices,svectors,work_vectors)
+
+  return GMGNumericalSetup(
+    s,smatrices,finest_level_cache,pre_smoothers_caches,post_smoothers_caches,coarsest_solver_cache,work_vectors,system_caches
+  )
+end
+
+function Algebra.numerical_setup!(
   ns::GMGNumericalSetup{<:GMGLinearSolverFromMatrices},
   mat::AbstractMatrix
 )
@@ -184,7 +205,7 @@ function Gridap.Algebra.numerical_setup!(
   @error msg
 end
 
-function Gridap.Algebra.numerical_setup!(
+function Algebra.numerical_setup!(
   ns::GMGNumericalSetup{<:GMGLinearSolverFromWeakform},
   mat::AbstractMatrix,
   x::AbstractVector
@@ -192,59 +213,109 @@ function Gridap.Algebra.numerical_setup!(
   @check ns.solver.is_nonlinear
 
   s = ns.solver
-  mh, trials, tests, restrictions = s.mh, s.trials, s.tests, s.primal_restrictions
-  work_vectors = ns.work_vectors
+  mh, interp, restrict = s.mh, s.interp, s.restrict
+  pre_smoothers_ns, post_smoothers_ns = ns.pre_smoothers_caches, ns.post_smoothers_caches
+  coarsest_solver_ns = ns.coarsest_solver_cache
   nlevs = num_levels(mh)
 
-  # Project solution to all levels
-  xh = Vector{Union{AbstractVector,Nothing}}(undef,nlevs)
-  xh[1] = work_vectors[1][1]; copy!(xh[1],x)
-  map(view(linear_indices(mh),1:nlevs-1),restrictions) do lev, R
-    dxh, Adxh, dxH, rH = work_vectors[lev]
-    mul!(rH,R,xh[lev])
-    xh[lev+1] = rH
-  end
-
-  # Update matrices, prolongations and smoothers
-  map(linear_indices(mh),ns.smatrices) do lev, Ah
-    if lev == 1
-      copyto!(Ah,mat)
-    else
-      Uh = MultilevelTools.get_fe_space(trials,lev)
-      Vh = MultilevelTools.get_fe_space(tests,lev)
-      uh = FEFunction(Uh,xh[lev])
-      ah(u,v) = s.is_nonlinear ? s.biforms[lev](uh,u,v) : s.biforms[lev](u,v)
-      assemble_matrix!(ah,Ah,Uh,Vh)
-    end
+  # Update smatrices and svectors
+  smatrices, svectors = gmg_compute_matrices!(ns.system_caches, s,mat,x)
+  
+  # Update prolongations and smoothers
+  map(linear_indices(mh),smatrices,svectors) do lev, Ah, xh
     if lev != nlevs
-      if isa(s.interp[lev],PatchProlongationOperator) || isa(s.interp[lev],MultiFieldTransferOperator)
-        MultilevelTools.update_transfer_operator!(s.interp[lev],xh[lev])
+      if isa(interp[lev],PatchProlongationOperator) || isa(interp[lev],MultiFieldTransferOperator)
+        MultilevelTools.update_transfer_operator!(interp[lev],xh)
       end
-      numerical_setup!(ns.pre_smoothers_caches[lev],Ah,xh[lev])
+      if isa(restrict[lev],PatchRestrictionOperator) || isa(restrict[lev],MultiFieldTransferOperator)
+        MultilevelTools.update_transfer_operator!(restrict[lev],xh)
+      end
+      numerical_setup!(pre_smoothers_ns[lev],Ah,xh)
       if !(s.pre_smoothers === s.post_smoothers)
-        numerical_setup!(ns.post_smoothers_caches[lev],Ah,xh[lev])
+        numerical_setup!(post_smoothers_ns[lev],Ah,xh)
       end
+    end
+    if lev == nlevs
+      numerical_setup!(coarsest_solver_ns,Ah,xh)
     end
   end
 end
 
-function gmg_compute_smatrices(s::GMGLinearSolverFromMatrices,mat::AbstractMatrix)
+function gmg_project_solutions(solver::GMGLinearSolverFromWeakform,x::AbstractVector)
+  tests = solver.tests
+  svectors = map(tests) do shlev
+    Vh = MultilevelTools.get_fe_space(shlev)
+    return zero_free_values(Vh)
+  end
+  return gmg_project_solutions!(svectors,solver,x)
+end
+
+function gmg_project_solutions!(
+  svectors::AbstractVector{<:AbstractVector},
+  solver::GMGLinearSolverFromWeakform,
+  x::AbstractVector
+)
+  restrictions = solver.primal_restrictions
+  copy!(svectors[1],x)
+  map(linear_indices(restrictions),restrictions) do lev, R
+    mul!(unsafe_getindex(svectors,lev+1),R,svectors[lev])
+  end
+  return svectors
+end
+
+function gmg_compute_matrices(s::GMGLinearSolverFromMatrices,mat::AbstractMatrix)
   smatrices = s.smatrices
   smatrices[1] = mat
   return smatrices
 end
 
-function gmg_compute_smatrices(s::GMGLinearSolverFromWeakform,mat::AbstractMatrix)
+function gmg_compute_matrices(s::GMGLinearSolverFromWeakform,mat::AbstractMatrix)
+  @check !s.is_nonlinear
   map(linear_indices(s.mh),s.biforms) do l, biform
     if l == 1
       return mat
     end
     Ul = MultilevelTools.get_fe_space(s.trials,l)
     Vl = MultilevelTools.get_fe_space(s.tests,l)
-    uh = zero(Ul)
-    al(u,v) = s.is_nonlinear ? biform(uh,u,v) : biform(u,v)
+    al(u,v) = biform(u,v)
     return assemble_matrix(al,Ul,Vl)
   end
+end
+
+function gmg_compute_matrices(s::GMGLinearSolverFromWeakform,mat::AbstractMatrix,x::AbstractVector)
+  @check s.is_nonlinear
+  svectors = gmg_project_solutions(s,x)
+  smatrices = map(linear_indices(s.mh),s.biforms,svectors) do l, biform, xl
+    if l == 1
+      return mat
+    end
+    Ul = MultilevelTools.get_fe_space(s.trials,l)
+    Vl = MultilevelTools.get_fe_space(s.tests,l)
+    ul = FEFunction(Ul,xl)
+    al(u,v) = biform(ul,u,v)
+    return assemble_matrix(al,Ul,Vl)
+  end
+  return smatrices, svectors
+end
+
+function gmg_compute_matrices!(caches,s::GMGLinearSolverFromWeakform,mat::AbstractMatrix,x::AbstractVector)
+  @check s.is_nonlinear
+  tests, trials = s.tests, s.trials
+  smatrices, svectors = caches
+
+  svectors = gmg_project_solutions!(svectors,s,x)
+  map(linear_indices(s.mh),s.biforms,smatrices,svectors) do l, biform, matl, xl
+    if l == 1
+      copyto!(matl,mat)
+    else
+      Ul = MultilevelTools.get_fe_space(trials,l)
+      Vl = MultilevelTools.get_fe_space(tests,l)
+      ul = FEFunction(Ul,xl)
+      al(u,v) = biform(ul,u,v)
+      assemble_matrix!(al,matl,Ul,Vl)
+    end
+  end
+  return smatrices, svectors
 end
 
 function gmg_finest_level_cache(smatrices::AbstractVector{<:AbstractMatrix})
@@ -254,7 +325,10 @@ function gmg_finest_level_cache(smatrices::AbstractVector{<:AbstractMatrix})
   end
 end
 
-function gmg_smoothers_caches(smoothers::AbstractVector{<:LinearSolver},smatrices::AbstractVector{<:AbstractMatrix})
+function gmg_smoothers_caches(
+  smoothers::AbstractVector{<:LinearSolver},
+  smatrices::AbstractVector{<:AbstractMatrix}
+)
   nlevs = num_levels(smatrices)
   # Last (i.e., coarsest) level does not need pre-/post-smoothing
   caches = map(smoothers,view(smatrices,1:nlevs-1)) do smoother, mat
@@ -263,13 +337,48 @@ function gmg_smoothers_caches(smoothers::AbstractVector{<:LinearSolver},smatrice
   return caches
 end
 
-function gmg_coarse_solver_caches(solver::LinearSolver,smatrices,work_vectors)
+function gmg_smoothers_caches(
+  smoothers::AbstractVector{<:LinearSolver},
+  smatrices::AbstractVector{<:AbstractMatrix},
+  svectors ::AbstractVector{<:AbstractVector}
+)
+  nlevs = num_levels(smatrices)
+  # Last (i.e., coarsest) level does not need pre-/post-smoothing
+  caches = map(smoothers,view(smatrices,1:nlevs-1),view(svectors,1:nlevs-1)) do smoother, mat, x
+    numerical_setup(symbolic_setup(smoother, mat, x), mat, x)
+  end
+  return caches
+end
+
+function gmg_coarse_solver_caches(
+  solver::LinearSolver,
+  smatrices::AbstractVector{<:AbstractMatrix},
+  work_vectors
+)
   nlevs = num_levels(smatrices)
   with_level(smatrices,nlevs) do AH
-    _, _, xH, rH = work_vectors[nlevs-1]
+    _, _, dxH, rH = work_vectors[nlevs-1]
     cache = numerical_setup(symbolic_setup(solver, AH), AH)
     if isa(solver,PETScLinearSolver)
-      cache = CachedPETScNS(cache, xH, rH)
+      cache = CachedPETScNS(cache, dxH, rH)
+    end
+    return cache
+  end
+end
+
+function gmg_coarse_solver_caches(
+  solver::LinearSolver,
+  smatrices::AbstractVector{<:AbstractMatrix},
+  svectors::AbstractVector{<:AbstractVector},
+  work_vectors
+)
+  nlevs = num_levels(smatrices)
+  with_level(smatrices,nlevs) do AH
+    _, _, dxH, rH = work_vectors[nlevs-1]
+    xH = svectors[nlevs]
+    cache = numerical_setup(symbolic_setup(solver, AH, xH), AH, xH)
+    if isa(solver,PETScLinearSolver)
+      cache = CachedPETScNS(cache, dxH, rH)
     end
     return cache
   end
