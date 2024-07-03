@@ -137,17 +137,17 @@ end
 
 function FESpaces.get_cell_dof_ids(::BoundaryTriangulation,a::PatchFESpace,trian::PatchTriangulation)
   cell_dof_ids     = get_cell_dof_ids(a)
-  pfaces_to_pcells = trian.pfaces_to_pcells
-  pcells = isempty(pfaces_to_pcells) ? Int[] : lazy_map(x->x[1],pfaces_to_pcells)
+  pface_to_pcell = trian.pface_to_pcell
+  pcells = isempty(pface_to_pcell) ? Int[] : lazy_map(x->x[1],pface_to_pcell)
   return lazy_map(Reindex(cell_dof_ids),pcells)
 end
 
 function FESpaces.get_cell_dof_ids(::SkeletonTriangulation,a::PatchFESpace,trian::PatchTriangulation)
   cell_dof_ids     = get_cell_dof_ids(a)
-  pfaces_to_pcells = trian.pfaces_to_pcells
+  pface_to_pcell = trian.pface_to_pcell
 
-  pcells_plus  = isempty(pfaces_to_pcells) ? Int[] : lazy_map(x->x[1],pfaces_to_pcells)
-  pcells_minus = isempty(pfaces_to_pcells) ? Int[] : lazy_map(x->x[2],pfaces_to_pcells)
+  pcells_plus  = isempty(pface_to_pcell) ? Int[] : lazy_map(x->x[1],pface_to_pcell)
+  pcells_minus = isempty(pface_to_pcell) ? Int[] : lazy_map(x->x[2],pface_to_pcell)
   
   plus  = lazy_map(Reindex(cell_dof_ids),pcells_plus)
   minus = lazy_map(Reindex(cell_dof_ids),pcells_minus)
