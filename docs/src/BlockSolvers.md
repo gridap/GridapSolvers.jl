@@ -29,6 +29,16 @@ On top of this interface, we provide some useful block implementations:
   TriformBlock
 ```
 
+To create a new type of block, one needs to implement the following implementation (similar to the one for `LinearSolver`):
+
+```@docs
+  block_symbolic_setup
+  block_numerical_setup
+  block_numerical_setup!
+  block_offdiagonal_setup
+  block_offdiagonal_setup!
+```
+
 ## Block solvers
 
 We can combine blocks to define a block solver. All block solvers take an array of blocks and a vector of solvers for the diagonal blocks (which need to be solved for). We provide two common types of block solvers:

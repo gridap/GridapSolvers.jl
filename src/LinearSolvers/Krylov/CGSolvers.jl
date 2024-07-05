@@ -37,10 +37,10 @@ mutable struct CGNumericalSetup <: Gridap.Algebra.NumericalSetup
 end
 
 function get_solver_caches(solver::CGSolver,A::AbstractMatrix)
-  w = allocate_in_domain(A)
-  p = allocate_in_domain(A)
-  z = allocate_in_domain(A)
-  r = allocate_in_domain(A)
+  w = allocate_in_domain(A); fill!(w,zero(eltype(w)))
+  p = allocate_in_domain(A); fill!(p,zero(eltype(p)))
+  z = allocate_in_domain(A); fill!(z,zero(eltype(z)))
+  r = allocate_in_domain(A); fill!(r,zero(eltype(r)))
   return (w,p,z,r)
 end
 

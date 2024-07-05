@@ -42,6 +42,98 @@ has_refinement(a::ModelHierarchyLevel{A,Nothing}) where A = false
 
 """
     CartesianModelHierarchy(
+      ranks::AbstractVector{<:Integer},
+      np_per_level::Vector{<:NTuple{D,<:Integer}},
+      domain::Tuple,
+      nc::NTuple{D,<:Integer};
+      nrefs::Union{<:Integer,Vector{<:Integer},Vector{<:NTuple{D,<:Integer}},NTuple{D,<:Integer}},
+      map::Function = identity,
+      isperiodic::NTuple{D,Bool} = Tuple(fill(false,D)),
+      add_labels!::Function = (labels -> nothing),
+    ) where D
+  
+  Returns a `ModelHierarchy` with a Cartesian model as coarsest level. The i-th level 
+  will be distributed among `np_per_level[i]` processors. Two consecutive levels are 
+  refined by a factor of `nrefs[i]`.
+
+  ## Parameters: 
+
+  - `ranks`: Initial communicator. Will be used to generate subcommunicators.
+  - `domain`: Tuple containing the domain limits.
+  - `nc`: Tuple containing the number of cells in each direction for the coarsest model.
+  - `np_per_level`: Vector containing the number of processors we want to distribute
+    each level into. Requires a tuple `np = (np_1,...,np_d)` for each level, then each 
+    level will be distributed among `prod(np)` processors with `np_i` processors in the
+    i-th direction.
+  - `nrefs`: Vector containing the refinement factor for each level. Has `nlevs-1` entries, 
+      and each entry can either be an integer (homogeneous refinement) or a tuple 
+      with `D` integers (inhomogeneous refinement).
+"""
+function CartesianModelHierarchy(
+  ranks::AbstractVector{<:Integer},
+  np_per_level::Vector{<:NTuple{D,<:Integer}},
+  domain::Tuple,
+  nc::NTuple{D,<:Integer};
+  nrefs::Union{<:Integer,Vector{<:Integer},Vector{<:NTuple{D,<:Integer}},NTuple{D,<:Integer}}=2,
+  map::Function = identity,
+  isperiodic::NTuple{D,Bool} = Tuple(fill(false,D)),
+  add_labels!::Function = (labels -> nothing),
+) where D
+
+  lnr(x::Integer,n) = fill(Tuple(fill(x,D)),n)
+  lnr(x::Vector{<:Integer},n) = [Tuple(fill(xi,D)) for xi in x]
+  lnr(x::NTuple{D,<:Integer},n) = fill(x,n)
+  lnr(x::Vector{<:NTuple{D,<:Integer}},n) = x
+
+  nlevs = length(np_per_level)
+  level_parts = generate_level_parts(ranks,Base.map(prod,np_per_level))
+  level_nrefs = lnr(nrefs,length(level_parts)-1)
+  @assert length(level_parts)-1 == length(level_nrefs)
+
+  # Cartesian descriptors for each level
+  level_descs = Vector{GridapDistributed.DistributedCartesianDescriptor}(undef,nlevs)
+  ncells = nc
+  for lev in nlevs:-1:1
+    level_descs[lev] = GridapDistributed.DistributedCartesianDescriptor(
+      level_parts[lev],np_per_level[lev],CartesianDescriptor(domain,ncells;map,isperiodic)
+    )
+    if lev != 1
+      ncells = nc .* level_nrefs[lev-1]
+    end
+  end
+  
+  meshes = Vector{ModelHierarchyLevel}(undef,nlevs)
+  if i_am_in(level_parts[nlevs]) 
+    coarsest_model = CartesianDiscreteModel(level_parts[nlevs],np_per_level[nlevs],domain,nc;map,isperiodic)
+    Base.map(add_labels!,local_views(get_face_labeling(coarsest_model)))
+  else
+    coarsest_model = nothing
+  end
+  meshes[nlevs] = ModelHierarchyLevel(nlevs,coarsest_model,nothing,nothing,nothing)
+
+  for lev in nlevs-1:-1:1
+    fparts = level_parts[lev]
+    cparts = level_parts[lev+1]
+    if i_am_in(cparts) # Refinement
+      cmodel = get_model(meshes[lev+1])
+      model_ref  = Gridap.Adaptivity.refine(cmodel,level_nrefs[lev])
+      ref_glue   = Gridap.Adaptivity.get_adaptivity_glue(model_ref)
+    else
+      model_ref, ref_glue = nothing, nothing, nothing
+    end
+    if i_am_in(fparts) && (cparts !== fparts) # Redistribution
+      _model_ref = i_am_in(cparts) ? Gridap.Adaptivity.get_model(model_ref) : nothing
+      model_red, red_glue = GridapDistributed.redistribute(_model_ref,level_descs[lev];old_ranks=cparts)
+    else
+      model_red, red_glue = nothing, nothing
+    end
+    meshes[lev] = ModelHierarchyLevel(lev,model_ref,ref_glue,model_red,red_glue)
+  end
+  return HierarchicalArray(meshes,level_parts)
+end
+
+"""
+    P4estCartesianModelHierarchy(
       ranks,np_per_level,domain,nc::NTuple{D,<:Integer};
       num_refs_coarse::Integer = 0,
       add_labels!::Function = (labels -> nothing),
@@ -49,11 +141,11 @@ has_refinement(a::ModelHierarchyLevel{A,Nothing}) where A = false
       isperiodic::NTuple{D,Bool} = Tuple(fill(false,D))
     ) where D
   
-  Returns a `ModelHierarchy` with a Cartesian model as coarsest level. The i-th level 
-  will be distributed among `np_per_level[i]` processors. The seed model is given by
-  `cmodel = CartesianDiscreteModel(domain,nc)`.
+  Returns a `ModelHierarchy` with a Cartesian model as coarsest level, using GridapP4est.jl. 
+  The i-th level will be distributed among `np_per_level[i]` processors. 
+  The seed model is given by `cmodel = CartesianDiscreteModel(domain,nc)`.
 """
-function CartesianModelHierarchy(
+function P4estCartesianModelHierarchy(
   ranks,np_per_level,domain,nc::NTuple{D,<:Integer};
   num_refs_coarse::Integer = 0,
   add_labels!::Function = (labels -> nothing),

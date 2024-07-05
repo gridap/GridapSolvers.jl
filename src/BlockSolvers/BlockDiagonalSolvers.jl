@@ -105,69 +105,60 @@ end
 
 # Symbolic setup
 
-struct BlockDiagonalSolverSS{A,B,C} <: Gridap.Algebra.SymbolicSetup
+struct BlockDiagonalSolverSS{A,B} <: Gridap.Algebra.SymbolicSetup
   solver       :: A
   block_ss     :: B
-  block_caches :: C
 end
 
 function Gridap.Algebra.symbolic_setup(solver::BlockDiagonalSolver,mat::AbstractBlockMatrix)
   mat_blocks   = diag(blocks(mat))
-  block_caches = map(instantiate_block_cache,solver.blocks,mat_blocks)
-  block_ss     = map(symbolic_setup,solver.solvers,block_caches)
-  return BlockDiagonalSolverSS(solver,block_ss,block_caches)
+  block_ss     = map(block_symbolic_setup,solver.blocks,solver.solvers,mat_blocks)
+  return BlockDiagonalSolverSS(solver,block_ss)
 end
 
 function Gridap.Algebra.symbolic_setup(solver::BlockDiagonalSolver,mat::AbstractBlockMatrix,x::AbstractBlockVector)
   mat_blocks   = diag(blocks(mat))
-  vec_blocks   = blocks(x)
-  block_caches = map(instantiate_block_cache,solver.blocks,mat_blocks,vec_blocks)
-  block_ss     = map(symbolic_setup,solver.solvers,block_caches,vec_blocks)
-  return BlockDiagonalSolverSS(solver,block_ss,block_caches)
+  block_ss     = map((b,m) -> block_symbolic_setup(b,m,x),solver.blocks,solver.solvers,mat_blocks)
+  return BlockDiagonalSolverSS(solver,block_ss)
 end
 
 # Numerical setup
 
-struct BlockDiagonalSolverNS{A,B,C,D} <: Gridap.Algebra.NumericalSetup
+struct BlockDiagonalSolverNS{A,B,C} <: Gridap.Algebra.NumericalSetup
   solver       :: A
   block_ns     :: B
-  block_caches :: C
-  work_caches  :: D
+  work_caches  :: C
 end
 
 function Gridap.Algebra.numerical_setup(ss::BlockDiagonalSolverSS,mat::AbstractBlockMatrix)
   solver     = ss.solver
-  block_ns   = map(numerical_setup,ss.block_ss,ss.block_caches)
+  mat_blocks = diag(blocks(mat))
+  block_ns   = map(block_numerical_setup,ss.block_ss,mat_blocks)
 
-  y = mortar(map(allocate_in_domain,ss.block_caches)); fill!(y,0.0)
+  y = mortar(map(allocate_in_domain,block_ns)); fill!(y,0.0)
   work_caches = y
-  return BlockDiagonalSolverNS(solver,block_ns,ss.block_caches,work_caches)
+  return BlockDiagonalSolverNS(solver,block_ns,work_caches)
 end
 
 function Gridap.Algebra.numerical_setup(ss::BlockDiagonalSolverSS,mat::AbstractBlockMatrix,x::AbstractBlockVector)
   solver     = ss.solver
-  vec_blocks = blocks(x)
-  block_ns   = map(numerical_setup,ss.block_ss,ss.block_caches,vec_blocks)
+  mat_blocks = diag(blocks(mat))
+  block_ns   = map((b,m) -> block_numerical_setup(b,m,x),ss.block_ss,mat_blocks)
 
-  y = mortar(map(allocate_in_domain,ss.block_caches)); fill!(y,0.0)
+  y = mortar(map(allocate_in_domain,block_ns)); fill!(y,0.0)
   work_caches = y
-  return BlockDiagonalSolverNS(solver,block_ns,ss.block_caches,work_caches)
+  return BlockDiagonalSolverNS(solver,block_ns,work_caches)
 end
 
 function Gridap.Algebra.numerical_setup!(ns::BlockDiagonalSolverNS,mat::AbstractBlockMatrix)
-  solver       = ns.solver
   mat_blocks   = diag(blocks(mat))
-  block_caches = map(update_block_cache!,ns.block_caches,solver.blocks,mat_blocks)
-  map(numerical_setup!,ns.block_ns,block_caches)
+  map(block_numerical_setup!,ns.block_ns,mat_blocks)
   return ns
 end
 
 function Gridap.Algebra.numerical_setup!(ns::BlockDiagonalSolverNS,mat::AbstractBlockMatrix,x::AbstractBlockVector)
-  solver       = ns.solver
   mat_blocks   = diag(blocks(mat))
-  vec_blocks   = blocks(x)
-  block_caches = map(update_block_cache!,ns.block_caches,solver.blocks,mat_blocks,vec_blocks)
-  map(numerical_setup!,ns.block_ns,block_caches,vec_blocks)
+  map((b,m) -> block_numerical_setup!(b,m,x),ns.block_ns,mat_blocks)
   return ns
 end
 
@@ -179,7 +170,7 @@ function Gridap.Algebra.solve!(x::AbstractBlockVector,ns::BlockDiagonalSolverNS,
     xi = blocks(x)[iB]
     bi = blocks(b)[iB]
     yi = blocks(y)[iB]
-    solve!(yi,bns,bi)
+    solve!(yi,bns.ns,bi)
     copy!(xi,yi)
   end
   return x

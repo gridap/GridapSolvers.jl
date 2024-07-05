@@ -16,7 +16,7 @@ using GridapSolvers.LinearSolvers, GridapSolvers.MultilevelTools
 using GridapSolvers.PatchBasedSmoothers, GridapSolvers.NonlinearSolvers
 using GridapSolvers.BlockSolvers: NonlinearSystemBlock, LinearSystemBlock, BiformBlock, BlockTriangularSolver
 
-function get_patch_smoothers(mh,tests,biform,patch_decompositions,qdegree)
+function get_patch_smoothers(mh,tests,biform,patch_decompositions,qdegree;is_nonlinear=false)
   patch_spaces = PatchFESpace(tests,patch_decompositions)
   nlevs = num_levels(mh)
   smoothers = map(view(tests,1:nlevs-1),patch_decompositions,patch_spaces) do tests, PD, Ph
@@ -24,7 +24,7 @@ function get_patch_smoothers(mh,tests,biform,patch_decompositions,qdegree)
     Ω  = Triangulation(PD)
     dΩ = Measure(Ω,qdegree)
     ap = (u,du,dv) -> biform(u,du,dv,dΩ)
-    patch_smoother = PatchBasedLinearSolver(ap,Ph,Vh;is_nonlinear=true)
+    patch_smoother = PatchBasedLinearSolver(ap,Ph,Vh;is_nonlinear)
     return RichardsonSmoother(patch_smoother,10,0.2)
   end
   return smoothers
@@ -49,14 +49,14 @@ function add_labels_3d!(labels)
   add_tag_from_tags!(labels,"walls",[17,18,23,25,26])
 end
 
-function main(distribute,np,nc)
+function main(distribute,np,nc,np_per_level)
   parts = distribute(LinearIndices((prod(np),)))
 
   # Geometry
   Dc = length(nc)
   domain = (Dc == 2) ? (0,1,0,1) : (0,1,0,1,0,1)
   add_labels! = (Dc == 2) ? add_labels_2d! : add_labels_3d!
-  mh = CartesianModelHierarchy(parts,[np,1],domain,nc;add_labels! = add_labels!)
+  mh = CartesianModelHierarchy(parts,np_per_level,domain,nc;add_labels! = add_labels!)
   model = get_model(mh,1)
 
   # FE spaces
@@ -111,11 +111,8 @@ function main(distribute,np,nc)
   biforms = map(mhl -> get_trilinear_form(mhl,jac_u,qdegree),mh)
   patch_decompositions = PatchDecomposition(mh)
   smoothers = get_patch_smoothers(
-    mh,tests_u,jac_u,patch_decompositions,qdegree
+    mh,trials_u,jac_u,patch_decompositions,qdegree;is_nonlinear=true
   )
-  #restrictions = setup_restriction_operators(
-  #  tests_u,qdegree;mode=:residual,solver=IS_ConjugateGradientSolver(;reltol=1.e-6)
-  #)
   prolongations = setup_patch_prolongation_operators(
     tests_u,jac_u,graddiv,qdegree;is_nonlinear=true
   )
@@ -137,10 +134,8 @@ function main(distribute,np,nc)
   solver_u.log.depth = 3
   solver_p.log.depth = 3
 
-  diag_blocks  = [NonlinearSystemBlock(),BiformBlock((p,q) -> ∫(-1.0/α*p*q)dΩ,Q,Q)]
-  bblocks = map(CartesianIndices((2,2))) do I
-    (I[1] == I[2]) ? diag_blocks[I[1]] : LinearSystemBlock()
-  end
+  bblocks  = [NonlinearSystemBlock([1]) LinearSystemBlock();
+              LinearSystemBlock()       BiformBlock((p,q) -> ∫(-(1.0/α)*p*q)dΩ,Q,Q)]
   coeffs = [1.0 1.0;
             0.0 1.0]  
   P = BlockTriangularSolver(bblocks,[solver_u,solver_p],coeffs,:upper)
@@ -148,7 +143,9 @@ function main(distribute,np,nc)
   solver.log.depth = 2
 
   nlsolver = NewtonSolver(solver;maxiter=20,atol=1e-14,rtol=1.e-7,verbose=i_am_main(parts))
-  xh = solve(nlsolver,op);
+  xh = solve(nlsolver,op)
+
+  @test true
 end
 
 end # module

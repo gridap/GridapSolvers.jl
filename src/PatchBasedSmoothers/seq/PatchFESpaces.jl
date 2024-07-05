@@ -115,7 +115,7 @@ function Gridap.CellData.get_triangulation(a::PatchFESpace)
   PD = a.patch_decomposition
   patch_cells = Gridap.Arrays.Table(PD.patch_cells)
   trian = get_triangulation(a.Vh)
-  return PatchTriangulation(trian,PD,patch_cells,nothing,nothing)
+  return PatchTriangulation(trian,PD,patch_cells,nothing)
 end
 
 # get_cell_dof_ids
@@ -137,17 +137,17 @@ end
 
 function FESpaces.get_cell_dof_ids(::BoundaryTriangulation,a::PatchFESpace,trian::PatchTriangulation)
   cell_dof_ids     = get_cell_dof_ids(a)
-  pfaces_to_pcells = trian.pfaces_to_pcells
-  pcells = isempty(pfaces_to_pcells) ? Int[] : lazy_map(x->x[1],pfaces_to_pcells)
+  pface_to_pcell = trian.pface_to_pcell
+  pcells = isempty(pface_to_pcell) ? Int[] : lazy_map(x->x[1],pface_to_pcell)
   return lazy_map(Reindex(cell_dof_ids),pcells)
 end
 
 function FESpaces.get_cell_dof_ids(::SkeletonTriangulation,a::PatchFESpace,trian::PatchTriangulation)
   cell_dof_ids     = get_cell_dof_ids(a)
-  pfaces_to_pcells = trian.pfaces_to_pcells
+  pface_to_pcell = trian.pface_to_pcell
 
-  pcells_plus  = isempty(pfaces_to_pcells) ? Int[] : lazy_map(x->x[1],pfaces_to_pcells)
-  pcells_minus = isempty(pfaces_to_pcells) ? Int[] : lazy_map(x->x[2],pfaces_to_pcells)
+  pcells_plus  = isempty(pface_to_pcell) ? Int[] : lazy_map(x->x[1],pface_to_pcell)
+  pcells_minus = isempty(pface_to_pcell) ? Int[] : lazy_map(x->x[2],pface_to_pcell)
   
   plus  = lazy_map(Reindex(cell_dof_ids),pcells_plus)
   minus = lazy_map(Reindex(cell_dof_ids),pcells_minus)
@@ -163,18 +163,22 @@ end
 
 # Construction of the patch cell dofs ids
 
-function generate_patch_cell_dofs_ids(topology,
-                                      patch_cells,
-                                      patch_cells_overlapped,
-                                      patch_cells_faces_on_boundary,
-                                      cell_dofs_ids,
-                                      cell_conformity,
-                                      patches_mask)
+function generate_patch_cell_dofs_ids(
+  topology,
+  patch_cells,
+  patch_cells_overlapped,
+  patch_cells_faces_on_boundary,
+  cell_dofs_ids,
+  cell_conformity,
+  patches_mask
+)
   patch_cell_dofs_ids = allocate_patch_cell_dofs_ids(patch_cells,cell_dofs_ids)
-  num_dofs = generate_patch_cell_dofs_ids!(patch_cell_dofs_ids,topology,
-                                           patch_cells,patch_cells_overlapped,
-                                           patch_cells_faces_on_boundary,
-                                           cell_dofs_ids,cell_conformity,patches_mask)
+  num_dofs = generate_patch_cell_dofs_ids!(
+    patch_cell_dofs_ids,topology,
+    patch_cells,patch_cells_overlapped,
+    patch_cells_faces_on_boundary,
+    cell_dofs_ids,cell_conformity,patches_mask
+  )
   return patch_cell_dofs_ids, num_dofs
 end
 
@@ -199,32 +203,35 @@ function allocate_patch_cell_dofs_ids(patch_cells,cell_dofs_ids)
   return Gridap.Arrays.Table(data,ptrs)
 end
 
-function generate_patch_cell_dofs_ids!(patch_cell_dofs_ids,
-                                       topology,
-                                       patch_cells,
-                                       patch_cells_overlapped,
-                                       patch_cells_faces_on_boundary,
-                                       cell_dofs_ids,
-                                       cell_conformity,
-                                       patches_mask)
-
-    cache = array_cache(patch_cells)
-    num_patches = length(patch_cells)
-    current_dof = 1
-    for patch = 1:num_patches
-      current_patch_cells = getindex!(cache,patch_cells,patch)
-      current_dof = generate_patch_cell_dofs_ids!(patch_cell_dofs_ids,
-                                    topology,
-                                    patch,
-                                    current_patch_cells,
-                                    patch_cells_overlapped,
-                                    patch_cells_faces_on_boundary,
-                                    cell_dofs_ids,
-                                    cell_conformity;
-                                    free_dofs_offset=current_dof,
-                                    mask=patches_mask[patch])
-    end
-    return current_dof-1
+function generate_patch_cell_dofs_ids!(
+  patch_cell_dofs_ids,
+  topology,
+  patch_cells,
+  patch_cells_overlapped,
+  patch_cells_faces_on_boundary,
+  cell_dofs_ids,
+  cell_conformity,
+  patches_mask
+)
+  cache = array_cache(patch_cells)
+  num_patches = length(patch_cells)
+  current_dof = 1
+  for patch = 1:num_patches
+    current_patch_cells = getindex!(cache,patch_cells,patch)
+    current_dof = generate_patch_cell_dofs_ids!(
+      patch_cell_dofs_ids,
+      topology,
+      patch,
+      current_patch_cells,
+      patch_cells_overlapped,
+      patch_cells_faces_on_boundary,
+      cell_dofs_ids,
+      cell_conformity;
+      free_dofs_offset=current_dof,
+      mask=patches_mask[patch]
+    )
+  end
+  return current_dof-1
 end
 
 # TO-THINK/STRESS:
@@ -236,17 +243,18 @@ end
 #       tag all as them with -1, as we are always imposing homogenous Dirichlet boundary
 #       conditions, and thus there is no need to address the result of interpolating Dirichlet
 #       Data into the FE space.
-function generate_patch_cell_dofs_ids!(patch_cell_dofs_ids,
-                                       topology,
-                                       patch::Integer,
-                                       patch_cells::AbstractVector{<:Integer},
-                                       patch_cells_overlapped::Gridap.Arrays.Table,
-                                       patch_cells_faces_on_boundary,
-                                       global_space_cell_dofs_ids,
-                                       cell_conformity;
-                                       free_dofs_offset=1,
-                                       mask=false)
-
+function generate_patch_cell_dofs_ids!(
+  patch_cell_dofs_ids,
+  topology,
+  patch::Integer,
+  patch_cells::AbstractVector{<:Integer},
+  patch_cells_overlapped::Gridap.Arrays.Table,
+  patch_cells_faces_on_boundary,
+  global_space_cell_dofs_ids,
+  cell_conformity;
+  free_dofs_offset=1,
+  mask=false
+)
   o  = patch_cells_overlapped.ptrs[patch]
   if mask
     for lpatch_cell = 1:length(patch_cells)

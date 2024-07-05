@@ -305,7 +305,10 @@ end
 #   where face1, face2, ... are the faces of the patch such that 
 #      - they are NOT on the boundary of the patch
 #      - they are flagged `true` in faces_mask
-function get_patch_faces(PD::PatchDecomposition{Dr,Dc},Df::Integer,faces_mask) where {Dr,Dc}
+#   If `reverse` is `true`, the faces are the ones ON the boundary of the patch.
+function get_patch_faces(
+  PD::PatchDecomposition{Dr,Dc},Df::Integer,faces_mask;reverse=false
+) where {Dr,Dc}
   model    = PD.model
   topo     = get_grid_topology(model)
 
@@ -314,13 +317,15 @@ function get_patch_faces(PD::PatchDecomposition{Dr,Dc},Df::Integer,faces_mask) w
   patch_cell_faces  = map(Reindex(c2e_map),patch_cells.data)
   faces_on_boundary = PD.patch_cells_faces_on_boundary[Df+1]
 
-  patch_faces = _allocate_patch_faces(patch_cells,patch_cell_faces,faces_on_boundary,faces_mask)
-  _generate_patch_faces!(patch_faces,patch_cells,patch_cell_faces,faces_on_boundary,faces_mask)
+  patch_faces = _allocate_patch_faces(patch_cells,patch_cell_faces,faces_on_boundary,faces_mask,reverse)
+  _generate_patch_faces!(patch_faces,patch_cells,patch_cell_faces,faces_on_boundary,faces_mask,reverse)
 
   return patch_faces
 end
 
-function _allocate_patch_faces(patch_cells,patch_cell_faces,faces_on_boundary,faces_mask)
+function _allocate_patch_faces(
+  patch_cells,patch_cell_faces,faces_on_boundary,faces_mask,reverse
+)
   num_patches = length(patch_cells)
 
   touched = Dict{Int,Bool}()
@@ -331,11 +336,12 @@ function _allocate_patch_faces(patch_cells,patch_cell_faces,faces_on_boundary,fa
   faces_on_boundary_cache = array_cache(faces_on_boundary)
   for patch in 1:num_patches
     current_patch_cells = getindex!(patch_cells_cache,patch_cells,patch)
-    for iC_local in 1:length(current_patch_cells)
+    for _ in 1:length(current_patch_cells)
       cell_faces  = getindex!(patch_cells_faces_cache,patch_cell_faces,pcell)
       on_boundary = getindex!(faces_on_boundary_cache,faces_on_boundary,pcell)
       for (iF,face) in enumerate(cell_faces)
-        if (!on_boundary[iF] && faces_mask[face] && !haskey(touched,face))
+        A = xor(on_boundary[iF],reverse) # reverse the flag if needed
+        if (!A && faces_mask[face] && !haskey(touched,face))
           num_patch_faces += 1
           touched[face] = true
         end
@@ -350,7 +356,9 @@ function _allocate_patch_faces(patch_cells,patch_cell_faces,faces_on_boundary,fa
   return Gridap.Arrays.Table(patch_faces_data,patch_faces_ptrs)
 end
 
-function _generate_patch_faces!(patch_faces,patch_cells,patch_cell_faces,faces_on_boundary,faces_mask)
+function _generate_patch_faces!(
+  patch_faces,patch_cells,patch_cell_faces,faces_on_boundary,faces_mask,reverse
+)
   num_patches = length(patch_cells)
   patch_faces_data, patch_faces_ptrs = patch_faces.data, patch_faces.ptrs
 
@@ -368,7 +376,8 @@ function _generate_patch_faces!(patch_faces,patch_cells,patch_cell_faces,faces_o
       cell_faces  = getindex!(patch_cells_faces_cache,patch_cell_faces,pcell)
       on_boundary = getindex!(faces_on_boundary_cache,faces_on_boundary,pcell)
       for (iF,face) in enumerate(cell_faces)
-        if (!on_boundary[iF] && faces_mask[face] && !haskey(touched,face))
+        A = xor(on_boundary[iF],reverse) # reverse the flag if needed
+        if (!A && faces_mask[face] && !haskey(touched,face))
           patch_faces_data[pface] = face
           patch_faces_ptrs[patch+1] += 1
           touched[face] = true
@@ -384,10 +393,12 @@ function _generate_patch_faces!(patch_faces,patch_cells,patch_cell_faces,faces_o
 end
 
 # Face connectivity for the patches
-#    pfaces_to_pcells[pface] = [pcell1, pcell2, ...]
+#    pface_to_pcell[pface] = [pcell1, pcell2, ...]
 # This would be the Gridap equivalent to `get_faces(patch_topology,Df,Dc)`.
+# On top of this, we also return the local cell index (within the face connectivity) of cell, 
+# which is needed when a pface touches different cells depending on the patch.
 # The argument `patch_faces` allows to select only some pfaces (i.e boundary/skeleton/etc...).
-function get_pfaces_to_pcells(PD::PatchDecomposition{Dr,Dc},Df::Integer,patch_faces) where {Dr,Dc}
+function get_pface_to_pcell(PD::PatchDecomposition{Dr,Dc},Df::Integer,patch_faces) where {Dr,Dc}
   model    = PD.model
   topo     = get_grid_topology(model)
 
@@ -397,24 +408,42 @@ function get_pfaces_to_pcells(PD::PatchDecomposition{Dr,Dc},Df::Integer,patch_fa
   patch_cells_overlapped = PD.patch_cells_overlapped
 
   num_patches = length(patch_cells)
-  pf2pc_ptrs  = Gridap.Adaptivity.counts_to_ptrs(map(length,pfaces_to_cells))
-  pf2pc_data  = zeros(Int64,pf2pc_ptrs[end]-1)
+  num_pfaces  = length(pfaces_to_cells)
 
   patch_cells_cache = array_cache(patch_cells)
   patch_cells_overlapped_cache = array_cache(patch_cells_overlapped)
   pfaces_to_cells_cache = array_cache(pfaces_to_cells)
+
+  # Maximum length of the data array
+  k = sum(pface -> length(getindex!(pfaces_to_cells_cache,pfaces_to_cells,pface)),1:num_pfaces)
+
+  # Collect patch cells touched by each pface
+  # Remark: Each pface does NOT necessarily touch all it's neighboring cells, since 
+  #         some of them might be outside the patch.
+  ptrs = zeros(Int64,num_pfaces+1)
+  data = zeros(Int64,k)
+  pface_to_lcell = zeros(Int8,k)
+  k = 1
   for patch in 1:num_patches
     cells = getindex!(patch_cells_cache,patch_cells,patch)
     cells_overlapped = getindex!(patch_cells_overlapped_cache,patch_cells_overlapped,patch)
     for pface in patch_faces.ptrs[patch]:patch_faces.ptrs[patch+1]-1
       pface_to_cells = getindex!(pfaces_to_cells_cache,pfaces_to_cells,pface)
-      for (lid,cell) in enumerate(pface_to_cells)
+      for (lcell,cell) in enumerate(pface_to_cells)
         lid_patch = findfirst(c->c==cell,cells)
-        pf2pc_data[pf2pc_ptrs[pface]+lid-1] = cells_overlapped[lid_patch]
+        if !isnothing(lid_patch)
+          ptrs[pface+1] += 1
+          data[k] = cells_overlapped[lid_patch]
+          pface_to_lcell[k] = Int8(lcell)
+          k += 1
+        end
       end
     end
   end
+  Arrays.length_to_ptrs!(ptrs)
+  data = resize!(data,k-1)
+  pface_to_lcell = resize!(pface_to_lcell,k-1)
 
-  pfaces_to_pcells = Gridap.Arrays.Table(pf2pc_data,pf2pc_ptrs)
-  return pfaces_to_pcells
+  pface_to_pcell = Gridap.Arrays.Table(data,ptrs)
+  return pface_to_pcell, pface_to_lcell
 end
