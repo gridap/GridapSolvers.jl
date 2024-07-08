@@ -49,14 +49,14 @@ function add_labels_3d!(labels)
   add_tag_from_tags!(labels,"walls",[17,18,23,25,26])
 end
 
-function main(distribute,np,nc)
+function main(distribute,np,nc,np_per_level)
   parts = distribute(LinearIndices((prod(np),)))
 
   # Geometry
   Dc = length(nc)
   domain = (Dc == 2) ? (0,1,0,1) : (0,1,0,1,0,1)
   add_labels! = (Dc == 2) ? add_labels_2d! : add_labels_3d!
-  mh = CartesianModelHierarchy(parts,[np,1],domain,nc;add_labels! = add_labels!)
+  mh = CartesianModelHierarchy(parts,np_per_level,domain,nc;add_labels! = add_labels!)
   model = get_model(mh,1)
 
   # FE spaces
