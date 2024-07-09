@@ -304,7 +304,6 @@ struct TriformBlock <: NonlinearSolverBlock
     ids::Vector{<:Integer}=Int8[],
     assem=SparseMatrixAssembler(trial,test)
   )
-    @check length(ids) == length(param)
     return new(f,param,trial,test,convert(Vector{Int8},ids),assem)
   end
 end
