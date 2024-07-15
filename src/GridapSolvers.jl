@@ -17,7 +17,7 @@ module GridapSolvers
   # MultilevelTools
   export get_parts, generate_level_parts, generate_subparts
 
-  export ModelHierarchy, CartesianModelHierarchy
+  export ModelHierarchy, CartesianModelHierarchy, P4estCartesianModelHierarchy
   export num_levels, get_level, get_level_parts
   export get_model, get_model_before_redist
 
