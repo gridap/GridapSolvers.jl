@@ -60,6 +60,14 @@ function Gridap.Algebra.numerical_setup(ss::MINRESSymbolicSetup, A::AbstractMatr
   return MINRESNumericalSetup(solver,A,Pr_ns,Pl_ns,caches)
 end
 
+function Gridap.Algebra.numerical_setup(ss::MINRESSymbolicSetup, A::AbstractMatrix, x::AbstractVector)
+  solver = ss.solver
+  Pr_ns  = isa(solver.Pr,Nothing) ? nothing : numerical_setup(symbolic_setup(solver.Pr,A,x),A,x)
+  Pl_ns  = isa(solver.Pl,Nothing) ? nothing : numerical_setup(symbolic_setup(solver.Pl,A,x),A,x)
+  caches = get_solver_caches(solver,A)
+  return MINRESNumericalSetup(solver,A,Pr_ns,Pl_ns,caches)
+end
+
 function Gridap.Algebra.numerical_setup!(ns::MINRESNumericalSetup, A::AbstractMatrix)
   if !isa(ns.Pr_ns,Nothing)
     numerical_setup!(ns.Pr_ns,A)
@@ -89,9 +97,10 @@ function Gridap.Algebra.solve!(x::AbstractVector,ns::MINRESNumericalSetup,b::Abs
   Vjm1, Vj, Vjp1 = V
   Wjm1, Wj, Wjp1 = W
 
+  fill!(zr,0.0); fill!(zl,0.0)
   fill!(Vjm1,0.0); fill!(Vjp1,0.0); copy!(Vj,b)
   fill!(Wjm1,0.0); fill!(Wjp1,0.0); fill!(Wj,0.0)
-  fill!(H,0.0), fill!(c,1.0); fill!(s,0.0); fill!(g,0.0)
+  fill!(H,0.0); fill!(c,1.0); fill!(s,0.0); fill!(g,0.0)
 
   krylov_residual!(Vj,x,A,b,Pl,zl)
   β    = norm(Vj); Vj ./= β; g[1] = β
