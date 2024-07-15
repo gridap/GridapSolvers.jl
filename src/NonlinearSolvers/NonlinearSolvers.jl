@@ -3,7 +3,7 @@ module NonlinearSolvers
   using SparseArrays
   using SparseMatricesCSR
   using BlockArrays
-  using IterativeSolvers
+  using NLsolve, LineSearches
 
   using Gridap
   using Gridap.Helpers, Gridap.Algebra, Gridap.CellData, Gridap.Arrays, Gridap.FESpaces, Gridap.MultiField
@@ -16,5 +16,8 @@ module NonlinearSolvers
 
   include("NewtonRaphsonSolver.jl")
   export NewtonSolver
+
+  include("NLsolve.jl")
+  export NLsolveNonlinearSolver
 
 end
