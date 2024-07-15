@@ -98,8 +98,11 @@ function CartesianModelHierarchy(
       level_parts[lev],np_per_level[lev],CartesianDescriptor(domain,ncells;map,isperiodic)
     )
     if lev != 1
-      ncells = nc .* level_nrefs[lev-1]
+      ncells = ncells .* level_nrefs[lev-1]
     end
+  end
+  map_main(ranks) do r
+    @info "$(nlevs)-level CartesianModelHierarchy:\n$(join(["  > Level $(lev): "*repr("text/plain",level_descs[lev]) for lev in 1:nlevs],"\n"))"
   end
   
   meshes = Vector{ModelHierarchyLevel}(undef,nlevs)
