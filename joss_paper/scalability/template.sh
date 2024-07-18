@@ -11,21 +11,20 @@
 
 source {{{modules}}}
 
-julia --project={{{projectdir}}} -O3 -J{{{sysimage}}} -e\
+julia --project={{{projectdir}}} -O3 -e\
   '
   using Scalability
   using Gridap, GridapDistributed, PartitionedArrays, GridapSolvers, GridapPETSc
   using FileIO, BSON
   '
 
-mpiexec -n {{ncpus}} julia --project={{{projectdir}}} -O3 -J{{{sysimage}}} -e\
+mpiexec -n {{ncpus}} julia --project={{{projectdir}}} -O3 -e\
   '
   using Scalability;
   stokes_main(;
     nr={{nr}},
     np={{np}},
     nc={{nc}},
-    np_per_level={{np_per_level}},
     title="{{{title}}}",
   )
   '

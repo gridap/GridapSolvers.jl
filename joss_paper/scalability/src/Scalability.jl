@@ -9,7 +9,8 @@ using GridapSolvers.LinearSolvers, GridapSolvers.MultilevelTools, GridapSolvers.
 
 include("utils.jl")
 include("stokes.jl")
+include("stokes_gmg.jl")
 
-export stokes_main
+export stokes_main, stokes_gmg_main
 
 end # module
