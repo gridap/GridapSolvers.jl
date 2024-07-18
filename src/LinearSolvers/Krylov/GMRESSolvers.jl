@@ -99,6 +99,14 @@ function Gridap.Algebra.numerical_setup(ss::GMRESSymbolicSetup, A::AbstractMatri
   return GMRESNumericalSetup(solver,A,Pr_ns,Pl_ns,caches)
 end
 
+function Gridap.Algebra.numerical_setup(ss::GMRESSymbolicSetup, A::AbstractMatrix, x::AbstractVector)
+  solver = ss.solver
+  Pr_ns  = !isnothing(solver.Pr) ? numerical_setup(symbolic_setup(solver.Pr,A,x),A,x) : nothing
+  Pl_ns  = !isnothing(solver.Pl) ? numerical_setup(symbolic_setup(solver.Pl,A,x),A,x) : nothing
+  caches = get_solver_caches(solver,A)
+  return GMRESNumericalSetup(solver,A,Pr_ns,Pl_ns,caches)
+end
+
 function Gridap.Algebra.numerical_setup!(ns::GMRESNumericalSetup, A::AbstractMatrix)
   if !isa(ns.Pr_ns,Nothing)
     numerical_setup!(ns.Pr_ns,A)

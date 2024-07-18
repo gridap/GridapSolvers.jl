@@ -98,10 +98,14 @@ function CartesianModelHierarchy(
       level_parts[lev],np_per_level[lev],CartesianDescriptor(domain,ncells;map,isperiodic)
     )
     if lev != 1
-      ncells = nc .* level_nrefs[lev-1]
+      ncells = ncells .* level_nrefs[lev-1]
     end
   end
+  map_main(ranks) do r
+    @info "$(nlevs)-level CartesianModelHierarchy:\n$(join(["  > Level $(lev): "*repr("text/plain",level_descs[lev]) for lev in 1:nlevs],"\n"))"
+  end
   
+  # Coarsest level
   meshes = Vector{ModelHierarchyLevel}(undef,nlevs)
   if i_am_in(level_parts[nlevs]) 
     coarsest_model = CartesianDiscreteModel(level_parts[nlevs],np_per_level[nlevs],domain,nc;map,isperiodic)
@@ -111,17 +115,20 @@ function CartesianModelHierarchy(
   end
   meshes[nlevs] = ModelHierarchyLevel(nlevs,coarsest_model,nothing,nothing,nothing)
 
+  # Remaining levels
   for lev in nlevs-1:-1:1
     fparts = level_parts[lev]
     cparts = level_parts[lev+1]
-    if i_am_in(cparts) # Refinement
+    # Refinement
+    if i_am_in(cparts)
       cmodel = get_model(meshes[lev+1])
       model_ref  = Gridap.Adaptivity.refine(cmodel,level_nrefs[lev])
       ref_glue   = Gridap.Adaptivity.get_adaptivity_glue(model_ref)
     else
       model_ref, ref_glue = nothing, nothing, nothing
     end
-    if i_am_in(fparts) && (cparts !== fparts) # Redistribution
+    # Redistribution (if needed)
+    if i_am_in(fparts) && (cparts !== fparts) 
       _model_ref = i_am_in(cparts) ? Gridap.Adaptivity.get_model(model_ref) : nothing
       model_red, red_glue = GridapDistributed.redistribute(_model_ref,level_descs[lev];old_ranks=cparts)
     else
