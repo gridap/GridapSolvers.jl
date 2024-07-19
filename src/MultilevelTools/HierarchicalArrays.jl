@@ -22,7 +22,7 @@ struct HierarchicalArray{T,A,B} <: AbstractVector{T}
 end
 
 function HierarchicalArray(array,ranks)
-  T = _typejoin(filter(t -> t != Nothing, map(typeof,array))...)
+  T = typejoin(filter(t -> t != Nothing, map(typeof,array))...)
   HierarchicalArray{T}(array,ranks)
 end
 
@@ -46,12 +46,6 @@ function Base.setindex!(a::HierarchicalArray,v,i::Integer)
   a.array[i] = v
   return v
 end
-
-# Typejoin that is also able to correctly handle arrays.
-_typejoin(types...) = typejoin(types...)
-_typejoin(types::Type{<:Array{<:Any,N}}...) where N = Array{typejoin(map(eltype,types)...),N}
-_typejoin(types::Type{<:DebugArray{<:Any,N}}...) where N = DebugArray{typejoin(map(eltype,types)...),N}
-_typejoin(types::Type{<:MPIArray{<:Any,N}}...) where N = MPIArray{typejoin(map(eltype,types)...),N}
 
 # Unsafe getindex: Returns the value without 
 # checking if the processor belongs to the subcommunicator.
