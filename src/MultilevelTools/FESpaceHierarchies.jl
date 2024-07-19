@@ -120,8 +120,8 @@ function Gridap.MultiField.MultiFieldFESpace(spaces::Vector{<:FESpaceHierarchyLe
   level  = spaces[1].level
   Uh     = all(map(s -> !isa(s.fe_space,Nothing),spaces)) ? MultiFieldFESpace(map(s -> s.fe_space, spaces); kwargs...) : nothing
   Uh_red = all(map(s -> !isa(s.fe_space_red,Nothing),spaces)) ? MultiFieldFESpace(map(s -> s.fe_space_red, spaces); kwargs...) : nothing
-  cell_conformity = map(s -> s.cell_conformity, spaces)
-  cell_conformity_red = map(s -> s.cell_conformity_red, spaces)
+  cell_conformity = map(s -> s.cell_conformity, spaces) :: Vector{<:AbstractArray{<:CellConformity}}
+  cell_conformity_red = map(s -> s.cell_conformity_red, spaces) :: Vector{<:AbstractArray{<:CellConformity}}
   return FESpaceHierarchyLevel(level,Uh,Uh_red,cell_conformity,cell_conformity_red,first(spaces).mh_level)
 end
 
