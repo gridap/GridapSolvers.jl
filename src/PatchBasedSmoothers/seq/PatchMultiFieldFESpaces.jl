@@ -25,7 +25,7 @@ end
 function PatchFESpace(
   space::GridapDistributed.DistributedMultiFieldFESpace,
   patch_decomposition::DistributedPatchDecomposition,
-  cell_conformity::Vector{<:AbstractArray{<:CellConformity}};
+  cell_conformity::Vector;
   patches_mask = default_patches_mask(patch_decomposition)
 )
 
