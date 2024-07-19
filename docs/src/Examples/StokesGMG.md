@@ -1,28 +1,34 @@
-# # Incompressible Stokes equations in a 2D/3D cavity, using GMG.
-# 
-# This example solves the incompressible Stokes equations, given by 
-# 
-# ```math
-# \begin{align*}
-# -\Delta u - \nabla p &= f \quad \text{in} \quad \Omega, \\
-# \nabla \cdot u &= 0 \quad \text{in} \quad \Omega, \\
-# u &= \hat{x} \quad \text{in} \quad \Gamma_\text{top} \subset \partial \Omega, \\
-# u &= 0 \quad \text{in} \quad \partial \Omega \backslash \Gamma_\text{top} \\
-# \end{align*}
-# ```
-# 
-# where $\Omega = [0,1]^d$. 
-# 
-# We use a mixed finite-element scheme, with $Q_k \times P_{k-1}^{-}$ elements for the velocity-pressure pair. 
-# 
-# To solve the linear system, we use a FGMRES solver preconditioned by a block-triangular 
-# Shur-complement-based preconditioner. We use an Augmented Lagrangian approach to 
-# get a better approximation of the Schur complement. Details for this preconditoner can be 
-# found in [Benzi and Olshanskii (2006)](https://epubs.siam.org/doi/10.1137/050646421).
-# 
-# The velocity block is solved using a Geometric Multigrid (GMG) solver. Due to the kernel 
-# introduced by the Augmented-Lagrangian operator, we require special smoothers and prolongation/restriction
-# operators. See [Schoberl (1999)](https://link.springer.com/article/10.1007/s002110050465) for more details.
+```@meta
+EditURL = "../../../test/Applications/StokesGMG.jl"
+```
+
+# Example 3: Incompressible Stokes equations in a 2D/3D cavity, using GMG.
+
+This example solves the incompressible Stokes equations, given by
+
+```math
+\begin{align*}
+-\Delta u - \nabla p &= f \quad \text{in} \quad \Omega, \\
+\nabla \cdot u &= 0 \quad \text{in} \quad \Omega, \\
+u &= \hat{x} \quad \text{in} \quad \Gamma_\text{top} \subset \partial \Omega, \\
+u &= 0 \quad \text{in} \quad \partial \Omega \backslash \Gamma_\text{top} \\
+\end{align*}
+```
+
+where $\Omega = [0,1]^D$.
+
+We use a mixed finite-element scheme, with $Q_k \times P_{k-1}^{-}$ elements for the velocity-pressure pair.
+
+To solve the linear system, we use a FGMRES solver preconditioned by a block-triangular
+Shur-complement-based preconditioner. We use an Augmented Lagrangian approach to
+get a better approximation of the Schur complement. Details for this preconditoner can be
+found in [Benzi and Olshanskii, 2006](https://epubs.siam.org/doi/10.1137/050646421).
+
+The velocity block is solved using a Geometric Multigrid (GMG) solver. Due to the kernel
+of the Augmented-Lagrangian operator, we require spetial smoothers and prolongation/restriction
+operators. See [Schoberl 1999](https://link.springer.com/article/10.1007/s002110050465) for more details.
+
+````@example StokesGMG
 module StokesGMGApplication
 
 using Test
@@ -63,12 +69,14 @@ end
 
 function add_labels_2d!(labels)
   add_tag_from_tags!(labels,"top",[3,4,6])
-  add_tag_from_tags!(labels,"walls",[1,2,5,7,8])
+  add_tag_from_tags!(labels,"bottom",[1,2,5])
+  add_tag_from_tags!(labels,"walls",[7,8])
 end
 
 function add_labels_3d!(labels)
   add_tag_from_tags!(labels,"top",[5,6,7,8,11,12,15,16,22])
-  add_tag_from_tags!(labels,"walls",[1,2,3,4,9,10,13,14,21,17,18,23,25,26])
+  add_tag_from_tags!(labels,"bottom",[1,2,3,4,9,10,13,14,21])
+  add_tag_from_tags!(labels,"walls",[17,18,23,25,26])
 end
 
 function main(distribute,np,nc,np_per_level)
@@ -85,13 +93,13 @@ function main(distribute,np,nc,np_per_level)
   reffe_u = ReferenceFE(lagrangian,VectorValue{Dc,Float64},order)
   reffe_p = ReferenceFE(lagrangian,Float64,order-1;space=:P)
 
-  u_walls = (Dc==2) ? VectorValue(0.0,0.0) : VectorValue(0.0,0.0,0.0)
+  u_bottom = (Dc==2) ? VectorValue(0.0,0.0) : VectorValue(0.0,0.0,0.0)
   u_top = (Dc==2) ? VectorValue(1.0,0.0) : VectorValue(1.0,0.0,0.0)
 
-  tests_u  = TestFESpace(mh,reffe_u,dirichlet_tags=["walls","top"]);
-  trials_u = TrialFESpace(tests_u,[u_walls,u_top]);
+  tests_u  = TestFESpace(mh,reffe_u,dirichlet_tags=["bottom","top"]);
+  trials_u = TrialFESpace(tests_u,[u_bottom,u_top]);
   U, V = get_fe_space(trials_u,1), get_fe_space(tests_u,1)
-  Q = TestFESpace(model,reffe_p;conformity=:L2) 
+  Q = TestFESpace(model,reffe_p;conformity=:L2)
 
   mfs = Gridap.MultiField.BlockMultiFieldStyle()
   X = MultiFieldFESpace([U,Q];style=mfs)
@@ -144,7 +152,7 @@ function main(distribute,np,nc,np_per_level)
     (I[1] == I[2]) ? diag_blocks[I[1]] : LinearSystemBlock()
   end
   coeffs = [1.0 1.0;
-            0.0 1.0]  
+            0.0 1.0]
   P = BlockTriangularSolver(bblocks,[solver_u,solver_p],coeffs,:upper)
   solver = FGMRESSolver(20,P;atol=1e-14,rtol=1.e-8,verbose=i_am_main(parts))
   ns = numerical_setup(symbolic_setup(solver,A),A)
@@ -160,3 +168,9 @@ function main(distribute,np,nc,np_per_level)
 end
 
 end # module
+````
+
+---
+
+*This page was generated using [Literate.jl](https://github.com/fredrikekre/Literate.jl).*
+
