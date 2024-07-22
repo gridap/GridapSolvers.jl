@@ -126,7 +126,8 @@ function LinearAlgebra.mul!(y::PVector,A::PatchProlongationOperator{Val{false}},
 
   copy!(fv_H,x) # Matrix layout -> FE layout
   uH = FEFunction(UH,fv_H,dv_H)
-  uh = interpolate!(uH,fv_h,Uh)
+  interpolate!(uH,fv_h,Uh)
+  uh = FEFunction(Uh,fv_h,dv_h)
 
   assemble_vector!(v->A.rhs(uh,v),rp,Ph)
   map(solve!,partition(dxp),Ap_ns,partition(rp))
@@ -148,7 +149,8 @@ function LinearAlgebra.mul!(y::PVector,A::PatchProlongationOperator{Val{true}},x
   if !isa(x,Nothing)
     copy!(fv_H,x) # Matrix layout -> FE layout
     uH = FEFunction(UH,fv_H,dv_H)
-    uh = interpolate!(uH,fv_h,Uh)
+    interpolate!(uH,fv_h,Uh)
+    uh = FEFunction(Uh,fv_h,dv_h)
 
     assemble_vector!(v->A.rhs(uh,v),rp,Ph)
     map(solve!,partition(dxp),Ap_ns,partition(rp))
