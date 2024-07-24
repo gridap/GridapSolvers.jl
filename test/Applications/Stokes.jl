@@ -44,7 +44,7 @@ end
 
 function add_labels_3d!(labels)
   add_tag_from_tags!(labels,"top",[5,6,7,8,11,12,15,16,22])
-  add_tag_from_tags!(labels,"walls",[1,2,3,4,9,10,13,14,21,17,18,23,25,26])
+  add_tag_from_tags!(labels,"walls",[1,2,3,4,9,10,13,14,17,18,19,20,21,23,24,25,26])
 end
 
 function main(distribute,np,nc)
