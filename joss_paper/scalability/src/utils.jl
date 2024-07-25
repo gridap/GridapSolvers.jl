@@ -38,7 +38,7 @@ function petsc_asm_setup(ksp)
   maxits = GridapPETSc.PETSC.PETSC_DEFAULT
 
   pc = Ref{GridapPETSc.PETSC.PC}()
-  @check_error_code GridapPETSc.PETSC.KSPSetType(ksp[],GridapPETSc.PETSC.KSPGMRES)
+  @check_error_code GridapPETSc.PETSC.KSPSetType(ksp[],GridapPETSc.PETSC.KSPCG)
   @check_error_code GridapPETSc.PETSC.KSPSetTolerances(ksp[], rtol, atol, dtol, maxits)
   @check_error_code GridapPETSc.PETSC.KSPGetPC(ksp[],pc)
   @check_error_code GridapPETSc.PETSC.PCSetType(pc[],GridapPETSc.PETSC.PCASM)
@@ -54,7 +54,7 @@ function petsc_amg_setup(ksp)
   maxits = GridapPETSc.PETSC.PETSC_DEFAULT
 
   pc = Ref{GridapPETSc.PETSC.PC}()
-  @check_error_code GridapPETSc.PETSC.KSPSetType(ksp[],GridapPETSc.PETSC.KSPRICHARDSON)
+  @check_error_code GridapPETSc.PETSC.KSPSetType(ksp[],GridapPETSc.PETSC.KSPCG)
   @check_error_code GridapPETSc.PETSC.KSPGetPC(ksp[],pc)
   @check_error_code GridapPETSc.PETSC.PCSetType(pc[],GridapPETSc.PETSC.PCGAMG)
   @check_error_code GridapPETSc.PETSC.KSPSetTolerances(ksp[], rtol, atol, dtol, maxits)

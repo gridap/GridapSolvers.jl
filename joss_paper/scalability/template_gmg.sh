@@ -25,11 +25,25 @@ mpiexec -n {{ncpus}} julia --project={{{projectdir}}} -O3 -J{{{sysimage}}} -e\
   @time "Loading libraries (MPI)" begin
     using Scalability;
   end
+
+  petsc_options = """
+    -ksp_type cg
+    -ksp_rtol 1.0e-5
+    -ksp_atol 1.0e-14
+    -ksp_converged_reason
+    -pc_type asm
+    -pc_asm_overlap 10
+    -pc_asm_type restrict
+    -sub_ksp_type preonly
+    -sub_pc_type lu
+  """
+
   stokes_gmg_main(;
     nr={{nr}},
     np={{np}},
     nc={{nc}},
     np_per_level={{np_per_level}},
+    petsc_options=petsc_options,
     title="{{{title}}}",
   )
   '
