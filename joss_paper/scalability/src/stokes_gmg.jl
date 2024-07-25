@@ -47,7 +47,7 @@ function stokes_gmg_driver(parts,mh)
     prolongations,restrictions,
     pre_smoothers=smoothers,
     post_smoothers=smoothers,
-    coarsest_solver=PETScLinearSolver(petsc_mumps_setup),
+    coarsest_solver=PETScLinearSolver(),
     maxiter=3,mode=:preconditioner,verbose=i_am_main(parts)
   )
   solver_u.log.depth = 4

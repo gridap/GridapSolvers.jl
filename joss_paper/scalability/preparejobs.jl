@@ -27,9 +27,9 @@ end
 
 function get_np_per_level(np,nl)
   a = fill(np,nl)
-  if prod(np) > 768
-    a[end] = (24,32) # 768
-  end
+  #if prod(np) > 768
+  #  a[end] = (24,32) # 768
+  #end
   return a
 end
 
