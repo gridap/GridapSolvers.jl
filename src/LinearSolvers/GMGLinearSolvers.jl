@@ -191,6 +191,7 @@ function Algebra.numerical_setup(ss::GMGSymbolicSetup,mat::AbstractMatrix,x::Abs
 
   # Update transfer operators
   mh, interp, restrict = s.mh, s.interp, s.restrict
+  nlevs = num_levels(mh)
   map(linear_indices(mh),smatrices,svectors) do lev, Ah, xh
     if lev != nlevs
       if isa(interp[lev],PatchProlongationOperator) || isa(interp[lev],MultiFieldTransferOperator)
