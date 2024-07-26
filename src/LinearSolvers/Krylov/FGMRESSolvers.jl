@@ -12,15 +12,15 @@
 
    - If `restart=true`, the basis size is fixed and restarted every `m` iterations.
    - If `restart=false`, the basis size is allowed to increase. When full, the solver 
-     allocates `m_add` new basis vectors.
+     allocates `m_add` new basis vectors at a time.
 """
 struct FGMRESSolver <: Gridap.Algebra.LinearSolver
-  m         :: Int
-  restart   :: Bool
-  m_add     :: Int
-  Pr        :: Gridap.Algebra.LinearSolver
-  Pl        :: Union{Gridap.Algebra.LinearSolver,Nothing}
-  log :: ConvergenceLog{Float64}
+  m       :: Int
+  restart :: Bool
+  m_add   :: Int
+  Pr      :: Gridap.Algebra.LinearSolver
+  Pl      :: Union{Gridap.Algebra.LinearSolver,Nothing}
+  log     :: ConvergenceLog{Float64}
 end
 
 function FGMRESSolver(m,Pr;Pl=nothing,restart=false,m_add=1,maxiter=100,atol=1e-12,rtol=1.e-6,verbose=false,name="FGMRES")
@@ -55,7 +55,7 @@ mutable struct FGMRESNumericalSetup <: Gridap.Algebra.NumericalSetup
   caches
 end
 
-function get_solver_caches(solver::FGMRESSolver,A)
+function get_solver_caches(solver::FGMRESSolver,A::AbstractMatrix)
   m = solver.m
 
   V  = [allocate_in_domain(A) for i in 1:m+1]

@@ -36,19 +36,19 @@ end
 
 function add_labels_2d!(labels)
   add_tag_from_tags!(labels,"top",[3,4,6])
-  add_tag_from_tags!(labels,"walls",[1,5,7])
+  add_tag_from_tags!(labels,"walls",[1,5,7,2,8])
   add_tag_from_tags!(labels,"right",[2,8])
 end
 
 function add_labels_3d!(labels)
   add_tag_from_tags!(labels,"top",[5,6,7,8,11,12,15,16,22])
-  add_tag_from_tags!(labels,"walls",[1,2,9,13,14,17,18,21,23,25,26])
+  add_tag_from_tags!(labels,"walls",[1,2,9,13,14,17,18,21,23,25,26,3,4,10,19,20,24])
   add_tag_from_tags!(labels,"right",[3,4,10,19,20,24])
 end
 
-np = 1
+np = (1,1)
 parts = with_mpi() do distribute
-  distribute(LinearIndices((np,)))
+  distribute(LinearIndices((prod(np),)))
 end
 
 # Geometry
@@ -71,14 +71,14 @@ u_top = (Dc==2) ? VectorValue(1.0,0.0) : VectorValue(1.0,0.0,0.0)
 tests_u  = TestFESpace(mh,reffe_u,dirichlet_tags=["walls","top"]);
 trials_u = TrialFESpace(tests_u,[u_wall,u_top]);
 U, V = get_fe_space(trials_u,1), get_fe_space(tests_u,1)
-Q = TestFESpace(model,reffe_p;conformity=:L2) 
+Q = TestFESpace(model,reffe_p;conformity=:L2,constraint=:zeromean) 
 
 mfs = Gridap.MultiField.BlockMultiFieldStyle()
 X = MultiFieldFESpace([U,Q];style=mfs)
 Y = MultiFieldFESpace([V,Q];style=mfs)
 
 # Weak formulation
-α = 1.e4
+α = 1.e2
 f = (Dc==2) ? VectorValue(1.0,1.0) : VectorValue(1.0,1.0,1.0)
 poly = (Dc==2) ? QUAD : HEX
 Π_Qh = LocalProjectionMap(poly,lagrangian,Float64,order-1;quad_order=qdegree,space=:P)
@@ -107,9 +107,7 @@ prolongations = setup_patch_prolongation_operators(
 restrictions = setup_patch_restriction_operators(
   tests_u,prolongations,graddiv,qdegree;solver=LUSolver()
 );
-#restrictions = setup_restriction_operators(
-#  tests_u,qdegree;mode=:residual,solver=LUSolver()
-#);
+
 gmg = GMGLinearSolver(
   mh,trials_u,tests_u,biforms,
   prolongations,restrictions,
@@ -120,8 +118,8 @@ gmg = GMGLinearSolver(
 );
 
 # Solver
-solver_u = gmg
-solver_p = CGSolver(JacobiLinearSolver();maxiter=20,atol=1e-14,rtol=1.e-6,verbose=i_am_main(parts))
+solver_u = gmg;
+solver_p = CGSolver(JacobiLinearSolver();maxiter=20,atol=1e-14,rtol=1.e-6,verbose=i_am_main(parts));
 solver_u.log.depth = 2
 solver_p.log.depth = 2
 

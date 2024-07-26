@@ -1,4 +1,8 @@
+```@meta
+EditURL = "../../../test/Applications/DarcyGMG.jl"
+```
 
+````@example DarcyGMG
 module DarcyGMGApplication
 
 using Test
@@ -55,7 +59,7 @@ function main(distribute,np,nc,np_per_level)
   tests_u  = TestFESpace(mh,reffe_u,dirichlet_tags=["boundary"]);
   trials_u = TrialFESpace(tests_u,[u_exact]);
   U, V = get_fe_space(trials_u,1), get_fe_space(tests_u,1)
-  Q = TestFESpace(model,reffe_p;conformity=:L2) 
+  Q = TestFESpace(model,reffe_p;conformity=:L2)
 
   mfs = Gridap.MultiField.BlockMultiFieldStyle()
   X = MultiFieldFESpace([U,Q];style=mfs)
@@ -104,7 +108,7 @@ function main(distribute,np,nc,np_per_level)
   bblocks  = [LinearSystemBlock() LinearSystemBlock();
               LinearSystemBlock() BiformBlock((p,q) -> ∫(-1.0/α*p*q)dΩ,Q,Q)]
   coeffs = [1.0 1.0;
-            0.0 1.0]  
+            0.0 1.0]
   P = BlockTriangularSolver(bblocks,[solver_u,solver_p],coeffs,:upper)
   solver = FGMRESSolver(20,P;atol=1e-14,rtol=1.e-10,verbose=i_am_main(parts))
   ns = numerical_setup(symbolic_setup(solver,A),A)
@@ -119,3 +123,9 @@ function main(distribute,np,nc,np_per_level)
 end
 
 end # module
+````
+
+---
+
+*This page was generated using [Literate.jl](https://github.com/fredrikekre/Literate.jl).*
+

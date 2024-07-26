@@ -49,14 +49,16 @@ function _cell_conformity(
   model::DiscreteModel,
   reffe::Tuple{<:Gridap.FESpaces.ReferenceFEName,Any,Any}; 
   conformity=nothing, kwargs...
-)
+) :: CellConformity
   basis, reffe_args, reffe_kwargs = reffe
   cell_reffe = ReferenceFE(model,basis,reffe_args...;reffe_kwargs...)
   conformity = Conformity(Gridap.Arrays.testitem(cell_reffe),conformity)
   return CellConformity(cell_reffe,conformity)
 end
 
-function _cell_conformity(model::GridapDistributed.DistributedDiscreteModel,args...;kwargs...)
+function _cell_conformity(
+  model::GridapDistributed.DistributedDiscreteModel,args...;kwargs...
+) :: AbstractVector{<:CellConformity}
   cell_conformities = map(local_views(model)) do model
     _cell_conformity(model,args...;kwargs...)
   end

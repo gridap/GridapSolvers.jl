@@ -298,13 +298,7 @@ end
 function get_mesh_hierarchy(parts,nc,np_per_level)
   Dc = length(nc)
   domain = (Dc == 2) ? (0,1,0,1) : (0,1,0,1,0,1)
-  num_refs_coarse = (Dc == 2) ? 1 : 0
-  
-  num_levels   = length(np_per_level)
-  cparts       = generate_subparts(parts,np_per_level[num_levels])
-  cmodel       = CartesianDiscreteModel(domain,nc)
-  coarse_model = OctreeDistributedDiscreteModel(cparts,cmodel,num_refs_coarse)
-  mh = ModelHierarchy(parts,coarse_model,np_per_level)
+  mh = CartesianModelHierarchy(parts,np_per_level,domain,nc)
   return mh
 end
 

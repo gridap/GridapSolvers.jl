@@ -189,6 +189,20 @@ function Algebra.numerical_setup(ss::GMGSymbolicSetup,mat::AbstractMatrix,x::Abs
   end
   coarsest_solver_cache = gmg_coarse_solver_caches(s.coarsest_solver,smatrices,svectors,work_vectors)
 
+  # Update transfer operators
+  mh, interp, restrict = s.mh, s.interp, s.restrict
+  nlevs = num_levels(mh)
+  map(linear_indices(mh),smatrices,svectors) do lev, Ah, xh
+    if lev != nlevs
+      if isa(interp[lev],PatchProlongationOperator) || isa(interp[lev],MultiFieldTransferOperator)
+        MultilevelTools.update_transfer_operator!(interp[lev],xh)
+      end
+      if isa(restrict[lev],PatchRestrictionOperator) || isa(restrict[lev],MultiFieldTransferOperator)
+        MultilevelTools.update_transfer_operator!(restrict[lev],xh)
+      end
+    end
+  end
+
   return GMGNumericalSetup(
     s,smatrices,finest_level_cache,pre_smoothers_caches,post_smoothers_caches,coarsest_solver_cache,work_vectors,system_caches
   )

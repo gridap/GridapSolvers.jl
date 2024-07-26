@@ -338,7 +338,8 @@ function block_symbolic_setup(block::TriformBlock,solver::LinearSolver,mat::Abst
 end
 function block_numerical_setup(block::TriformBlock,ss::BlockSS,mat::AbstractMatrix,x::AbstractVector)
   A = ss.cache
-  return BlockNS(block,numerical_setup(ss.ss,A,x),A,nothing)
+  y = restrict_blocks(x,block.ids)
+  return BlockNS(block,numerical_setup(ss.ss,A,y),A,nothing)
 end
 function block_numerical_setup!(block::TriformBlock,ns::BlockNS,mat::AbstractMatrix,x::AbstractVector)
   y = restrict_blocks(x,block.ids)

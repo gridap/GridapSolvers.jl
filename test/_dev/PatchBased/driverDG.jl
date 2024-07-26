@@ -5,6 +5,7 @@ using GridapSolvers
 using GridapSolvers.LinearSolvers
 using GridapSolvers.MultilevelTools
 using GridapSolvers.PatchBasedSmoothers
+using LinearAlgebra
 
 get_edge_measures(Ω::Triangulation,dΩ) = sqrt∘CellField(get_array(∫(1)dΩ),Ω)
 
@@ -22,6 +23,27 @@ function weakform_dg(u,v,Ω,Γ,Λ,qorder)
   c = ∫(∇(u)⋅∇(v))*dΩ + 
       ∫(-jump(u⋅n_Λ)⋅mean(∇(v)) - mean(∇(u))⋅jump(v⋅n_Λ) + ω/h_e_Λ*jump(u⋅n_Λ)⋅jump(v⋅n_Λ))*dΛ +
       ∫(-(∇(u)⋅n_Γ)⋅v - u⋅(∇(v)⋅n_Γ) + ω/h_e_Γ*(u⋅n_Γ)⋅(v⋅n_Γ))*dΓ
+  return c
+end
+
+function weakform_dg_patch(u,v,Ω,Γ_phys,Γ_patch,Λ,qorder)
+  dΩ = Measure(Ω, qorder)
+  dΓ_phys = Measure(Γ_phys, qorder)
+  dΓ_patch = Measure(Γ_patch, qorder)
+  dΛ = Measure(Λ, qorder)
+
+  n_Γ_phys = get_normal_vector(Γ_phys)
+  n_Γ_patch = get_normal_vector(Γ_patch)
+  n_Λ = get_normal_vector(Λ)
+  h_e_Λ = get_edge_measures(Λ,dΛ)
+  h_e_Γ_phys = get_edge_measures(Γ_phys,dΓ_phys)
+  h_e_Γ_patch = get_edge_measures(Γ_patch,dΓ_patch)
+
+  ω = 1000.0
+  c = ∫(∇(u)⋅∇(v))*dΩ + 
+      ∫(-jump(u⋅n_Λ)⋅mean(∇(v)) - mean(∇(u))⋅jump(v⋅n_Λ) + ω/h_e_Λ*jump(u⋅n_Λ)⋅jump(v⋅n_Λ))*dΛ +
+      ∫(-(∇(u)⋅n_Γ_phys)⋅v - u⋅(∇(v)⋅n_Γ_phys) + ω/h_e_Γ_phys*(u⋅n_Γ_phys)⋅(v⋅n_Γ_phys))*dΓ_phys + 
+      ∫(-(∇(u)⋅n_Γ_patch)⋅v - u⋅(∇(v)⋅n_Γ_patch) + ω/h_e_Γ_patch*(u⋅n_Γ_patch)⋅(v⋅n_Γ_patch))*dΓ_patch
   return c
 end
 
@@ -43,6 +65,7 @@ PD = PatchDecomposition(model;boundary_tag_names=btags)
 Ωp = Triangulation(PD)
 Γp = BoundaryTriangulation(PD)
 Λp = SkeletonTriangulation(PD)
+Γp_patch = BoundaryTriangulation(PD;reverse=true)
 
 order = 2
 qdegree = 2*(order+1)
@@ -74,29 +97,39 @@ ns_h1 = numerical_setup(symbolic_setup(solver_h1,A_h1),A_h1)
 x_h1 = allocate_in_domain(A_h1); fill!(x_h1,0.0)
 solve!(x_h1,ns_h1,b_h1)
 
+uh_h1 = FEFunction(V_h1,x_h1)
+
 # Discontinuous problem
 
 reffe_l2 = ReferenceFE(lagrangian,Float64,order)
 V_l2 = FESpace(model,reffe_l2;conformity=:L2,dirichlet_tags="boundary")
 P_l2 = PatchFESpace(V_l2,PD,reffe_l2;conformity=:L2)
 
+ω = 1000.0
+h_e_Γ = get_edge_measures(Γ,dΓ)
+n_Γ = get_normal_vector(Γ)
 a_l2(u,v) = weakform_dg(u,v,Ω,Γ,Λ,qdegree)
-l_l2(v) = ∫(f⋅v)*dΩ
+l_l2(v) = ∫(f⋅v)*dΩ  + ∫(-(∇(v)⋅n_Γ)*u_sol + (ω/h_e_Γ)*v*u_sol)*dΓ
 
 op_l2 = AffineFEOperator(a_l2,l_l2,V_l2,V_l2)
 A_l2, b_l2 = get_matrix(op_l2), get_vector(op_l2)
 
-S_l2 = RichardsonSmoother(PatchBasedLinearSolver((u,v)->weakform_dg(u,v,Ωp,Γp,Λp,qdegree),P_l2,V_l2),10,0.2)
+S_l2 = RichardsonSmoother(PatchBasedLinearSolver((u,v)->weakform_dg_patch(u,v,Ωp,Γp,Γp_patch,Λp,qdegree),P_l2,V_l2),10,0.2)
 solver_l2 = CGSolver(S_l2,verbose=true)
 ns_l2 = numerical_setup(symbolic_setup(solver_l2,A_l2),A_l2)
 
 x_l2 = allocate_in_domain(A_l2); fill!(x_l2,0.0)
 solve!(x_l2,ns_l2,b_l2)
 
-
 S_l2_ns = numerical_setup(symbolic_setup(S_l2,A_l2),A_l2)
 solve!(x_l2,S_l2_ns,b_l2)
+x_l2
 
+x_l2 = A_l2\b_l2
+uh_l2 = FEFunction(V_l2,x_l2)
+
+eh = uh_h1 - uh_l2
+sum(∫(eh⋅eh)*dΩ)
 
 ############################################################################################
 ### VECTOR POISSON PROBLEM

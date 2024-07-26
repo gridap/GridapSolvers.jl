@@ -14,18 +14,23 @@ using FillArrays
 using GridapSolvers
 import GridapSolvers.PatchBasedSmoothers as PBS
 
-np = (1,1)
+np = (2,1)
 parts = with_debug() do distribute
   distribute(LinearIndices((prod(np),)))
 end
 
 domain = (0,1,0,1)
-domain_partition = (2,2)#(2,4)
+domain_partition = (4,3)
+isperiodic = (false,true)
 
 if prod(np) == 1
-  model = CartesianDiscreteModel(domain,domain_partition)
+  model = CartesianDiscreteModel(domain,domain_partition;isperiodic)
+  add_tag_from_tags!(get_face_labeling(model), "dirichlet", [1,2,5])
 else
-  model = CartesianDiscreteModel(parts,ranks,domain,domain_partition)
+  model = CartesianDiscreteModel(parts,np,domain,domain_partition;isperiodic)
+  map(local_views(get_face_labeling(model))) do labels
+    add_tag_from_tags!(labels, "dirichlet", [1,2,5])
+  end
 end
 pbs = PBS.PatchBoundaryExclude()
 PD  = PBS.PatchDecomposition(model;patch_boundary_style=pbs)
@@ -49,14 +54,15 @@ else
   biform(u,v,dΩ) = ∫(u⋅v + divergence(v)⋅divergence(u))*dΩ
   liform(v,dΩ)   = ∫(f⋅v)*dΩ
 end
-Vh = TestFESpace(model,_reffe,dirichlet_tags="boundary")
+Vh = TestFESpace(model,_reffe,dirichlet_tags="dirichlet")
 Uh = TrialFESpace(Vh,u_bc)
-Ph = PBS.PatchFESpace(model,_reffe,conformity,PD,Vh)
+Ph = PBS.PatchFESpace(Vh,PD,_reffe;conformity)
 
 Ωₚ  = Triangulation(PD)
 dΩₚ = Measure(Ωₚ,2*(order+2))
 ap(u,v) = biform(u,v,dΩₚ)
 Ahp = assemble_matrix(ap,Ph,Ph)
+cond(Matrix(Ahp))
 det(Ahp)
 
 n1 = 4 # 8

@@ -54,7 +54,7 @@ mutable struct GMRESNumericalSetup <: Gridap.Algebra.NumericalSetup
   caches
 end
 
-function get_solver_caches(solver::GMRESSolver,A)
+function get_solver_caches(solver::GMRESSolver,A::AbstractMatrix)
   m, Pl, Pr = solver.m, solver.Pl, solver.Pr
 
   V  = [allocate_in_domain(A) for i in 1:m+1]

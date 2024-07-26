@@ -31,9 +31,11 @@ function ProlongationOperator(lev::Int,sh::FESpaceHierarchy,qdegree::Int;kwargs.
   return DistributedGridTransferOperator(lev,sh,qdegree,:prolongation;kwargs...)
 end
 
-function DistributedGridTransferOperator(lev::Int,sh::FESpaceHierarchy,qdegree::Int,op_type::Symbol;
-                                         mode::Symbol=:solution,restriction_method::Symbol=:projection,
-                                         solver=LUSolver())
+function DistributedGridTransferOperator(
+  lev::Int,sh::FESpaceHierarchy,qdegree::Int,op_type::Symbol;
+  mode::Symbol=:solution,restriction_method::Symbol=:projection,
+  solver=LUSolver()
+)
   @check lev < num_levels(sh)
   @check op_type ∈ [:restriction, :prolongation]
   @check mode ∈ [:solution, :residual]

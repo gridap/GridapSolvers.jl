@@ -1,6 +1,8 @@
 using GridapSolvers
 using Documenter
 
+include("examples.jl")
+
 DocMeta.setdocmeta!(GridapSolvers, :DocTestSetup, :(using GridapSolvers); recursive=true)
 
 makedocs(;
@@ -22,6 +24,13 @@ makedocs(;
         "NonlinearSolvers" => "NonlinearSolvers.md",
         "BlockSolvers" => "BlockSolvers.md",
         "PatchBasedSmoothers" => "PatchBasedSmoothers.md",
+        "Examples" => [
+            "Stokes" => "Examples/Stokes.md",
+            "Navier-Stokes" => "Examples/NavierStokes.md",
+            "Stokes (GMG)" => "Examples/StokesGMG.md",
+            "Navier-Stokes (GMG)" => "Examples/NavierStokesGMG.md",
+            "Darcy (GMG)" => "Examples/DarcyGMG.md",
+        ],
     ],
 )
 
