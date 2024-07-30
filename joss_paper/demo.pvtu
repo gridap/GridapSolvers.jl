@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<VTKFile type="PUnstructuredGrid" version="1.0" byte_order="LittleEndian">
+  <PUnstructuredGrid GhostLevel="0">
+    <Piece Source="demo/demo_1.vtu"/>
+    <Piece Source="demo/demo_2.vtu"/>
+    <Piece Source="demo/demo_3.vtu"/>
+    <Piece Source="demo/demo_4.vtu"/>
+    <PPoints>
+      <PDataArray type="Float64" Name="Points" NumberOfComponents="3"/>
+    </PPoints>
+    <PPointData>
+      <PDataArray type="Float64" Name="ph" NumberOfComponents="1"/>
+      <PDataArray type="Float64" Name="uh" NumberOfComponents="3"/>
+    </PPointData>
+    <PCellData>
+      <PDataArray type="Int32" Name="piece" NumberOfComponents="1"/>
+      <PDataArray type="Int64" Name="cell" NumberOfComponents="1"/>
+    </PCellData>
+  </PUnstructuredGrid>
+</VTKFile>

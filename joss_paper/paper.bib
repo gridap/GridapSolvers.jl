@@ -20,7 +20,7 @@
     month  = jun
 }
 
-@article{Verdugo:2021,
+@article{Verdugo2021,
   doi = {10.1016/j.cpc.2022.108341},
   url = {https://doi.org/10.1016/j.cpc.2022.108341},
   year = {2022},
@@ -28,7 +28,7 @@
   publisher = {Elsevier {BV}},
   volume = {276},
   pages = {108341},
-  author = {Francesc Verdugo and Santiago Badia},
+  author = {Verdugo, F. and Badia, S.},
   title = {The software design of {G}ridap: a finite element package based on the {J}ulia {JIT} compiler},
   journal = {Computer Physics Communications}
 }
@@ -205,4 +205,94 @@ year = {2006}
   publisher = {Springer Berlin Heidelberg},
   editor = {Anders Logg and Kent-Andre Mardal and Garth Wells},
   title = {Automated Solution of Differential Equations by the Finite Element Method}
+}
+
+@book{Elman2014,
+  author = {Elman, Howard and Silvester, David and Wathen, Andy},
+  title = "{Finite Elements and Fast Iterative Solvers: with Applications in Incompressible Fluid Dynamics}",
+  publisher = {Oxford University Press},
+  year = {2014},
+  month = {06},
+  abstract = "{The subject of this book is the efficient solution of partial differential equations (PDEs) that arise when modelling incompressible fluid flow. The first part (Chapters 1 through 5) covers the Poisson equation and the Stokes equations. For each PDE, there is a chapter concerned with finite element discretization and a companion chapter concerned with efficient iterative solution of the algebraic equations obtained from discretization. Chapter 5 describes the basics of PDE-constrained optimization. The second part of the book (Chapters 6 to 11) is a more advanced introduction to the numerical analysis of incompressible flows. It starts with four chapters on the convection–diffusion equation and the steady Navier–Stokes equations, organized by equation with a chapter describing discretization coupled with a companion concerned with iterative solution algorithms. The book concludes with two chapters describing discretization and solution methods for models of unsteady flow and buoyancy-driven flow.}",
+  isbn = {9780199678792},
+  doi = {10.1093/acprof:oso/9780199678792.001.0001},
+  url = {https://doi.org/10.1093/acprof:oso/9780199678792.001.0001},
+}
+
+@Manual{trilinos,
+  title = {The {T}rilinos {P}roject {W}ebsite},
+  author = {The {T}rilinos {P}roject {T}eam},
+  year = {2020},
+  url = {https://trilinos.github.io}
+}
+
+@misc{hypre,
+  key   = {hypre},
+  title = {{\sl hypre}: High Performance Preconditioners},
+  note  = {\url{https://llnl.gov/casc/hypre}, \url{https://github.com/hypre-space/hypre}}
+}
+
+@Inbook{PARDISO,
+  author="Schenk, Olaf and G{\"a}rtner, Klaus",
+  editor="Padua, David",
+  title="PARDISO",
+  bookTitle="Encyclopedia of Parallel Computing",
+  year="2011",
+  publisher="Springer US",
+  address="Boston, MA",
+  pages="1458--1464",
+  isbn="978-0-387-09766-4",
+  doi="10.1007/978-0-387-09766-4_90",
+  url="https://doi.org/10.1007/978-0-387-09766-4_90"
+}
+
+@article{MUMPS1,
+   title   = {A Fully Asynchronous Multifrontal Solver Using Distributed Dynamic Scheduling},
+   author  = {P.R. Amestoy and I. S. Duff and J. Koster and J.-Y. L'Excellent},
+   journal = {SIAM Journal on Matrix Analysis and Applications},
+   volume  = {23},
+   number  = {1},
+   year    = {2001},
+   pages   = {15-41}
+ }
+
+@article{MUMPS2,
+  title = {{Performance and Scalability of the Block Low-Rank Multifrontal
+  Factorization on Multicore Architectures}},
+  author = {P.R. Amestoy and A. Buttari and J.-Y. L'Excellent and T. Mary},
+  journal = {ACM Transactions on Mathematical Software},
+  volume = 45,
+  issue = 1,
+  pages = {2:1--2:26},
+  year={2019},
+}
+
+@article{gridapdistributed, 
+  doi = {10.21105/joss.04157}, 
+  url = {https://doi.org/10.21105/joss.04157}, 
+  year = {2022}, 
+  publisher = {The Open Journal}, 
+  volume = {7}, 
+  number = {74}, 
+  pages = {4157}, 
+  author = {Santiago Badia and Alberto F. Martín and Francesc Verdugo}, 
+  title = {GridapDistributed: a massively parallel finite element toolbox in Julia}, 
+  journal = {Journal of Open Source Software} 
+} 
+
+@inproceedings{Arnold1,
+  title={Preconditing in H(div) and applications},
+  author={D. N. Arnold and Richard S. Falk and Ragnar Winther},
+  year={1997},
+  url={https://api.semanticscholar.org/CorpusID:12559456}
+}
+
+@article{Arnold2,
+  title={Multigrid in H (div) and H (curl)},
+  author={Douglas N. Arnold and Richard S. Falk and Ragnar Winther},
+  journal={Numerische Mathematik},
+  year={2000},
+  volume={85},
+  pages={197-217},
+  url={https://api.semanticscholar.org/CorpusID:14301688}
 }

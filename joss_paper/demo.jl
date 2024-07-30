@@ -1,6 +1,9 @@
 using Gridap, Gridap.Algebra, Gridap.MultiField
 using PartitionedArrays, GridapDistributed, GridapSolvers
-using GridapSolvers.LinearSolvers, GridapSolvers.MultilevelTools, GridapSolvers.BlockSolvers
+
+using GridapSolvers.LinearSolvers
+using GridapSolvers.MultilevelTools
+using GridapSolvers.BlockSolvers
 
 function get_bilinear_form(mh_lev,biform,qdegree)
   model = get_model(mh_lev)
@@ -14,8 +17,8 @@ function add_labels!(labels)
   add_tag_from_tags!(labels,"bottom",[1,2,5])
 end
 
-np = 4
-np_per_level = [np,1]
+np = (2,2)
+np_per_level = [np,(1,1)]
 nc = (10,10)
 fe_order = 2
 
@@ -53,8 +56,12 @@ with_mpi() do distribute
   A, b = get_matrix(op), get_vector(op)
 
   # GMG preconditioner for the velocity block
-  biforms = map(mhl -> get_bilinear_form(mhl,biform_u,qdegree),mh)
-  smoothers = map(mhl -> RichardsonSmoother(JacobiLinearSolver(),10,2.0/3.0), view(mh,1:num_levels(mh)-1))
+  biforms = map(mh) do mhl
+    get_bilinear_form(mhl,biform_u,qdegree)
+  end
+  smoothers = map(view(mh,1:num_levels(mh)-1)) do mhl
+    RichardsonSmoother(JacobiLinearSolver(),10,2.0/3.0)
+  end
   restrictions, prolongations = setup_transfer_operators(
     trials_u, qdegree; mode=:residual, solver=CGSolver(JacobiLinearSolver())
   )
@@ -77,8 +84,9 @@ with_mpi() do distribute
   solver = GMRESSolver(10;Pr=P,rtol=1.e-8,verbose=i_am_main(parts))
   ns = numerical_setup(symbolic_setup(solver,A),A)
 
-  x = allocate_in_domain(A); fill!(x,0.0)
+  x = allocate_in_domain(A)
+  fill!(x,0.0)
   solve!(x,ns,b)
   uh, ph = FEFunction(X,x)
-  writevtk(Ω,"joss_paper/demo",cellfields=["uh"=>uh,"ph"=>ph])
+  writevtk(Ω,"demo",cellfields=["uh"=>uh,"ph"=>ph])
 end
