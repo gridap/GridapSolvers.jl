@@ -43,7 +43,7 @@ function jobdict(params)
     "q" => "normal",
     "o" => datadir(jobname(fparams,"o")),
     "e" => datadir(jobname(fparams,"e")),
-    "walltime" => "01:00:00",
+    "walltime" => "02:00:00",
     "ncpus" => prod(np),
     "nnodes" => prod(np)÷48,
     "mem" => "$(prod(np)*4)gb",

@@ -11,10 +11,10 @@ function stokes_gmg_driver(parts,mh)
   reffe_u = ReferenceFE(lagrangian,VectorValue{2,Float64},fe_order)
   reffe_p = ReferenceFE(lagrangian,Float64,fe_order-1;space=:P)
 
-  tests_u  = TestFESpace(mh,reffe_u,dirichlet_tags=["bottom","top"])
+  tests_u  = TestFESpace(mh,reffe_u,dirichlet_tags=["walls","top"])
   trials_u = TrialFESpace(tests_u,[VectorValue(0.0,0.0),VectorValue(1.0,0.0)])
   U, V = get_fe_space(trials_u,1), get_fe_space(tests_u,1)
-  Q = TestFESpace(model,reffe_p;conformity=:L2) 
+  Q = TestFESpace(model,reffe_p;conformity=:L2,constraint=:zeromean) 
 
   mfs = Gridap.MultiField.BlockMultiFieldStyle()
   X = MultiFieldFESpace([U,Q];style=mfs)
@@ -38,7 +38,7 @@ function stokes_gmg_driver(parts,mh)
   tic!(t;barrier=true)
   # GMG preconditioner for the velocity block
   biforms = map(mhl -> get_bilinear_form(mhl,biform_u,qdegree),mh)
-  smoothers = map(mhl -> RichardsonSmoother(JacobiLinearSolver(),10,2.0/3.0), view(mh,1:num_levels(mh)-1))
+  smoothers = map(mhl -> RichardsonSmoother(JacobiLinearSolver(),20,2.0/3.0), view(mh,1:num_levels(mh)-1))
   restrictions, prolongations = setup_transfer_operators(
     trials_u, qdegree; mode=:residual, solver=CGSolver(JacobiLinearSolver(),verbose=false)
   )
@@ -47,20 +47,20 @@ function stokes_gmg_driver(parts,mh)
     prolongations,restrictions,
     pre_smoothers=smoothers,
     post_smoothers=smoothers,
-    coarsest_solver=PETScLinearSolver(),
-    maxiter=3,mode=:preconditioner,verbose=i_am_main(parts)
+    coarsest_solver=AMGSolver(),
+    maxiter=3,mode=:solver,verbose=i_am_main(parts)
   )
   solver_u.log.depth = 4
 
   # PCG solver for the pressure block
-  solver_p = CGSolver(JacobiLinearSolver();maxiter=20,atol=1e-14,rtol=1.e-10,verbose=i_am_main(parts))
+  solver_p = CGSolver(JacobiLinearSolver();maxiter=20,atol=1e-14,rtol=1.e-10,verbose=false)
   solver_p.log.depth = 4
 
   # Block triangular preconditioner
   blocks = [LinearSystemBlock() LinearSystemBlock();
             LinearSystemBlock() BiformBlock((p,q) -> ∫(p*q)dΩ,Q,Q)]
   P = BlockTriangularSolver(blocks,[solver_u,solver_p])
-  solver = FGMRESSolver(15,P;rtol=1.e-8,maxiter=20,verbose=i_am_main(parts))
+  solver = FGMRESSolver(30,P;rtol=1.e-8,maxiter=20,verbose=i_am_main(parts))
   ns = numerical_setup(symbolic_setup(solver,A),A)
   toc!(t,"SolverSetup")
 

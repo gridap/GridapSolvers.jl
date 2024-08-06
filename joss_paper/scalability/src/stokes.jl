@@ -10,9 +10,9 @@ function stokes_driver(parts,model)
   reffe_u = ReferenceFE(lagrangian,VectorValue{2,Float64},fe_order)
   reffe_p = ReferenceFE(lagrangian,Float64,fe_order-1;space=:P)
 
-  V = TestFESpace(model,reffe_u,dirichlet_tags=["bottom","top"])
+  V = TestFESpace(model,reffe_u,dirichlet_tags=["walls","top"])
   U = TrialFESpace(V,[VectorValue(0.0,0.0),VectorValue(1.0,0.0)])
-  Q = TestFESpace(model,reffe_p;conformity=:L2) 
+  Q = TestFESpace(model,reffe_p;conformity=:L2,constraint=:zeromean) 
 
   mfs = Gridap.MultiField.BlockMultiFieldStyle()
   X = MultiFieldFESpace([U,Q];style=mfs)
@@ -38,7 +38,7 @@ function stokes_driver(parts,model)
   blocks = [LinearSystemBlock() LinearSystemBlock();
             LinearSystemBlock() BiformBlock((p,q) -> ∫(p*q)dΩ,Q,Q)]
   P = BlockTriangularSolver(blocks,[solver_u,solver_p])
-  solver = FGMRESSolver(15,P;rtol=1.e-8,verbose=i_am_main(parts))
+  solver = FGMRESSolver(30,P;rtol=1.e-8,verbose=i_am_main(parts))
   ns = numerical_setup(symbolic_setup(solver,A),A)
   toc!(t,"Setup")
 
