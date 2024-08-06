@@ -16,7 +16,7 @@ end
 
 # ╔═╡ 4725bb5d-8973-436b-af96-74cc90e7f354
 begin 
-	raw = collect_results(datadir("run_asm"))
+	raw = collect_results(datadir("run_amg"))
 
 	dfgr = groupby(raw,[:np])
 	df = combine(dfgr) do df
@@ -42,13 +42,13 @@ end
 begin
 	plt = plot(xlabel="Number of processors",ylabel="time (s)",legend=false)
 	plot!(df[!,:n_procs],df[!,:t_solver]./df[!,:n_iter],marker=:circ)
-	#savefig(plt,datadir("weakScalability"))
+	#savefig(plt,projectdir("../weakScalability"))
 end
 
 # ╔═╡ 8d1b090e-2548-48fe-afb9-92f044442a80
 begin
 	plt2 = plot(xlabel="N processors",ylabel="N Iters",legend=false)
-	plot!(plt2,df[!,:n_procs],df[!,:n_iter])
+	plot!(plt2,df[!,:n_procs],df[!,:n_levels])
 end
 
 # ╔═╡ f63c1451-e3ad-41bb-851b-0366eb71c0cc

@@ -13,8 +13,8 @@ function get_bilinear_form(mh_lev,biform,qdegree)
 end
 
 function add_labels!(labels)
-  add_tag_from_tags!(labels,"top",[3,4,6])
-  add_tag_from_tags!(labels,"bottom",[1,2,5])
+  add_tag_from_tags!(labels,"top",[6])
+  add_tag_from_tags!(labels,"walls",[1,2,3,4,5,7,8])
 end
 
 np = (2,2)
@@ -34,10 +34,10 @@ with_mpi() do distribute
   reffe_u = ReferenceFE(lagrangian,VectorValue{2,Float64},fe_order)
   reffe_p = ReferenceFE(lagrangian,Float64,fe_order-1;space=:P)
 
-  tests_u  = TestFESpace(mh,reffe_u,dirichlet_tags=["bottom","top"])
+  tests_u  = TestFESpace(mh,reffe_u,dirichlet_tags=["walls","top"])
   trials_u = TrialFESpace(tests_u,[VectorValue(0.0,0.0),VectorValue(1.0,0.0)])
   U, V = get_fe_space(trials_u,1), get_fe_space(tests_u,1)
-  Q = TestFESpace(model,reffe_p;conformity=:L2) 
+  Q = TestFESpace(model,reffe_p;conformity=:L2,constraint=:zeromean) 
 
   mfs = Gridap.MultiField.BlockMultiFieldStyle()
   X = MultiFieldFESpace([U,Q];style=mfs)
@@ -71,7 +71,7 @@ with_mpi() do distribute
     pre_smoothers=smoothers,
     post_smoothers=smoothers,
     coarsest_solver=LUSolver(),
-    maxiter=2,mode=:preconditioner
+    maxiter=2,mode=:solver
   )
 
   # PCG solver for the pressure block

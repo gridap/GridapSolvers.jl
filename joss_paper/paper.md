@@ -39,7 +39,7 @@ The implementation of exact factorization-based solvers in parallel environments
 Hence the use of iterative methods is crucial to maintain scalability of FE codes. Unfortunately, the convergence of iterative methods is not guaranteed and rapidly deteriorates as the size of the linear system increases. To retain performance, the use of highly scalable preconditioners is mandatory.
 For simple problems, algebraic solvers and preconditioners (i.e based uniquelly on the algebraic system) are enough to obtain robust convergence. Many well-known libraries providing algebraic solvers already exist, such as PETSc [@petsc-user-ref], Trilinos [@trilinos], or Hypre [@hypre]. However, algebraic solvers are not always suited to deal with more challenging problems.
 
-In these cases, solvers that exploit the geometry and physics of the particular problem are required. This is the case of many multiphysics problems involving differential operators with a large kernel such as the divergence [@arnold1] and the curl [@arnold2]. Examples of this are highly relevant problems such as Navier-Stokes, Maxwell or Darcy. Scalable solvers for this type of multiphysics problems rely on exploiting the block structure of such systems to find a spectrally equivalent block-preconditioner, and are often tied to specific discretizations of the underlying equations.
+In these cases, solvers that exploit the geometry and physics of the particular problem are required. This is the case of many multiphysics problems involving differential operators with a large kernel such as the divergence [@Arnold1] and the curl [@Arnold2]. Examples of this are highly relevant problems such as Navier-Stokes, Maxwell or Darcy. Scalable solvers for this type of multiphysics problems rely on exploiting the block structure of such systems to find a spectrally equivalent block-preconditioner, and are often tied to specific discretizations of the underlying equations.
 To this end, GridapSolvers is a registered Julia [@Bezanson2017] software package which provides highly scalable geometric solvers tailored for the FE numerical solution of PDEs on parallel computers. Emphasis is put on the modular design of the library, which easily allows new preconditioners to be designed from the user's specific problem.
 
 ## Building blocks and composability
@@ -104,8 +104,8 @@ function get_bilinear_form(mh_lev,biform,qdegree)
 end
 
 function add_labels!(labels)
-  add_tag_from_tags!(labels,"top",[3,4,6])
-  add_tag_from_tags!(labels,"bottom",[1,2,5])
+  add_tag_from_tags!(labels,"top",[6])
+  add_tag_from_tags!(labels,"walls",[1,2,3,4,5,7,8])
 end
 
 np = (2,2)
@@ -125,10 +125,10 @@ with_mpi() do distribute
   reffe_u = ReferenceFE(lagrangian,VectorValue{2,Float64},fe_order)
   reffe_p = ReferenceFE(lagrangian,Float64,fe_order-1;space=:P)
 
-  tests_u  = TestFESpace(mh,reffe_u,dirichlet_tags=["bottom","top"])
+  tests_u  = TestFESpace(mh,reffe_u,dirichlet_tags=["walls","top"])
   trials_u = TrialFESpace(tests_u,[VectorValue(0.0,0.0),VectorValue(1.0,0.0)])
   U, V = get_fe_space(trials_u,1), get_fe_space(tests_u,1)
-  Q = TestFESpace(model,reffe_p;conformity=:L2) 
+  Q = TestFESpace(model,reffe_p;conformity=:L2,constraint=:zeromean) 
 
   mfs = Gridap.MultiField.BlockMultiFieldStyle()
   X = MultiFieldFESpace([U,Q];style=mfs)
@@ -162,7 +162,7 @@ with_mpi() do distribute
     pre_smoothers=smoothers,
     post_smoothers=smoothers,
     coarsest_solver=LUSolver(),
-    maxiter=2,mode=:preconditioner
+    maxiter=2,mode=:solver
   )
 
   # PCG solver for the pressure block
@@ -179,13 +179,13 @@ with_mpi() do distribute
   fill!(x,0.0)
   solve!(x,ns,b)
   uh, ph = FEFunction(X,x)
-  writevtk(Ω,"joss_paper/demo",cellfields=["uh"=>uh,"ph"=>ph])
+  writevtk(Ω,"demo",cellfields=["uh"=>uh,"ph"=>ph])
 end
 ```
 
 ## Parallel scaling benchmark
 
-The following section shows scalability results for the demo problem discussed above. We run our code on the Gadi supercomputer, which is part of the Australian National Computational Infrastructure. We use Intel's Cascade Lake 2x24-core Xeon Platinum 8274 nodes. Scalability is shown for up to 64 nodes, for a fixed local problem size of 48x64 quadrangle cells per processor. This amounts to a maximum size of 37M cells and 415M degrees of freedom distributed amongst 3072 processors. The code used to create these results can be found together with the submited paper (LINK).
+The following section shows scalability results for the demo problem discussed above. We run our code on the Gadi supercomputer, which is part of the Australian National Computational Infrastructure. We use Intel's Cascade Lake 2x24-core Xeon Platinum 8274 nodes. Scalability is shown for up to 64 nodes, for a fixed local problem size of 48x64 quadrangle cells per processor. This amounts to a maximum size of approximately 37M cells and 415M degrees of freedom distributed amongst 3072 processors. The code used to create these results can be found together with the submitted paper.
 
 ![Weak scalability for a Stokes problem in 2D. Time is given per Conjugate Gradient iteration, as a function of the number of processors. \label{fig:packages}](weakScalability.png){ width=60% }
 
