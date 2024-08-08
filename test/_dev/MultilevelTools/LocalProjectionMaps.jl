@@ -4,7 +4,9 @@ using GridapDistributed, PartitionedArrays
 using GridapSolvers
 using GridapSolvers.MultilevelTools
 
-model = CartesianDiscreteModel((0,1,0,1),(4,4))
+layer(x) = sign(x)*abs(x)^(1/3)
+cmap(x) = VectorValue(layer(x[1]),layer(x[2]))
+model = CartesianDiscreteModel((0,-1,0,-1),(10,10),map=cmap)
 
 Ω = Triangulation(model)
 dΩ = Measure(Ω,2)

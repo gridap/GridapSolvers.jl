@@ -183,6 +183,26 @@ function LocalProjectionMap(space::FESpace)
   LocalProjectionMap(identity,space)
 end
 
+function GridapDistributed.local_views(k::SpaceProjectionMap)
+  @check isa(k.space,GridapDistributed.DistributedFESpace)
+  map(local_views(k.space)) do space
+    SpaceProjectionMap(k.op.op,space)
+  end
+end
+
+function Arrays.evaluate!(
+  cache,
+  k::SpaceProjectionMap,
+  u::GridapDistributed.DistributedCellField,
+  dΩ::GridapDistributed.DistributedMeasure
+)
+  @check isa(k.space,GridapDistributed.DistributedFESpace)
+  fields = map(local_views(k),local_views(u),local_views(dΩ)) do k,u,dΩ
+    evaluate!(nothing,k,u,dΩ)
+  end
+  return GridapDistributed.DistributedCellField(fields,u.trian)
+end
+
 function _compute_local_projections(
   k::SpaceProjectionMap,u::CellField,dΩ::Measure
 )

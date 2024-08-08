@@ -7,20 +7,20 @@ using FillArrays
 u_sol(x) = VectorValue(x[1]^2*x[2], -x[1]*x[2]^2)
 p_sol(x) = (x[1] - 1.0/2.0)
 
-model = simplexify(CartesianDiscreteModel((0,1,0,1),(200,200)))
+model = simplexify(CartesianDiscreteModel((0,1,0,1),(50,50)))
 labels = get_face_labeling(model)
-add_tag_from_tags!(labels,"top",[3,4,6])
-add_tag_from_tags!(labels,"walls",[1,2,5,7,8])
+add_tag_from_tags!(labels,"top",[6])
+add_tag_from_tags!(labels,"walls",[1,2,3,4,5,7,8])
 
-order = 2
+order = 3
 rrule = Adaptivity.BarycentricRefinementRule(TRI)
 reffes = Fill(LagrangianRefFE(VectorValue{2,Float64},TRI,order),Adaptivity.num_subcells(rrule))
 reffe_u = Adaptivity.MacroReferenceFE(rrule,reffes)
 
-#reffe_p = LagrangianRefFE(Float64,TRI,order-1)
-reffe_p = Adaptivity.MacroReferenceFE(rrule,reffes;conformity=L2Conformity())
+reffe_p = LagrangianRefFE(Float64,TRI,order-1)
+#reffe_p = Adaptivity.MacroReferenceFE(rrule,reffes;conformity=L2Conformity())
 
-qdegree = 10
+qdegree = 2*order
 quad  = Quadrature(TRI,Adaptivity.CompositeQuadrature(),rrule,qdegree)
 
 V = FESpace(model,reffe_u,dirichlet_tags=["boundary"])
@@ -43,12 +43,16 @@ l((v,q)) = ∫(f⋅v)dΩ
 op = AffineFEOperator(a,l,X,Y)
 xh = solve(op)
 uh, ph = xh
+sum(∫(uh⋅uh)dΩ)
+sum(∫(ph)dΩ)
 
 eh_u = uh - u_sol
 eh_p = ph - p_sol
 sum(∫(eh_u⋅eh_u)dΩ)
 sum(∫(eh_p*eh_p)dΩ)
 
-writevtk(Ω,"stokes",cellfields=["u"=>uh,"p"=>ph,"eu"=>eh_u,"ep"=>eh_p,"u_sol"=>u_sol,"p_sol"=>p_sol])
-
-
+writevtk(
+  Ω,"stokes",
+  cellfields=["u"=>uh,"p"=>ph,"eu"=>eh_u,"ep"=>eh_p,"u_sol"=>u_sol,"p_sol"=>p_sol],
+  append=false,
+)

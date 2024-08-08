@@ -38,13 +38,13 @@ using GridapSolvers.LinearSolvers, GridapSolvers.MultilevelTools, GridapSolvers.
 using GridapSolvers.BlockSolvers: LinearSystemBlock, NonlinearSystemBlock, BiformBlock, BlockTriangularSolver
 
 function add_labels_2d!(labels)
-  add_tag_from_tags!(labels,"top",[3,4,6])
-  add_tag_from_tags!(labels,"walls",[1,2,5,7,8])
+  add_tag_from_tags!(labels,"top",[6])
+  add_tag_from_tags!(labels,"walls",[1,2,3,4,5,7,8])
 end
 
 function add_labels_3d!(labels)
-  add_tag_from_tags!(labels,"top",[5,6,7,8,11,12,15,16,22])
-  add_tag_from_tags!(labels,"walls",[1,2,3,4,9,10,13,14,17,18,19,20,21,23,24,25,26])
+  add_tag_from_tags!(labels,"top",[22])
+  add_tag_from_tags!(labels,"walls",[1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,23,24,25,26])
 end
 
 function main(distribute,np,nc)
@@ -75,11 +75,10 @@ function main(distribute,np,nc)
   Re = 10.0
   ν = 1/Re
   α = 1.e2
-  f = (Dc==2) ? VectorValue(1.0,1.0) : VectorValue(1.0,1.0,1.0)
+  f = (Dc==2) ? VectorValue(0.0,0.0) : VectorValue(0.0,0.0,0.0)
 
-  poly = (Dc==2) ? QUAD : HEX
-  Π_Qh = LocalProjectionMap(poly,lagrangian,Float64,order-1;quad_order=qdegree,space=:P)
-  graddiv(u,v,dΩ) = ∫(α*Π_Qh(divergence(u))⋅Π_Qh(divergence(v)))dΩ
+  Π_Qh = LocalProjectionMap(divergence,Q)
+  graddiv(u,v,dΩ) = ∫(α*Π_Qh(u,dΩ)⋅Π_Qh(v,dΩ))dΩ
 
   conv(u,∇u) = (∇u')⋅u
   dconv(du,∇du,u,∇u) = conv(u,∇du)+conv(du,∇u)
@@ -114,7 +113,7 @@ function main(distribute,np,nc)
   solver.log.depth = 2
   
   nlsolver = NewtonSolver(solver;maxiter=20,atol=1e-14,rtol=1.e-7,verbose=i_am_main(parts))
-  xh = solve(nlsolver,op)
+  xh = solve(nlsolver,op);
 
   @test true
 end
