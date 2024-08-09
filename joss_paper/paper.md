@@ -22,7 +22,7 @@ authors:
 affiliations:
  - name: School of Mathematics, Monash University, Clayton, Victoria, 3800, Australia.
    index: 1
- - name: School of Computing, Australian National University, Autonomous territories of Canberra, Australia
+ - name: School of Computing, Australian National University, Canberra, ACT, 2600, Australia
    index: 2
 date: 1 August 2024
 bibliography: paper.bib
