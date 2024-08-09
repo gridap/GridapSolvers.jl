@@ -16,7 +16,10 @@ digraph G {
   "GridapPETSC.jl" -> "GridapSolvers.jl" [dir=back,style=dashed]
   "GridapP4est.jl" -> "GridapSolvers.jl" [dir=back,style=dashed]
   
-  "Gridap.jl" [shape=rectangle];
+  "Gridap.jl" [shape=rectangle]
   "PartitionedArrays.jl" [shape=rectangle]
-  "GridapSolvers.jl" [style=filled;]
+  "GridapDistributed.jl" [shape=rectangle]
+  "GridapPETSC.jl" [shape=rectangle]
+  "GridapP4est.jl" [shape=rectangle]
+  "GridapSolvers.jl" [style=filled,shape=rectangle]
 }
