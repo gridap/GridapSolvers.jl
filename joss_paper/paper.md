@@ -114,12 +114,13 @@ with_mpi() do distribute
   parts = distribute(LinearIndices((prod(np_per_level[1]),)))
 
   # Create multi-level mesh
-  mh = CartesianModelHierarchy(parts,np_per_level,(0,1,0,1),(10,10);add_labels!)
+  domain = (0,1,0,1) # Cartesian domain (xmin,xmax,ymin,ymax)
+  ncells = (10,10)   # Number of cells
+  mh = CartesianModelHierarchy(parts,np_per_level,domain,ncells;add_labels!)
   model = get_model(mh,1) # Finest mesh
 
   # Create FESpaces
   fe_order = 2
-  qdegree = 2*(fe_order+1)
   reffe_u = ReferenceFE(lagrangian,VectorValue{2,Float64},fe_order)
   reffe_p = ReferenceFE(lagrangian,Float64,fe_order-1;space=:P)
 
@@ -128,7 +129,7 @@ with_mpi() do distribute
   U, V = get_fe_space(trials_u,1), get_fe_space(tests_u,1)
   Q = TestFESpace(model,reffe_p;conformity=:L2,constraint=:zeromean) 
 
-  mfs = Gridap.MultiField.BlockMultiFieldStyle()
+  mfs = BlockMultiFieldStyle() # Activates block-wise assembly
   X = MultiFieldFESpace([U,Q];style=mfs)
   Y = MultiFieldFESpace([V,Q];style=mfs)
 
@@ -139,6 +140,7 @@ with_mpi() do distribute
   liform((v,q),dΩ) = ∫(v⋅f)dΩ
 
   # Assemble linear system
+  qdegree = 2*(fe_order+1) # Quadrature degree
   Ω = Triangulation(model)
   dΩ = Measure(Ω,qdegree)
   op = AffineFEOperator((u,v)->biform(u,v,dΩ),v->liform(v,dΩ),X,Y)
@@ -160,7 +162,7 @@ with_mpi() do distribute
     pre_smoothers=smoothers,
     post_smoothers=smoothers,
     coarsest_solver=LUSolver(),
-    maxiter=2,mode=:solver
+    maxiter=4,mode=:solver
   )
 
   # PCG solver for the pressure block
@@ -193,12 +195,6 @@ The following section shows scalability results for the demo problem discussed a
 The code used to create these results can be found [here](https://github.com/gridap/GridapSolvers.jl/tree/joss-paper/joss_paper/scalability). The exact releases for the packages used are provided by Julia's `Manifest.toml` file.
 
 ![**Top**: Weak scalability for a Stokes problem in 2D. Time is given per F-GMRES iteration, as a function of the number of processors. **Middle**: Number of coarsening levels for the GMG solver, as a function of the number of processors. **Bottom**: Number of F-GMRES iterations required for convergence. \label{fig:packages}](weakScalability.png){ width=80% }
-
-|Num Procs     |    1 |   12 |   48 |   96 |  192 |  384 |  768 | 1536 | 3072 |
-|:------------ |:----:|:----:|:----:|:----:|:----:|:----:|:----:|:----:|:----:|
-|Time/Iter(s)  |  3.2 |  5.7 |  6.3 |  6.0 |  7.1 |  7.2 |  9.8 | 10.3 | 13.3 |
-|Num Levels    |    2 |    2 |    2 |    2 |    3 |    3 |    4 |    4 |    5 |
-|Num Iters     |   20 |   12 |   10 |   11 |    9 |   10 |    8 |    9 |    7 |
 
 ## Acknowledgements
 
