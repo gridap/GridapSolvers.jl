@@ -75,7 +75,7 @@ function main(distribute,np,nc)
 
   α = 1.e2
   f = (Dc==2) ? VectorValue(1.0,1.0) : VectorValue(1.0,1.0,1.0)
-  Π_Qh = LocalProjectionMap(divergence,Q)
+  Π_Qh = LocalProjectionMap(divergence,Q,qdegree)
   graddiv(u,v,dΩ) = ∫(α*Π_Qh(u,dΩ)⋅Π_Qh(v,dΩ))dΩ
   biform_u(u,v,dΩ) = ∫(∇(v)⊙∇(u))dΩ + graddiv(u,v,dΩ)
   biform((u,p),(v,q),dΩ) = biform_u(u,v,dΩ) - ∫(divergence(v)*p)dΩ - ∫(divergence(u)*q)dΩ

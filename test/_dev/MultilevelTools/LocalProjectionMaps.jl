@@ -3,6 +3,12 @@ using Gridap
 using GridapDistributed, PartitionedArrays
 using GridapSolvers
 using GridapSolvers.MultilevelTools
+using Gridap.Arrays
+
+np = (2,2)
+ranks = with_debug() do distribute
+  distribute(LinearIndices((prod(np),)))
+end
 
 layer(x) = sign(x)*abs(x)^(1/3)
 cmap(x) = VectorValue(layer(x[1]),layer(x[2]))
@@ -22,11 +28,11 @@ Q = TestFESpace(model,reffe_p;conformity=:L2,constraint=:zeromean)
 mfs = Gridap.MultiField.BlockMultiFieldStyle()
 X = MultiFieldFESpace([V,Q];style=mfs)
 
-#Π_Qh = LocalProjectionMap(divergence,reffe_p)
-Π_Qh = LocalProjectionMap(divergence,Q)
+#Π_Qh = LocalProjectionMap(divergence,reffe_p,qdegree)
+Π_Qh = LocalProjectionMap(divergence,Q,qdegree)
 
 A = assemble_matrix((u,v) -> ∫(∇(v)⊙∇(u))dΩ, V, V)
-D = assemble_matrix((u,v) -> ∫(Π_Qh(u,dΩ)⋅Π_Qh(v,dΩ))dΩ, V, V)
+D = assemble_matrix((u,v) -> ∫(Π_Qh(u)⋅(∇⋅v))dΩ, V, V)
 B = assemble_matrix((u,q) -> ∫(divergence(u)*q)dΩ, V, Q)
 Bt = assemble_matrix((p,v) -> ∫(divergence(v)*p)dΩ, Q, V)
 Mp = assemble_matrix((p,q) -> ∫(p⋅q)dΩ, Q, Q)
@@ -37,3 +43,5 @@ G = Matrix(D)
 
 F-G
 norm(F-G)
+maximum(abs.(F-G))
+

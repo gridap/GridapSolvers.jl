@@ -77,7 +77,7 @@ function main(distribute,np,nc)
   α = 1.e2
   f = (Dc==2) ? VectorValue(0.0,0.0) : VectorValue(0.0,0.0,0.0)
 
-  Π_Qh = LocalProjectionMap(divergence,Q)
+  Π_Qh = LocalProjectionMap(divergence,Q,qdegree)
   graddiv(u,v,dΩ) = ∫(α*Π_Qh(u,dΩ)⋅Π_Qh(v,dΩ))dΩ
 
   conv(u,∇u) = (∇u')⋅u

@@ -9,51 +9,50 @@ abstract type LocalProjectionMap{T} <: Map end
 function Arrays.evaluate!(
   cache,
   k::LocalProjectionMap,
-  u::GridapDistributed.DistributedCellField,
-  dΩ::GridapDistributed.DistributedMeasure
+  u::GridapDistributed.DistributedCellField
 )
-  fields = map(local_views(u),local_views(dΩ)) do u,dΩ
-    evaluate!(nothing,k,u,dΩ)
+  fields = map(local_views(u)) do u
+    evaluate!(nothing,k,u)
   end
   return GridapDistributed.DistributedCellField(fields,u.trian)
 end
 
 function Arrays.evaluate!(
-  cache,k::LocalProjectionMap,u::MultiField.MultiFieldFEBasisComponent,dΩ::Measure
+  cache,k::LocalProjectionMap,u::MultiField.MultiFieldFEBasisComponent
 )
   nfields, fieldid = u.nfields, u.fieldid
   block_fields(fields,::TestBasis) = lazy_map(BlockMap(nfields,fieldid),fields)
   block_fields(fields,::TrialBasis) = lazy_map(BlockMap((1,nfields),fieldid),fields)
 
-  sf = evaluate!(nothing,k,u.single_field,dΩ)
+  sf = evaluate!(nothing,k,u.single_field)
   sf_data = CellData.get_data(sf)
   mf_data = block_fields(sf_data,BasisStyle(u.single_field))
   return CellData.similar_cell_field(sf,mf_data,get_triangulation(sf),DomainStyle(sf))
 end
 
 function Arrays.evaluate!(
-  cache,k::LocalProjectionMap,v::SingleFieldFEBasis{<:TestBasis},dΩ::Measure
+  cache,k::LocalProjectionMap,v::SingleFieldFEBasis{<:TestBasis}
 )
   cell_v = CellData.get_data(v)
   cell_u = lazy_map(transpose,cell_v)
   u = FESpaces.similar_fe_basis(v,cell_u,get_triangulation(v),TrialBasis(),DomainStyle(v))
   
-  data = _compute_local_projections(k,u,dΩ)
+  data = _compute_local_projections(k,u)
   return GenericCellField(data,get_triangulation(u),ReferenceDomain())
 end
 
 function Arrays.evaluate!(
-  cache,k::LocalProjectionMap,u::SingleFieldFEBasis{<:TrialBasis},dΩ::Measure
+  cache,k::LocalProjectionMap,u::SingleFieldFEBasis{<:TrialBasis}
 )
-  _data = _compute_local_projections(k,u,dΩ)
+  _data = _compute_local_projections(k,u)
   data = lazy_map(transpose,_data)
   return GenericCellField(data,get_triangulation(u),ReferenceDomain())
 end
 
 function Arrays.evaluate!(
-  cache,k::LocalProjectionMap,u::SingleFieldFEFunction,dΩ::Measure
+  cache,k::LocalProjectionMap,u::SingleFieldFEFunction
 )
-  data = _compute_local_projections(k,u,dΩ)
+  data = _compute_local_projections(k,u)
   return GenericCellField(data,get_triangulation(u),ReferenceDomain())
 end
 
@@ -86,14 +85,24 @@ end
 struct ReffeProjectionMap{T,A} <: LocalProjectionMap{T}
   op::Operation{T}
   reffe::A
+  qdegree::Int
   function ReffeProjectionMap(
     op::Function,
     reffe::Tuple{<:ReferenceFEName,Any,Any},
+    qdegree::Integer
   )
     T = typeof(op)
     A = typeof(reffe)
-    return new{T,A}(Operation(op),reffe)
+    return new{T,A}(Operation(op),reffe,Int(qdegree))
   end
+end
+
+function LocalProjectionMap(
+  op::Function,
+  reffe::Tuple{<:ReferenceFEName,Any,Any},
+  qdegree::Integer=2*maximum(reffe[2][2])
+)
+  ReffeProjectionMap(op,reffe,qdegree)
 end
 
 function LocalProjectionMap(op::Function,basis::ReferenceFEName,args...;kwargs...)
@@ -104,15 +113,12 @@ function LocalProjectionMap(basis::ReferenceFEName,args...;kwargs...)
   LocalProjectionMap(identity,basis,args...;kwargs...)
 end
 
-function LocalProjectionMap(op::Function,reffe::Tuple{<:ReferenceFEName,Any,Any},)
-  ReffeProjectionMap(op,reffe)
-end
-
 # We expect the input to be in `TrialBasis` style.
 function _compute_local_projections(
-  k::ReffeProjectionMap,u::CellField,dΩ::Measure
+  k::ReffeProjectionMap,u::CellField
 )
   Ω = get_triangulation(u)
+  dΩ = Measure(Ω,k.qdegree)
   basis, args, kwargs = k.reffe
   cell_polytopes = lazy_map(get_polytope,get_cell_reffe(Ω))
   cell_reffe = lazy_map(p -> ReferenceFE(p,basis,args...;kwargs...),cell_polytopes)
@@ -164,29 +170,30 @@ end
 struct SpaceProjectionMap{T,A} <: LocalProjectionMap{T}
   op::Operation{T}
   space::A
-
+  qdegree::Int
   function SpaceProjectionMap(
     op::Function,
-    space::FESpace
+    space::FESpace,
+    qdegree::Integer
   )
     T = typeof(op)
     A = typeof(space)
-    return new{T,A}(Operation(op),space)
+    return new{T,A}(Operation(op),space,Int(qdegree))
   end
 end
 
-function LocalProjectionMap(op::Function,space::FESpace)
-  SpaceProjectionMap(op,space)
+function LocalProjectionMap(op::Function,space::FESpace,qdegree::Integer)
+  SpaceProjectionMap(op,space,qdegree)
 end
 
-function LocalProjectionMap(space::FESpace)
-  LocalProjectionMap(identity,space)
+function LocalProjectionMap(space::FESpace,qdegree::Integer)
+  LocalProjectionMap(identity,space,qdegree)
 end
 
 function GridapDistributed.local_views(k::SpaceProjectionMap)
   @check isa(k.space,GridapDistributed.DistributedFESpace)
   map(local_views(k.space)) do space
-    SpaceProjectionMap(k.op.op,space)
+    SpaceProjectionMap(k.op.op,space,k.qdegree)
   end
 end
 
@@ -194,24 +201,24 @@ function Arrays.evaluate!(
   cache,
   k::SpaceProjectionMap,
   u::GridapDistributed.DistributedCellField,
-  dΩ::GridapDistributed.DistributedMeasure
 )
   @check isa(k.space,GridapDistributed.DistributedFESpace)
-  fields = map(local_views(k),local_views(u),local_views(dΩ)) do k,u,dΩ
-    evaluate!(nothing,k,u,dΩ)
+  fields = map(local_views(k),local_views(u)) do k,u
+    evaluate!(nothing,k,u)
   end
   return GridapDistributed.DistributedCellField(fields,u.trian)
 end
 
 function _compute_local_projections(
-  k::SpaceProjectionMap,u::CellField,dΩ::Measure
+  k::SpaceProjectionMap,u::CellField
 )
   space = k.space
   p = get_trial_fe_basis(space)
   q = get_fe_basis(space)
 
-  Ωi = get_triangulation(dΩ.quad)
-  ids = lazy_map(ids -> findall(id -> id > 0, ids), get_cell_dof_ids(space,Ωi))
+  Ω = get_triangulation(space)
+  dΩ = Measure(Ω,k.qdegree)
+  ids = lazy_map(ids -> findall(id -> id > 0, ids), get_cell_dof_ids(space))
 
   op = k.op.op
   lhs_data = get_array(∫(p⋅q)dΩ)
