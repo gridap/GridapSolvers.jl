@@ -32,7 +32,7 @@ makedocs(;
             "Darcy (GMG)" => "Examples/DarcyGMG.md",
         ],
     ],
-    doctest=false,
+    warnonly=:doctest
 )
 
 deploydocs(;
