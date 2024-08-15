@@ -32,6 +32,7 @@ makedocs(;
             "Darcy (GMG)" => "Examples/DarcyGMG.md",
         ],
     ],
+    doctest=false,
 )
 
 deploydocs(;
