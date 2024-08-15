@@ -7,12 +7,12 @@ using FillArrays
 u_sol(x) = VectorValue(x[1]^2*x[2], -x[1]*x[2]^2)
 p_sol(x) = (x[1] - 1.0/2.0)
 
-model = simplexify(CartesianDiscreteModel((0,1,0,1),(50,50)))
+model = simplexify(CartesianDiscreteModel((0,1,0,1),(20,20)))
 labels = get_face_labeling(model)
 add_tag_from_tags!(labels,"top",[6])
 add_tag_from_tags!(labels,"walls",[1,2,3,4,5,7,8])
 
-order = 3
+order = 2
 rrule = Adaptivity.BarycentricRefinementRule(TRI)
 reffes = Fill(LagrangianRefFE(VectorValue{2,Float64},TRI,order),Adaptivity.num_subcells(rrule))
 reffe_u = Adaptivity.MacroReferenceFE(rrule,reffes)
