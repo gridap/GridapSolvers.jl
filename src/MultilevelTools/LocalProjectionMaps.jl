@@ -58,29 +58,30 @@ end
 
 """
     struct ReffeProjectionMap{T} <: LocalProjectionMap{T}
-      op    :: Operation{T}
-      reffe :: Tuple{<:ReferenceFEName,Any,Any}
+      op      :: Operation{T}
+      reffe   :: Tuple{<:ReferenceFEName,Any,Any}
+      qdegree :: Int
     end
 
-  Map that projects a field/field-basis onto another local reference space 
-  given by a `ReferenceFE`.
+Map that projects a field/field-basis onto another local reference space 
+given by a `ReferenceFE`.
 
-  Example:
+Example:
 
-  ```julia
-  model = CartesianDiscreteModel((0,1,0,1),(2,2))
+```julia
+model = CartesianDiscreteModel((0,1,0,1),(2,2))
 
-  reffe_h1 = ReferenceFE(QUAD,lagrangian,Float64,1,space=:Q)
-  reffe_l2 = ReferenceFE(QUAD,lagrangian,Float64,1,space=:P)
-  U = FESpace(model,reffe_h1)
-  u_h1 = interpolate(f,U)
+reffe_h1 = ReferenceFE(QUAD,lagrangian,Float64,1,space=:Q)
+reffe_l2 = ReferenceFE(QUAD,lagrangian,Float64,1,space=:P)
+U = FESpace(model,reffe_h1)
+u_h1 = interpolate(f,U)
 
-  Ω = Triangulation(model)
-  dΩ = Measure(Ω,2)
-  
-  Π = LocalProjectionMap(reffe_l2)
-  u_l2 = Π(u_h1,dΩ)
-  ```
+Ω = Triangulation(model)
+dΩ = Measure(Ω,2)
+
+Π = LocalProjectionMap(reffe_l2)
+u_l2 = Π(u_h1,dΩ)
+```
 """
 struct ReffeProjectionMap{T,A} <: LocalProjectionMap{T}
   op::Operation{T}
@@ -162,10 +163,15 @@ function Arrays.evaluate!(cache,::LocalProjectionMap,lhs::Matrix{T},rhs::A,basis
 end
 
 """
-    SpaceProjectionMap{T} <: LocalProjectionMap{T}
-      op    :: Operation{T}
-      space :: A
+    struct SpaceProjectionMap{T} <: LocalProjectionMap{T}
+      op      :: Operation{T}
+      space   :: A
+      qdegree :: Int
     end
+
+Map that projects a CellField onto another `FESpace`. Necessary when the arrival space 
+has constraints (e.g. boundary conditions) that need to be taken into account.
+
 """
 struct SpaceProjectionMap{T,A} <: LocalProjectionMap{T}
   op::Operation{T}
