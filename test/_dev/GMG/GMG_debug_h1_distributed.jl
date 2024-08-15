@@ -78,10 +78,10 @@ Uh = TrialFESpace(Vh,u_exact)
 # Weakform
 α = 1.e10
 f(x) = -Δ(u_exact)(x)
-Π_Qh = LocalProjectionMap(poly,lagrangian,Float64,order-1;quad_order=qdegree,space=:P)
+Π_Qh = LocalProjectionMap(divergence,lagrangian,Float64,order-1;space=:P)
 
 lap(u,v,dΩ) = ∫(∇(v)⊙∇(u))dΩ
-graddiv(u,v,dΩ) = ∫(α*Π_Qh(divergence(v))⋅Π_Qh(divergence(u)))dΩ
+graddiv(u,v,dΩ) = ∫(α*Π_Qh(v,dΩ)⋅Π_Qh(u,dΩ))dΩ
 biform(u,v,dΩ) = lap(u,v,dΩ) + graddiv(u,v,dΩ)
 ah(u,v) = biform(u,v,dΩh)
 aH(u,v) = biform(u,v,dΩH)

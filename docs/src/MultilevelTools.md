@@ -39,8 +39,10 @@ ProlongationOperator
 MultiFieldTransferOperator
 ```
 
-## Misc
+## Local projection maps
 
 ```@docs
 LocalProjectionMap
+ReffeProjectionMap
+SpaceProjectionMap
 ```

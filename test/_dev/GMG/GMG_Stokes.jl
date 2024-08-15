@@ -81,8 +81,8 @@ Y = MultiFieldFESpace([V,Q];style=mfs)
 α = 1.e2
 f = (Dc==2) ? VectorValue(1.0,1.0) : VectorValue(1.0,1.0,1.0)
 poly = (Dc==2) ? QUAD : HEX
-Π_Qh = LocalProjectionMap(poly,lagrangian,Float64,order-1;quad_order=qdegree,space=:P)
-graddiv(u,v,dΩ) = ∫(α*Π_Qh(divergence(u))⋅Π_Qh(divergence(v)))dΩ
+Π_Qh = LocalProjectionMap(divergence,lagrangian,Float64,order-1;space=:P)
+graddiv(u,v,dΩ) = ∫(α*Π_Qh(u,dΩ)⋅Π_Qh(v,dΩ))dΩ
 biform_u(u,v,dΩ) = ∫(∇(v)⊙∇(u))dΩ + graddiv(u,v,dΩ)
 biform((u,p),(v,q),dΩ) = biform_u(u,v,dΩ) - ∫(divergence(v)*p)dΩ - ∫(divergence(u)*q)dΩ
 liform((v,q),dΩ) = ∫(v⋅f)dΩ

@@ -62,13 +62,13 @@ function get_bilinear_form(mh_lev,biform,qdegree)
 end
 
 function add_labels_2d!(labels)
-  add_tag_from_tags!(labels,"top",[3,4,6])
-  add_tag_from_tags!(labels,"walls",[1,2,5,7,8])
+  add_tag_from_tags!(labels,"top",[6])
+  add_tag_from_tags!(labels,"walls",[1,2,3,4,5,7,8])
 end
 
 function add_labels_3d!(labels)
-  add_tag_from_tags!(labels,"top",[5,6,7,8,11,12,15,16,22])
-  add_tag_from_tags!(labels,"walls",[1,2,3,4,9,10,13,14,17,18,19,20,21,23,24,25,26])
+  add_tag_from_tags!(labels,"top",[22])
+  add_tag_from_tags!(labels,"walls",[1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,23,24,25,26])
 end
 
 function main(distribute,np,nc,np_per_level)
@@ -99,9 +99,8 @@ function main(distribute,np,nc,np_per_level)
 
   α = 1.e2
   f = (Dc==2) ? VectorValue(1.0,1.0) : VectorValue(1.0,1.0,1.0)
-  poly = (Dc==2) ? QUAD : HEX
-  Π_Qh = LocalProjectionMap(poly,lagrangian,Float64,order-1;quad_order=qdegree,space=:P)
-  graddiv(u,v,dΩ) = ∫(α*Π_Qh(divergence(u))⋅Π_Qh(divergence(v)))dΩ
+  Π_Qh = LocalProjectionMap(divergence,reffe_p,qdegree)
+  graddiv(u,v,dΩ) = ∫(α*(∇⋅v)⋅Π_Qh(u))dΩ
   biform_u(u,v,dΩ) = ∫(∇(v)⊙∇(u))dΩ + graddiv(u,v,dΩ)
   biform((u,p),(v,q),dΩ) = biform_u(u,v,dΩ) - ∫(divergence(v)*p)dΩ - ∫(divergence(u)*q)dΩ
   liform((v,q),dΩ) = ∫(v⋅f)dΩ
@@ -123,7 +122,7 @@ function main(distribute,np,nc,np_per_level)
     tests_u,biform_u,graddiv,qdegree
   )
   restrictions = setup_patch_restriction_operators(
-    tests_u,prolongations,graddiv,qdegree;solver=LUSolver()#IS_ConjugateGradientSolver(;reltol=1.e-6)
+    tests_u,prolongations,graddiv,qdegree;solver=CGSolver(JacobiLinearSolver())
   )
   gmg = GMGLinearSolver(
     mh,trials_u,tests_u,biforms,
@@ -146,7 +145,7 @@ function main(distribute,np,nc,np_per_level)
   coeffs = [1.0 1.0;
             0.0 1.0]  
   P = BlockTriangularSolver(bblocks,[solver_u,solver_p],coeffs,:upper)
-  solver = FGMRESSolver(20,P;atol=1e-14,rtol=1.e-8,verbose=i_am_main(parts))
+  solver = FGMRESSolver(20,P;atol=1e-10,rtol=1.e-12,verbose=i_am_main(parts))
   ns = numerical_setup(symbolic_setup(solver,A),A)
 
   x = allocate_in_domain(A); fill!(x,0.0)
@@ -156,7 +155,7 @@ function main(distribute,np,nc,np_per_level)
   r = allocate_in_range(A)
   mul!(r,A,x)
   r .-= b
-  @test norm(r) < 1.e-6
+  @test norm(r) < 1.e-7
 end
 
 end # module

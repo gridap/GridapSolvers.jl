@@ -1,7 +1,7 @@
 name = "GridapSolvers"
 uuid = "6d3209ee-5e3c-4db7-a716-942eb12ed534"
 authors = ["Santiago Badia <santiago.badia@monash.edu>", "Jordi Manyer <jordi.manyer@monash.edu>", "Alberto F. Martin <alberto.f.martin@anu.edu.au>", "Javier Principe <principe@cimne.upc.edu>"]
-version = "0.3.0"
+version = "0.4.0"
 
 [deps]
 AbstractTrees = "1520ce14-60c1-5f80-bbc7-55ef81b5835c"
@@ -30,7 +30,9 @@ GridapDistributed = "0.4"
 GridapP4est = "0.3"
 GridapPETSc = "0.5"
 IterativeSolvers = "0.9"
+LineSearches = "7.0.1"
 MPI = "0.20"
+NLsolve = "4.3.0"
 PartitionedArrays = "0.3"
 SparseMatricesCSR = "0.6.7"
 julia = "1.7"
