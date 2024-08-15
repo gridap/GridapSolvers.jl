@@ -145,7 +145,7 @@ function main(distribute,np,nc,np_per_level)
   coeffs = [1.0 1.0;
             0.0 1.0]  
   P = BlockTriangularSolver(bblocks,[solver_u,solver_p],coeffs,:upper)
-  solver = FGMRESSolver(20,P;atol=1e-14,rtol=1.e-8,verbose=i_am_main(parts))
+  solver = FGMRESSolver(20,P;atol=1e-10,rtol=1.e-12,verbose=i_am_main(parts))
   ns = numerical_setup(symbolic_setup(solver,A),A)
 
   x = allocate_in_domain(A); fill!(x,0.0)
@@ -155,7 +155,7 @@ function main(distribute,np,nc,np_per_level)
   r = allocate_in_range(A)
   mul!(r,A,x)
   r .-= b
-  @test norm(r) < 1.e-6
+  @test norm(r) < 1.e-7
 end
 
 end # module

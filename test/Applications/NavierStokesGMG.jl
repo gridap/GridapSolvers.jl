@@ -156,10 +156,10 @@ function main(distribute,np,nc,np_per_level)
   coeffs = [1.0 1.0;
             0.0 1.0]  
   P = BlockTriangularSolver(bblocks,[solver_u,solver_p],coeffs,:upper)
-  solver = FGMRESSolver(20,P;atol=1e-14,rtol=1.e-8,verbose=i_am_main(parts))
+  solver = FGMRESSolver(20,P;atol=1e-11,rtol=1.e-8,verbose=i_am_main(parts))
   solver.log.depth = 2
 
-  nlsolver = NewtonSolver(solver;maxiter=20,atol=1e-14,rtol=1.e-7,verbose=i_am_main(parts))
+  nlsolver = NewtonSolver(solver;maxiter=20,atol=1e-10,rtol=1.e-12,verbose=i_am_main(parts))
   xh = solve(nlsolver,op)
 
   @test true
