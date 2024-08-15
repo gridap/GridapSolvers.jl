@@ -6,8 +6,9 @@
   subcommunicators with sizes given by `num_procs_x_level`.
 """
 function generate_level_parts(root_parts::AbstractArray,num_procs_x_level::Vector{<:Integer})
-  num_levels  = length(num_procs_x_level)
-  level_parts = Vector{typeof(parts)}(undef,num_levels)
+  num_levels = length(num_procs_x_level)
+  T = Union{typeof(root_parts),GridapDistributed.MPIVoidVector{eltype(root_parts)}}
+  level_parts = Vector{T}(undef,num_levels)
   level_parts[1] = generate_subparts(root_parts,num_procs_x_level[1])
   for l = 2:num_levels
     level_parts[l] = generate_level_parts(root_parts,level_parts[l-1],num_procs_x_level[l])

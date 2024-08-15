@@ -19,7 +19,7 @@ Solvers follow a modular design, where most blocks can be combined to produce PD
 
 ## Installation
 
-GridapSolvers is a registered package in the official [Julia package registry](https://github.com/JuliaRegistries/General).  Thus, the installation of Gridap is straight forward using the [Julia's package manager](https://julialang.github.io/Pkg.jl/v1/). Open the Julia REPL, type `]` to enter package mode, and install as follows
+GridapSolvers is a registered package in the official [Julia package registry](https://github.com/JuliaRegistries/General).  Thus, the installation of GridapSolvers is straight forward using the [Julia's package manager](https://julialang.github.io/Pkg.jl/v1/). Open the Julia REPL, type `]` to enter package mode, and install as follows
 
 ```julia
 pkg> add GridapSolvers

@@ -101,11 +101,11 @@ Ha = 1.0e3
 η = 1000
 
 poly = (Dc == 2) ? QUAD : HEX
-Π = LocalProjectionMap(poly,lagrangian,Float64,order-1;quad_order=qdegree,space=:P)
+Π = LocalProjectionMap(divergence,lagrangian,Float64,order-1;space=:P)
 mass(x,v_x,dΩ) = ∫(v_x⋅x)dΩ
 lap(x,v_x,dΩ) = ∫(β*∇(v_x)⊙∇(x))dΩ
 graddiv(x,v_x,dΩ) = ∫(η*divergence(v_x)⋅divergence(x))dΩ
-Qgraddiv(x,v_x,dΩ) = ∫(η*Π(divergence(v_x))⋅Π(divergence(x)))dΩ
+Qgraddiv(x,v_x,dΩ) = ∫(η*Π(v_x,dΩ)⋅Π(x,dΩ))dΩ
 crossB(x,v_x,dΩ) = ∫(v_x⋅cross(x,B))dΩ
 
 biform_u(u,v_u,dΩ) = lap(u,v_u,dΩ) + Qgraddiv(u,v_u,dΩ)

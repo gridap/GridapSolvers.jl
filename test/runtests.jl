@@ -4,6 +4,7 @@ using Test
 @testset "Sequential tests" begin
   include("MultilevelTools/seq/runtests.jl")
   include("LinearSolvers/seq/runtests.jl")
+  include("NonlinearSolvers/seq/runtests.jl")
   include("BlockSolvers/seq/runtests.jl")
   include("Applications/seq/runtests.jl")
 end

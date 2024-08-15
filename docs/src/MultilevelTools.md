@@ -24,6 +24,7 @@ This objects are the multilevel counterparts of Gridap's `DiscreteModel` and `FE
 ModelHierarchy
 ModelHierarchyLevel
 CartesianModelHierarchy
+P4estCartesianModelHierarchy
 FESpaceHierarchy
 ```
 
@@ -38,8 +39,10 @@ ProlongationOperator
 MultiFieldTransferOperator
 ```
 
-## Misc
+## Local projection maps
 
 ```@docs
 LocalProjectionMap
+ReffeProjectionMap
+SpaceProjectionMap
 ```

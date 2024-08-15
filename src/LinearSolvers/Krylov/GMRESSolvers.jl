@@ -54,7 +54,7 @@ mutable struct GMRESNumericalSetup <: Gridap.Algebra.NumericalSetup
   caches
 end
 
-function get_solver_caches(solver::GMRESSolver,A)
+function get_solver_caches(solver::GMRESSolver,A::AbstractMatrix)
   m, Pl, Pr = solver.m, solver.Pl, solver.Pr
 
   V  = [allocate_in_domain(A) for i in 1:m+1]
@@ -95,6 +95,14 @@ function Gridap.Algebra.numerical_setup(ss::GMRESSymbolicSetup, A::AbstractMatri
   solver = ss.solver
   Pr_ns  = !isnothing(solver.Pr) ? numerical_setup(symbolic_setup(solver.Pr,A),A) : nothing
   Pl_ns  = !isnothing(solver.Pl) ? numerical_setup(symbolic_setup(solver.Pl,A),A) : nothing
+  caches = get_solver_caches(solver,A)
+  return GMRESNumericalSetup(solver,A,Pr_ns,Pl_ns,caches)
+end
+
+function Gridap.Algebra.numerical_setup(ss::GMRESSymbolicSetup, A::AbstractMatrix, x::AbstractVector)
+  solver = ss.solver
+  Pr_ns  = !isnothing(solver.Pr) ? numerical_setup(symbolic_setup(solver.Pr,A,x),A,x) : nothing
+  Pl_ns  = !isnothing(solver.Pl) ? numerical_setup(symbolic_setup(solver.Pl,A,x),A,x) : nothing
   caches = get_solver_caches(solver,A)
   return GMRESNumericalSetup(solver,A,Pr_ns,Pl_ns,caches)
 end

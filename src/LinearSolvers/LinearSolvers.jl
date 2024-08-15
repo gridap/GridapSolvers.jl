@@ -55,5 +55,6 @@ include("SymGaussSeidelSmoothers.jl")
 include("GMGLinearSolvers.jl")
 include("IterativeLinearSolvers.jl")
 include("SchurComplementSolvers.jl")
+include("MatrixSolvers.jl")
 
 end

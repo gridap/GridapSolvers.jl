@@ -62,12 +62,23 @@ function Gridap.Algebra.numerical_setup(ss::RichardsonSmootherSymbolicSetup, A::
   return RichardsonSmootherNumericalSetup(ss.smoother,A,Adx,dx,Mns)
 end
 
+function Gridap.Algebra.numerical_setup(ss::RichardsonSmootherSymbolicSetup, A::AbstractMatrix, x::AbstractVector)
+  Adx = allocate_in_range(A)
+  dx  = allocate_in_domain(A)
+  Mns = numerical_setup(ss.Mss,A,x)
+  return RichardsonSmootherNumericalSetup(ss.smoother,A,Adx,dx,Mns)
+end
+
 function Gridap.Algebra.numerical_setup!(ns::RichardsonSmootherNumericalSetup, A::AbstractMatrix)
   numerical_setup!(ns.Mns,A)
+  ns.A = A
+  return ns
 end
 
 function Gridap.Algebra.numerical_setup!(ns::RichardsonSmootherNumericalSetup, A::AbstractMatrix, x::AbstractVector)
   numerical_setup!(ns.Mns,A,x)
+  ns.A = A
+  return ns
 end
 
 function Gridap.Algebra.solve!(x::AbstractVector,ns::RichardsonSmootherNumericalSetup,r::AbstractVector)

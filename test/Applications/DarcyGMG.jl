@@ -39,13 +39,11 @@ end
 function main(distribute,np,nc,np_per_level)
   parts = distribute(LinearIndices((prod(np),)))
 
-  # Geometry
   Dc = length(nc)
   domain = (Dc == 2) ? (0,1,0,1) : (0,1,0,1,0,1)
   mh = CartesianModelHierarchy(parts,np_per_level,domain,nc)
   model = get_model(mh,1)
 
-  # FE spaces
   order = 2
   qdegree = 2*(order+1)
   reffe_u = ReferenceFE(raviart_thomas,Float64,order-1)
@@ -63,7 +61,6 @@ function main(distribute,np,nc,np_per_level)
   X = MultiFieldFESpace([U,Q];style=mfs)
   Y = MultiFieldFESpace([V,Q];style=mfs)
 
-  # Weak formulation
   α = 1.e2
   f(x) = u_exact(x) + ∇(p_exact)(x)
   graddiv(u,v,dΩ) = ∫(α*divergence(u)⋅divergence(v))dΩ
@@ -79,7 +76,6 @@ function main(distribute,np,nc,np_per_level)
   op = AffineFEOperator(a,l,X,Y)
   A, b = get_matrix(op), get_vector(op);
 
-  # GMG Solver for u
   biforms = map(mhl -> get_bilinear_form(mhl,biform_u,qdegree),mh)
   patch_decompositions = PatchDecomposition(mh)
   smoothers = get_patch_smoothers(
@@ -101,15 +97,12 @@ function main(distribute,np,nc,np_per_level)
     maxiter=3,mode=:preconditioner,verbose=i_am_main(parts)
   )
 
-  # Solver
   solver_u = gmg
   solver_p = CGSolver(JacobiLinearSolver();maxiter=20,atol=1e-14,rtol=1.e-6,verbose=i_am_main(parts))
   solver_p.log.depth = 2
 
-  diag_blocks  = [LinearSystemBlock(),BiformBlock((p,q) -> ∫(-1.0/α*p*q)dΩ,Q,Q)]
-  bblocks = map(CartesianIndices((2,2))) do I
-    (I[1] == I[2]) ? diag_blocks[I[1]] : LinearSystemBlock()
-  end
+  bblocks  = [LinearSystemBlock() LinearSystemBlock();
+              LinearSystemBlock() BiformBlock((p,q) -> ∫(-1.0/α*p*q)dΩ,Q,Q)]
   coeffs = [1.0 1.0;
             0.0 1.0]  
   P = BlockTriangularSolver(bblocks,[solver_u,solver_p],coeffs,:upper)
@@ -118,7 +111,6 @@ function main(distribute,np,nc,np_per_level)
 
   x = allocate_in_domain(A); fill!(x,0.0)
   solve!(x,ns,b)
-  xh = FEFunction(X,x);
 
   r = allocate_in_range(A)
   mul!(r,A,x)

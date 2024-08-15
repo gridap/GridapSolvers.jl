@@ -1,3 +1,28 @@
+# # Incompressible Stokes equations in a 2D/3D cavity, using GMG.
+# 
+# This example solves the incompressible Stokes equations, given by 
+# 
+# ```math
+# \begin{align*}
+# -\Delta u - \nabla p &= f \quad \text{in} \quad \Omega, \\
+# \nabla \cdot u &= 0 \quad \text{in} \quad \Omega, \\
+# u &= \hat{x} \quad \text{in} \quad \Gamma_\text{top} \subset \partial \Omega, \\
+# u &= 0 \quad \text{in} \quad \partial \Omega \backslash \Gamma_\text{top} \\
+# \end{align*}
+# ```
+# 
+# where $\Omega = [0,1]^d$. 
+# 
+# We use a mixed finite-element scheme, with $Q_k \times P_{k-1}^{-}$ elements for the velocity-pressure pair. 
+# 
+# To solve the linear system, we use a FGMRES solver preconditioned by a block-triangular 
+# Shur-complement-based preconditioner. We use an Augmented Lagrangian approach to 
+# get a better approximation of the Schur complement. Details for this preconditoner can be 
+# found in [Benzi and Olshanskii (2006)](https://epubs.siam.org/doi/10.1137/050646421).
+# 
+# The velocity block is solved using a Geometric Multigrid (GMG) solver. Due to the kernel 
+# introduced by the Augmented-Lagrangian operator, we require special smoothers and prolongation/restriction
+# operators. See [Schoberl (1999)](https://link.springer.com/article/10.1007/s002110050465) for more details.
 module StokesGMGApplication
 
 using Test
@@ -37,51 +62,45 @@ function get_bilinear_form(mh_lev,biform,qdegree)
 end
 
 function add_labels_2d!(labels)
-  add_tag_from_tags!(labels,"top",[3,4,6])
-  add_tag_from_tags!(labels,"bottom",[1,2,5])
-  add_tag_from_tags!(labels,"walls",[7,8])
+  add_tag_from_tags!(labels,"top",[6])
+  add_tag_from_tags!(labels,"walls",[1,2,3,4,5,7,8])
 end
 
 function add_labels_3d!(labels)
-  add_tag_from_tags!(labels,"top",[5,6,7,8,11,12,15,16,22])
-  add_tag_from_tags!(labels,"bottom",[1,2,3,4,9,10,13,14,21])
-  add_tag_from_tags!(labels,"walls",[17,18,23,25,26])
+  add_tag_from_tags!(labels,"top",[22])
+  add_tag_from_tags!(labels,"walls",[1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,23,24,25,26])
 end
 
 function main(distribute,np,nc,np_per_level)
   parts = distribute(LinearIndices((prod(np),)))
 
-  # Geometry
   Dc = length(nc)
   domain = (Dc == 2) ? (0,1,0,1) : (0,1,0,1,0,1)
   add_labels! = (Dc == 2) ? add_labels_2d! : add_labels_3d!
   mh = CartesianModelHierarchy(parts,np_per_level,domain,nc;add_labels! = add_labels!)
   model = get_model(mh,1)
 
-  # FE spaces
   order = 2
   qdegree = 2*(order+1)
   reffe_u = ReferenceFE(lagrangian,VectorValue{Dc,Float64},order)
   reffe_p = ReferenceFE(lagrangian,Float64,order-1;space=:P)
 
-  u_bottom = (Dc==2) ? VectorValue(0.0,0.0) : VectorValue(0.0,0.0,0.0)
+  u_walls = (Dc==2) ? VectorValue(0.0,0.0) : VectorValue(0.0,0.0,0.0)
   u_top = (Dc==2) ? VectorValue(1.0,0.0) : VectorValue(1.0,0.0,0.0)
 
-  tests_u  = TestFESpace(mh,reffe_u,dirichlet_tags=["bottom","top"]);
-  trials_u = TrialFESpace(tests_u,[u_bottom,u_top]);
+  tests_u  = TestFESpace(mh,reffe_u,dirichlet_tags=["walls","top"]);
+  trials_u = TrialFESpace(tests_u,[u_walls,u_top]);
   U, V = get_fe_space(trials_u,1), get_fe_space(tests_u,1)
-  Q = TestFESpace(model,reffe_p;conformity=:L2) 
+  Q = TestFESpace(model,reffe_p;conformity=:L2,constraint=:zeromean) 
 
   mfs = Gridap.MultiField.BlockMultiFieldStyle()
   X = MultiFieldFESpace([U,Q];style=mfs)
   Y = MultiFieldFESpace([V,Q];style=mfs)
 
-  # Weak formulation
   α = 1.e2
   f = (Dc==2) ? VectorValue(1.0,1.0) : VectorValue(1.0,1.0,1.0)
-  poly = (Dc==2) ? QUAD : HEX
-  Π_Qh = LocalProjectionMap(poly,lagrangian,Float64,order-1;quad_order=qdegree,space=:P)
-  graddiv(u,v,dΩ) = ∫(α*Π_Qh(divergence(u))⋅Π_Qh(divergence(v)))dΩ
+  Π_Qh = LocalProjectionMap(divergence,reffe_p,qdegree)
+  graddiv(u,v,dΩ) = ∫(α*(∇⋅v)⋅Π_Qh(u))dΩ
   biform_u(u,v,dΩ) = ∫(∇(v)⊙∇(u))dΩ + graddiv(u,v,dΩ)
   biform((u,p),(v,q),dΩ) = biform_u(u,v,dΩ) - ∫(divergence(v)*p)dΩ - ∫(divergence(u)*q)dΩ
   liform((v,q),dΩ) = ∫(v⋅f)dΩ
@@ -94,20 +113,16 @@ function main(distribute,np,nc,np_per_level)
   op = AffineFEOperator(a,l,X,Y)
   A, b = get_matrix(op), get_vector(op);
 
-  # GMG Solver for u
   biforms = map(mhl -> get_bilinear_form(mhl,biform_u,qdegree),mh)
   patch_decompositions = PatchDecomposition(mh)
   smoothers = get_patch_smoothers(
     mh,tests_u,biform_u,patch_decompositions,qdegree
   )
-  #restrictions = setup_restriction_operators(
-  #  tests_u,qdegree;mode=:residual,solver=IS_ConjugateGradientSolver(;reltol=1.e-6)
-  #)
   prolongations = setup_patch_prolongation_operators(
     tests_u,biform_u,graddiv,qdegree
   )
   restrictions = setup_patch_restriction_operators(
-    tests_u,prolongations,graddiv,qdegree;solver=LUSolver()#IS_ConjugateGradientSolver(;reltol=1.e-6)
+    tests_u,prolongations,graddiv,qdegree;solver=CGSolver(JacobiLinearSolver())
   )
   gmg = GMGLinearSolver(
     mh,trials_u,tests_u,biforms,
@@ -118,7 +133,6 @@ function main(distribute,np,nc,np_per_level)
     maxiter=4,mode=:preconditioner,verbose=i_am_main(parts)
   )
 
-  # Solver
   solver_u = gmg
   solver_p = CGSolver(JacobiLinearSolver();maxiter=20,atol=1e-14,rtol=1.e-6,verbose=i_am_main(parts))
   solver_u.log.depth = 2
@@ -131,7 +145,7 @@ function main(distribute,np,nc,np_per_level)
   coeffs = [1.0 1.0;
             0.0 1.0]  
   P = BlockTriangularSolver(bblocks,[solver_u,solver_p],coeffs,:upper)
-  solver = FGMRESSolver(20,P;atol=1e-14,rtol=1.e-8,verbose=i_am_main(parts))
+  solver = FGMRESSolver(20,P;atol=1e-10,rtol=1.e-12,verbose=i_am_main(parts))
   ns = numerical_setup(symbolic_setup(solver,A),A)
 
   x = allocate_in_domain(A); fill!(x,0.0)
@@ -141,7 +155,7 @@ function main(distribute,np,nc,np_per_level)
   r = allocate_in_range(A)
   mul!(r,A,x)
   r .-= b
-  @test norm(r) < 1.e-6
+  @test norm(r) < 1.e-7
 end
 
 end # module

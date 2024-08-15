@@ -43,3 +43,11 @@ function Algebra.solve!(x::AbstractVector,ns::CachedPETScNS,b::AbstractVector)
   consistent!(x)
   return x
 end
+
+function Algebra.numerical_setup!(ns::CachedPETScNS,mat::AbstractMatrix)
+  numerical_setup!(ns.ns,mat)
+end
+
+function Algebra.numerical_setup!(ns::CachedPETScNS,mat::AbstractMatrix,x::AbstractVector)
+  numerical_setup!(ns.ns,mat,x)
+end
