@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width, initial-scale=1.0"/><title>Darcy (GMG) · GridapSolvers.jl</title><meta name="title" content="Darcy (GMG) · GridapSolvers.jl"/><meta property="og:title" content="Darcy (GMG) · GridapSolvers.jl"/><meta property="twitter:title" content="Darcy (GMG) · GridapSolvers.jl"/><meta name="description" content="Documentation for GridapSolvers.jl."/><meta property="og:description" content="Documentation for GridapSolvers.jl."/><meta property="twitter:description" content="Documentation for GridapSolvers.jl."/><meta property="og:url" content="https://gridap.github.io/GridapSolvers.jl/Examples/DarcyGMG/"/><meta property="twitter:url" content="https://gridap.github.io/GridapSolvers.jl/Examples/DarcyGMG/"/><link rel="canonical" href="https://gridap.github.io/GridapSolvers.jl/Examples/DarcyGMG/"/><script data-outdated-warner src="../../assets/warner.js"></script><link href="https://cdnjs.cloudflare.com/ajax/libs/lato-font/3.0.0/css/lato-font.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/juliamono/0.050/juliamono.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/fontawesome.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/solid.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/brands.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.8/katex.min.css" rel="stylesheet" type="text/css"/><script>documenterBaseURL="../.."</script><script src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.6/require.min.js" data-main="../../assets/documenter.js"></script><script src="../../search_index.js"></script><script src="../../siteinfo.js"></script><script src="../../../versions.js"></script><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/catppuccin-mocha.css" data-theme-name="catppuccin-mocha"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/catppuccin-macchiato.css" data-theme-name="catppuccin-macchiato"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/catppuccin-frappe.css" data-theme-name="catppuccin-frappe"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/catppuccin-latte.css" data-theme-name="catppuccin-latte"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/documenter-dark.css" data-theme-name="documenter-dark" data-theme-primary-dark/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/documenter-light.css" data-theme-name="documenter-light" data-theme-primary/><script src="../../assets/themeswap.js"></script></head><body><div id="documenter"><nav class="docs-sidebar"><div class="docs-package-name"><span class="docs-autofit"><a href="../../">GridapSolvers.jl</a></span></div><button class="docs-search-query input is-rounded is-small is-clickable my-2 mx-auto py-1 px-2" id="documenter-search-query">Search docs (Ctrl + /)</button><ul class="docs-menu"><li><a class="tocitem" href="../../">Home</a></li><li><a class="tocitem" href="../../SolverInterfaces/">SolverInterfaces</a></li><li><a class="tocitem" href="../../MultilevelTools/">MultilevelTools</a></li><li><a class="tocitem" href="../../LinearSolvers/">LinearSolvers</a></li><li><a class="tocitem" href="../../NonlinearSolvers/">NonlinearSolvers</a></li><li><a class="tocitem" href="../../BlockSolvers/">BlockSolvers</a></li><li><a class="tocitem" href="../../PatchBasedSmoothers/">PatchBasedSmoothers</a></li><li><span class="tocitem">Examples</span><ul><li><a class="tocitem" href="../Stokes/">Stokes</a></li><li><a class="tocitem" href="../NavierStokes/">Navier-Stokes</a></li><li><a class="tocitem" href="../StokesGMG/">Stokes (GMG)</a></li><li><a class="tocitem" href="../NavierStokesGMG/">Navier-Stokes (GMG)</a></li><li class="is-active"><a class="tocitem" href>Darcy (GMG)</a></li></ul></li></ul><div class="docs-version-selector field has-addons"><div class="control"><span class="docs-label button is-static is-size-7">Version</span></div><div class="docs-selector control is-expanded"><div class="select is-fullwidth is-size-7"><select id="documenter-version-selector"></select></div></div></div></nav><div class="docs-main"><header class="docs-navbar"><a class="docs-sidebar-button docs-navbar-link fa-solid fa-bars is-hidden-desktop" id="documenter-sidebar-button" href="#"></a><nav class="breadcrumb"><ul class="is-hidden-mobile"><li><a class="is-disabled">Examples</a></li><li class="is-active"><a href>Darcy (GMG)</a></li></ul><ul class="is-hidden-tablet"><li class="is-active"><a href>Darcy (GMG)</a></li></ul></nav><div class="docs-right"><a class="docs-navbar-link" href="https://github.com/gridap/GridapSolvers.jl/blob/main/test/Applications/DarcyGMG.jl#" title="Edit source on GitHub"><span class="docs-icon fa-solid"></span></a><a class="docs-settings-button docs-navbar-link fa-solid fa-gear" id="documenter-settings-button" href="#" title="Settings"></a><a class="docs-article-toggle-button fa-solid fa-chevron-up" id="documenter-article-toggle-button" href="javascript:;" title="Collapse all docstrings"></a></div></header><article class="content" id="documenter-page"><pre><code class="language- hljs">module DarcyGMGApplication
+
+using Test
+using LinearAlgebra
+using FillArrays, BlockArrays
+
+using Gridap
+using Gridap.ReferenceFEs, Gridap.Algebra, Gridap.Geometry, Gridap.FESpaces
+using Gridap.CellData, Gridap.MultiField, Gridap.Algebra
+using PartitionedArrays
+using GridapDistributed
+
+using GridapSolvers
+using GridapSolvers.LinearSolvers, GridapSolvers.MultilevelTools, GridapSolvers.PatchBasedSmoothers
+using GridapSolvers.BlockSolvers: LinearSystemBlock, BiformBlock, BlockTriangularSolver
+
+function get_patch_smoothers(mh,tests,biform,patch_decompositions,qdegree)
+  patch_spaces = PatchFESpace(tests,patch_decompositions)
+  nlevs = num_levels(mh)
+  smoothers = map(view(tests,1:nlevs-1),patch_decompositions,patch_spaces) do tests, PD, Ph
+    Vh = get_fe_space(tests)
+    Ω  = Triangulation(PD)
+    dΩ = Measure(Ω,qdegree)
+    ap = (u,v) -&gt; biform(u,v,dΩ)
+    patch_smoother = PatchBasedLinearSolver(ap,Ph,Vh)
+    return RichardsonSmoother(patch_smoother,10,0.2)
+  end
+  return smoothers
+end
+
+function get_bilinear_form(mh_lev,biform,qdegree)
+  model = get_model(mh_lev)
+  Ω = Triangulation(model)
+  dΩ = Measure(Ω,qdegree)
+  return (u,v) -&gt; biform(u,v,dΩ)
+end
+
+function main(distribute,np,nc,np_per_level)
+  parts = distribute(LinearIndices((prod(np),)))
+
+  Dc = length(nc)
+  domain = (Dc == 2) ? (0,1,0,1) : (0,1,0,1,0,1)
+  mh = CartesianModelHierarchy(parts,np_per_level,domain,nc)
+  model = get_model(mh,1)
+
+  order = 2
+  qdegree = 2*(order+1)
+  reffe_u = ReferenceFE(raviart_thomas,Float64,order-1)
+  reffe_p = ReferenceFE(lagrangian,Float64,order-1;space=:P)
+
+  u_exact(x) = (Dc==2) ? VectorValue(x[1]+x[2],-x[2]) : VectorValue(x[1]+x[2],-x[2],0.0)
+  p_exact(x) = 2.0*x[1]-1.0
+
+  tests_u  = TestFESpace(mh,reffe_u,dirichlet_tags=[&quot;boundary&quot;]);
+  trials_u = TrialFESpace(tests_u,[u_exact]);
+  U, V = get_fe_space(trials_u,1), get_fe_space(tests_u,1)
+  Q = TestFESpace(model,reffe_p;conformity=:L2)
+
+  mfs = Gridap.MultiField.BlockMultiFieldStyle()
+  X = MultiFieldFESpace([U,Q];style=mfs)
+  Y = MultiFieldFESpace([V,Q];style=mfs)
+
+  α = 1.e2
+  f(x) = u_exact(x) + ∇(p_exact)(x)
+  graddiv(u,v,dΩ) = ∫(α*divergence(u)⋅divergence(v))dΩ
+  biform_u(u,v,dΩ) = ∫(v⊙u)dΩ + graddiv(u,v,dΩ)
+  biform((u,p),(v,q),dΩ) = biform_u(u,v,dΩ) - ∫(divergence(v)*p)dΩ - ∫(divergence(u)*q)dΩ
+  liform((v,q),dΩ) = ∫(v⋅f)dΩ
+
+  Ω = Triangulation(model)
+  dΩ = Measure(Ω,qdegree)
+
+  a(u,v) = biform(u,v,dΩ)
+  l(v) = liform(v,dΩ)
+  op = AffineFEOperator(a,l,X,Y)
+  A, b = get_matrix(op), get_vector(op);
+
+  biforms = map(mhl -&gt; get_bilinear_form(mhl,biform_u,qdegree),mh)
+  patch_decompositions = PatchDecomposition(mh)
+  smoothers = get_patch_smoothers(
+    mh,tests_u,biform_u,patch_decompositions,qdegree
+  )
+  prolongations = setup_prolongation_operators(
+    tests_u,qdegree;mode=:residual
+  )
+  restrictions = setup_restriction_operators(
+    tests_u,qdegree;mode=:residual,solver=IS_ConjugateGradientSolver(;reltol=1.e-6)
+  )
+
+  gmg = GMGLinearSolver(
+    mh,trials_u,tests_u,biforms,
+    prolongations,restrictions,
+    pre_smoothers=smoothers,
+    post_smoothers=smoothers,
+    coarsest_solver=LUSolver(),
+    maxiter=3,mode=:preconditioner,verbose=i_am_main(parts)
+  )
+
+  solver_u = gmg
+  solver_p = CGSolver(JacobiLinearSolver();maxiter=20,atol=1e-14,rtol=1.e-6,verbose=i_am_main(parts))
+  solver_p.log.depth = 2
+
+  bblocks  = [LinearSystemBlock() LinearSystemBlock();
+              LinearSystemBlock() BiformBlock((p,q) -&gt; ∫(-1.0/α*p*q)dΩ,Q,Q)]
+  coeffs = [1.0 1.0;
+            0.0 1.0]
+  P = BlockTriangularSolver(bblocks,[solver_u,solver_p],coeffs,:upper)
+  solver = FGMRESSolver(20,P;atol=1e-14,rtol=1.e-10,verbose=i_am_main(parts))
+  ns = numerical_setup(symbolic_setup(solver,A),A)
+
+  x = allocate_in_domain(A); fill!(x,0.0)
+  solve!(x,ns,b)
+
+  r = allocate_in_range(A)
+  mul!(r,A,x)
+  r .-= b
+  @test norm(r) &lt; 1.e-5
+end
+
+end # module</code></pre><hr/><p><em>This page was generated using <a href="https://github.com/fredrikekre/Literate.jl">Literate.jl</a>.</em></p></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="../NavierStokesGMG/">« Navier-Stokes (GMG)</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="auto">Automatic (OS)</option><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option><option value="catppuccin-latte">catppuccin-latte</option><option value="catppuccin-frappe">catppuccin-frappe</option><option value="catppuccin-macchiato">catppuccin-macchiato</option><option value="catppuccin-mocha">catppuccin-mocha</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 1.5.0 on <span class="colophon-date" title="Thursday 15 August 2024 14:42">Thursday 15 August 2024</span>. Using Julia version 1.10.4.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>
