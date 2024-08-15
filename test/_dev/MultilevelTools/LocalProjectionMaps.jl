@@ -44,4 +44,3 @@ G = Matrix(D)
 F-G
 norm(F-G)
 maximum(abs.(F-G))
-

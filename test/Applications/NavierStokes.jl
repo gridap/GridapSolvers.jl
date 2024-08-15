@@ -78,7 +78,7 @@ function main(distribute,np,nc)
   f = (Dc==2) ? VectorValue(0.0,0.0) : VectorValue(0.0,0.0,0.0)
 
   Π_Qh = LocalProjectionMap(divergence,Q,qdegree)
-  graddiv(u,v,dΩ) = ∫(α*Π_Qh(u,dΩ)⋅Π_Qh(v,dΩ))dΩ
+  graddiv(u,v,dΩ) = ∫(α*(∇⋅v)⋅Π_Qh(u))dΩ
 
   conv(u,∇u) = (∇u')⋅u
   dconv(du,∇du,u,∇u) = conv(u,∇du)+conv(du,∇u)
