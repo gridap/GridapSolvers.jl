@@ -198,6 +198,6 @@ The code used to create these results can be found [here](https://github.com/gri
 
 ## Acknowledgements
 
-This research was partially funded by the Australian Government through the Australian Research Council (project number DP210103092). This work was also supported by computational resources provided by the Australian Government through NCI under the National Computational Merit Allocation Scheme (NCMAS) and ANU Merit Allocation Scheme (ANUMAS).
+This research was partially funded by the Australian Government through the Australian Research Council (project number DP210103092). This work was also supported by computational resources provided by the Australian Government through NCI under the National Computational Merit Allocation Scheme (NCMAS), the Monash-NCI partnership scheme and the ANU Merit Allocation Scheme (ANUMAS).
 
 ## References
