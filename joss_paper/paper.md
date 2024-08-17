@@ -32,7 +32,7 @@ aas-journal: Journal of Open Source Software
 
 ## Summary and statement of need
 
-The ever-increasing demand for resolution and accuracy in mathematical models of physical processes governed by systems of Partial Differential Equations (PDEs) can only be addressed using fully-parallel advanced numerical discretization methods and scalable solution methods, thus able to exploit the vast amount of computational resources in state-of-the-art supercomputers.
+The ever-increasing demand for resolution and accuracy in mathematical models of physical processes governed by systems of Partial Differential Equations (PDEs) can only be addressed using fully-parallel advanced numerical discretization methods and scalable solvers, thus able to exploit the vast amount of computational resources in state-of-the-art supercomputers.
 
 One of the biggest scalability bottlenecks within Finite Element (FE) parallel codes is the solution of linear systems arising from the discretization of PDEs.
 The implementation of exact factorization-based solvers in parallel environments is an extremely challenging task, and even state-of-the-art libraries such as MUMPS [@MUMPS1] [@MUMPS2] or PARDISO [@PARDISO] have severe limitations in terms of scalability and memory consumption above a certain number of CPU cores.
@@ -41,7 +41,9 @@ For simple problems, algebraic solvers and preconditioners (i.e based uniquelly 
 
 In these cases, solvers that exploit the physics and mathematical discretization of the particular problem are required. This is the case of many multiphysics problems involving differential operators with a large kernel such as the divergence [@Arnold1] and the curl [@Arnold2]. Examples can be found amongst highly relevant problems such as Navier-Stokes, Maxwell or Darcy. Scalable solvers for this type of multiphysics problems rely on exploiting the block structure of such systems to find a spectrally equivalent block-preconditioner, and are often tied to a specific discretization of the underlying equations.
 
-To this end, GridapSolvers is a registered Julia [@Bezanson2017] software package which provides highly scalable physics-informed solvers tailored for the FE numerical solution of PDEs on parallel computers. Emphasis is put on the modular design of the library, which easily allows new preconditioners to be designed from the user's specific problem.
+As a consequence, high-quality open-source parallel finite element packages like FEniCS [@fenics-book] or deal.II [@dealII93] already provide implementations of several state-of-the-art physics-informed solvers [@fenics-patch] [@dealII-patch]. The Gridap ecosystem [@Badia2020] aims to provide a similar level of functionality within the Julia programming language [@Bezanson2017].
+
+To this end, GridapSolvers is a registered Julia software package which provides highly scalable physics-informed solvers tailored for the FE numerical solution of PDEs on parallel computers within the Gridap ecosystem of packages. Emphasis is put on the modular design of the library, which easily allows new preconditioners to be designed from the user's specific problem.
 
 ## Building blocks and composability
 
@@ -191,6 +193,8 @@ end
 ## Parallel scaling benchmark
 
 The following section shows scalability results for the demo problem discussed above. We run our code on the Gadi supercomputer, which is part of the Australian National Computational Infrastructure (NCI). We use Intel's Cascade Lake 2x24-core Xeon Platinum 8274 nodes. Scalability is shown for up to 64 nodes, for a fixed local problem size of 48x64 quadrangle cells per processor. This amounts to a maximum size of approximately 37M cells and 415M degrees of freedom distributed amongst 3072 processors. Within the GMG solver, the number of coarsening levels is progressively increased to keep the global size of the coarsest solve (approximately) constant. The coarsest solve is then performed by a CG solver preconditioned by an Algebraic MultiGrid (AMG) solver, provided by PETSc [@petsc-user-ref] through the package GridapPETSc.jl.
+
+The results show that the code scales relatively well up to 3072 processors, with loss in performance mostly tied to the number of GMG levels used for the velocity solver. The number of F-GMRES iterations required for convergence is also shown to be relatively constant (and even decreasing for bigger problem sizes), indicating that the preconditioner is robust with respect to the problem size.
 
 The code used to create these results can be found [here](https://github.com/gridap/GridapSolvers.jl/tree/joss-paper/joss_paper/scalability). The exact releases for the packages used are provided by Julia's `Manifest.toml` file.
 
