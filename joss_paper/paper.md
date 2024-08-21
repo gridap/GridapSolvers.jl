@@ -50,13 +50,13 @@ To this end, GridapSolvers is a registered Julia software package which provides
 \autoref{fig:packages} depicts the relation among GridapDistributed and other packages in the Julia package ecosystem.
 
 The core library Gridap [@Badia2020] provides all necessary abstraction and interfaces needed for the FE solution of PDEs [@Verdugo2021] for serial computing. GridapDistributed [@gridapdistributed] provides distributed-memory counterparts for these abstractions, while leveraging the serial implementations in Gridap to handle the local portion on each parallel task. GridapDistributed relies on PartitionedArrays [@parrays] in order to handle the parallel execution model (e.g., message-passing via the Message Passing Interface (MPI) [@mpi40]), global data distribution layout, and communication among tasks. PartitionedArrays also provides a parallel implementation of partitioned global linear systems (i.e., linear algebra vectors and sparse matrices) as needed in grid-based numerical simulations.
-This parallel framework does however not include any performant solver for the resulting linear systems. This was delegated to GridapPETSc, which provides a plethora of highly-scalable and efficient algebraic solvers through a high-level interface to the Portable, Extensible Toolkit for Scientific Computation (PETSc) [@petsc-user-ref].
+This parallel framework does however not include any performant solver for the resulting linear systems. This was delegated to GridapPETSc [@gridapetsc], which provides a plethora of highly-scalable and efficient algebraic solvers through a high-level interface to the Portable, Extensible Toolkit for Scientific Computation (PETSc) [@petsc-user-ref].
 
 GridapSolvers complements GridapPETSc with a modular and extensible interface for the design of physics-informed solvers. Some of the highlights of the library are:
 
 - A set of HPC-first implementations for popular Krylov-based iterative solvers. These solvers extend Gridap's API and are fully compatible with PartitionedArrays.
 - A modular, high-level interface for designing block-based preconditioners for multiphysics problems. These preconditioners can be used together with any solver compliant with Gridap's API, including those provided by GridapPETSc.
-- A generic interface to handle multi-level distributed meshes, with full support for Adaptative Mesh Refinement (AMR) using p4est [@p4est] through GridapP4est.
+- A generic interface to handle multi-level distributed meshes, with full support for Adaptative Mesh Refinement (AMR) using p4est [@p4est] through GridapP4est [@gridap4est].
 - A modular implementation of Geometric MultiGrid (GMG) solvers [@gmg-book], allowing different types of smoothers and restriction/prolongation operators.
 - A generic interface for patch-based subdomain decomposition methods, and an implementation of patch-based smoothers for GMG solvers.
 
