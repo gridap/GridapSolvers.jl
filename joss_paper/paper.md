@@ -35,13 +35,13 @@ aas-journal: Journal of Open Source Software
 The ever-increasing demand for resolution and accuracy in mathematical models of physical processes governed by systems of Partial Differential Equations (PDEs) can only be addressed using fully-parallel advanced numerical discretization methods and scalable solvers, thus able to exploit the vast amount of computational resources in state-of-the-art supercomputers.
 
 One of the biggest scalability bottlenecks within Finite Element (FE) parallel codes is the solution of linear systems arising from the discretization of PDEs.
-The implementation of exact factorization-based solvers in parallel environments is an extremely challenging task, and even state-of-the-art libraries such as MUMPS [@MUMPS1] [@MUMPS2] or PARDISO [@PARDISO] have severe limitations in terms of scalability and memory consumption above a certain number of CPU cores.
+The implementation of exact factorization-based solvers in parallel environments is an extremely challenging task, and even state-of-the-art libraries such as MUMPS [@MUMPS1; @MUMPS2] or PARDISO [@PARDISO] have severe limitations in terms of scalability and memory consumption above a certain number of CPU cores.
 Hence the use of iterative methods is crucial to maintain scalability of FE codes. Unfortunately, the convergence of iterative methods is not guaranteed and rapidly deteriorates as the size of the linear system increases. To retain performance, the use of highly scalable preconditioners is mandatory.
 For simple problems, algebraic solvers and preconditioners (i.e based uniquelly on the algebraic system) are enough to obtain robust convergence. Many well-known libraries providing algebraic solvers already exist, such as PETSc [@petsc-user-ref], Trilinos [@trilinos], or Hypre [@hypre]. However, algebraic solvers are not always suited to deal with more challenging problems.
 
 In these cases, solvers that exploit the physics and mathematical discretization of the particular problem are required. This is the case of many multiphysics problems involving differential operators with a large kernel such as the divergence [@Arnold1] and the curl [@Arnold2]. Examples can be found amongst highly relevant problems such as Navier-Stokes, Maxwell or Darcy. Scalable solvers for this type of multiphysics problems rely on exploiting the block structure of such systems to find a spectrally equivalent block-preconditioner, and are often tied to a specific discretization of the underlying equations.
 
-As a consequence, high-quality open-source parallel finite element packages like FEniCS [@fenics-book] or deal.II [@dealII93] already provide implementations of several state-of-the-art physics-informed solvers [@fenics-patch] [@dealII-patch]. The Gridap ecosystem [@Badia2020] aims to provide a similar level of functionality within the Julia programming language [@Bezanson2017].
+As a consequence, high-quality open-source parallel finite element packages like FEniCS [@fenics-book] or deal.II [@dealII93] already provide implementations of several state-of-the-art physics-informed solvers [@fenics-patch; @dealII-patch]. The Gridap ecosystem [@Badia2020] aims to provide a similar level of functionality within the Julia programming language [@Bezanson2017].
 
 To this end, GridapSolvers is a registered Julia software package which provides highly scalable physics-informed solvers tailored for the FE numerical solution of PDEs on parallel computers within the Gridap ecosystem of packages. Emphasis is put on the modular design of the library, which easily allows new preconditioners to be designed from the user's specific problem.
 
@@ -89,116 +89,17 @@ $$
 with $A$ the velocity laplacian block, and $M$ a pressure mass matrix.
 
 The mass matrix is approximated by a Conjugate Gradient (CG) solver with Jacobi preconditioner. The eliminated velocity block is approximated by a 2-level V-cycle GMG solver, where the coarsest level is solved exactly in a single processor.
-The code is setup to run in parallel with 4 MPI tasks and can be executed with the following command: `mpiexec -n 4 julia --project=. demo.jl`.
-
-```julia
-using Gridap, Gridap.Algebra, Gridap.MultiField
-using PartitionedArrays, GridapDistributed, GridapSolvers
-
-using GridapSolvers.LinearSolvers
-using GridapSolvers.MultilevelTools
-using GridapSolvers.BlockSolvers
-
-function get_bilinear_form(mh_lev,biform,qdegree)
-  model = get_model(mh_lev)
-  Ω = Triangulation(model)
-  dΩ = Measure(Ω,qdegree)
-  return (u,v) -> biform(u,v,dΩ)
-end
-
-function add_labels!(labels)
-  add_tag_from_tags!(labels,"top",[6])
-  add_tag_from_tags!(labels,"walls",[1,2,3,4,5,7,8])
-end
-
-with_mpi() do distribute
-  np_per_level = [(2,2),(1,1)] # Number of processors per GMG level
-  parts = distribute(LinearIndices((prod(np_per_level[1]),)))
-
-  # Create multi-level mesh
-  domain = (0,1,0,1) # Cartesian domain (xmin,xmax,ymin,ymax)
-  ncells = (10,10)   # Number of cells
-  mh = CartesianModelHierarchy(parts,np_per_level,domain,ncells;add_labels!)
-  model = get_model(mh,1) # Finest mesh
-
-  # Create FESpaces
-  fe_order = 2
-  reffe_u = ReferenceFE(lagrangian,VectorValue{2,Float64},fe_order)
-  reffe_p = ReferenceFE(lagrangian,Float64,fe_order-1;space=:P)
-
-  tests_u  = TestFESpace(mh,reffe_u,dirichlet_tags=["walls","top"])
-  trials_u = TrialFESpace(tests_u,[VectorValue(0.0,0.0),VectorValue(1.0,0.0)])
-  U, V = get_fe_space(trials_u,1), get_fe_space(tests_u,1)
-  Q = TestFESpace(model,reffe_p;conformity=:L2,constraint=:zeromean) 
-
-  mfs = BlockMultiFieldStyle() # Activates block-wise assembly
-  X = MultiFieldFESpace([U,Q];style=mfs)
-  Y = MultiFieldFESpace([V,Q];style=mfs)
-
-  # Weak formulation
-  f = VectorValue(1.0,1.0)
-  biform_u(u,v,dΩ) = ∫(∇(v)⊙∇(u))dΩ
-  biform((u,p),(v,q),dΩ) = biform_u(u,v,dΩ) - ∫((∇⋅v)*p)dΩ - ∫((∇⋅u)*q)dΩ
-  liform((v,q),dΩ) = ∫(v⋅f)dΩ
-
-  # Assemble linear system
-  qdegree = 2*(fe_order+1) # Quadrature degree
-  Ω = Triangulation(model)
-  dΩ = Measure(Ω,qdegree)
-  op = AffineFEOperator((u,v)->biform(u,v,dΩ),v->liform(v,dΩ),X,Y)
-  A, b = get_matrix(op), get_vector(op)
-
-  # GMG preconditioner for the velocity block
-  biforms = map(mh) do mhl
-    get_bilinear_form(mhl,biform_u,qdegree)
-  end
-  smoothers = map(view(mh,1:num_levels(mh)-1)) do mhl
-    RichardsonSmoother(JacobiLinearSolver(),10,2.0/3.0)
-  end
-  restrictions, prolongations = setup_transfer_operators(
-    trials_u, qdegree; mode=:residual, solver=CGSolver(JacobiLinearSolver())
-  )
-  solver_u = GMGLinearSolver(
-    mh,trials_u,tests_u,biforms,
-    prolongations,restrictions,
-    pre_smoothers=smoothers,
-    post_smoothers=smoothers,
-    coarsest_solver=LUSolver(),
-    maxiter=4,mode=:solver
-  )
-
-  # PCG solver for the pressure block
-  solver_p = CGSolver(JacobiLinearSolver();maxiter=20,atol=1e-14,rtol=1.e-6)
-
-  # Block triangular preconditioner
-  blocks = [LinearSystemBlock() LinearSystemBlock();
-            LinearSystemBlock() BiformBlock((p,q) -> ∫(p*q)dΩ,Q,Q)]
-  P = BlockTriangularSolver(blocks,[solver_u,solver_p])
-
-  # Global solver
-  solver = FGMRESSolver(10,P;rtol=1.e-8,verbose=i_am_main(parts))
-  ns = numerical_setup(symbolic_setup(solver,A),A)
-
-  # Solve
-  x = allocate_in_domain(A)
-  fill!(x,0.0)
-  solve!(x,ns,b)
-
-  # Postprocess
-  uh, ph = FEFunction(X,x)
-  writevtk(Ω,"demo",cellfields=["uh"=>uh,"ph"=>ph])
-end
-```
+The code for this example can be found [here](https://github.com/gridap/GridapSolvers.jl/tree/joss-paper/joss_paper/demo.jl). It is setup to run in parallel with 4 MPI tasks and can be executed with the following command: `mpiexec -n 4 julia --project=. demo.jl`.
 
 ## Parallel scaling benchmark
 
 The following section shows scalability results for the demo problem discussed above. We run our code on the Gadi supercomputer, which is part of the Australian National Computational Infrastructure (NCI). We use Intel's Cascade Lake 2x24-core Xeon Platinum 8274 nodes. Scalability is shown for up to 64 nodes, for a fixed local problem size of 48x64 quadrangle cells per processor. This amounts to a maximum size of approximately 37M cells and 415M degrees of freedom distributed amongst 3072 processors. Within the GMG solver, the number of coarsening levels is progressively increased to keep the global size of the coarsest solve (approximately) constant. The coarsest solve is then performed by a CG solver preconditioned by an Algebraic MultiGrid (AMG) solver, provided by PETSc [@petsc-user-ref] through the package GridapPETSc.jl.
 
-The results show that the code scales relatively well up to 3072 processors, with loss in performance mostly tied to the number of GMG levels used for the velocity solver. The number of F-GMRES iterations required for convergence is also shown to be relatively constant (and even decreasing for bigger problem sizes), indicating that the preconditioner is robust with respect to the problem size.
+The results in \autoref{fig:scalability} show that the code scales relatively well up to 3072 processors, with loss in performance mostly tied to the number of GMG levels used for the velocity solver. The number of F-GMRES iterations required for convergence is also shown to be relatively constant (and even decreasing for bigger problem sizes), indicating that the preconditioner is robust with respect to the problem size.
 
 The code used to create these results can be found [here](https://github.com/gridap/GridapSolvers.jl/tree/joss-paper/joss_paper/scalability). The exact releases for the packages used are provided by Julia's `Manifest.toml` file.
 
-![**Top**: Weak scalability for a Stokes problem in 2D. Time is given per F-GMRES iteration, as a function of the number of processors. **Middle**: Number of coarsening levels for the GMG solver, as a function of the number of processors. **Bottom**: Number of F-GMRES iterations required for convergence. \label{fig:packages}](weakScalability.png){ width=80% }
+![**Top**: Weak scalability for a Stokes problem in 2D. Time is given per F-GMRES iteration, as a function of the number of processors. **Middle**: Number of coarsening levels for the GMG solver, as a function of the number of processors. **Bottom**: Number of F-GMRES iterations required for convergence. \label{fig:scalability}](weakScalability.png){ width=80% }
 
 ## Acknowledgements
 
