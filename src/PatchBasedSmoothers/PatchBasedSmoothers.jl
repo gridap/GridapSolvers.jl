@@ -13,7 +13,7 @@ using GridapSolvers.MultilevelTools
 
 export PatchDecomposition
 export PatchFESpace
-export PatchBasedLinearSolver
+export PatchBasedLinearSolver, VankaSolver
 
 export PatchProlongationOperator, PatchRestrictionOperator
 export setup_patch_prolongation_operators, setup_patch_restriction_operators
@@ -26,10 +26,12 @@ include("seq/PatchTriangulations.jl")
 # FESpaces
 include("seq/PatchFESpaces.jl")
 include("mpi/PatchFESpaces.jl")
+include("seq/ZeroMeanPatchFESpaces.jl")
 include("seq/PatchMultiFieldFESpaces.jl")
 
 # Solvers
 include("seq/PatchBasedLinearSolvers.jl")
 include("seq/PatchTransferOperators.jl")
+include("seq/VankaSolvers.jl")
 
 end

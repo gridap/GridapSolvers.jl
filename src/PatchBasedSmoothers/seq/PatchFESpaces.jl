@@ -38,12 +38,24 @@
 
 FESpace representing a patch-based subspace decomposition `V = Σ_i V_i` of a global space `V`.
 """
-struct PatchFESpace  <: FESpaces.SingleFieldFESpace
-  Vh                  :: FESpaces.SingleFieldFESpace
+struct PatchFESpace{A,B} <: FESpaces.SingleFieldFESpace
+  Vh                  :: A
   patch_decomposition :: PatchDecomposition
   num_dofs            :: Int
   patch_cell_dofs_ids :: Arrays.Table
   dof_to_pdof         :: Arrays.Table
+  metadata            :: B
+
+  function PatchFESpace(
+    space::SingleFieldFESpace,
+    patch_decomposition::PatchDecomposition,
+    num_dofs,patch_cell_dofs_ids,dof_to_pdof,
+    matadata=nothing
+  )
+    A = typeof(space)
+    B = typeof(matadata)
+    new{A,B}(space,patch_decomposition,num_dofs,patch_cell_dofs_ids,dof_to_pdof,matadata)
+  end
 end
 
 @doc """
@@ -103,13 +115,13 @@ function PatchFESpace(
   return PatchFESpace(space,patch_decomposition,num_dofs,patch_cell_dofs_ids,dof_to_pdof)
 end
 
-FESpaces.get_dof_value_type(a::PatchFESpace)   = Gridap.FESpaces.get_dof_value_type(a.Vh)
-FESpaces.get_free_dof_ids(a::PatchFESpace)     = Base.OneTo(a.num_dofs)
-FESpaces.get_fe_basis(a::PatchFESpace)         = get_fe_basis(a.Vh)
-FESpaces.ConstraintStyle(::PatchFESpace)       = Gridap.FESpaces.UnConstrained()
-FESpaces.ConstraintStyle(::Type{PatchFESpace}) = Gridap.FESpaces.UnConstrained()
-FESpaces.get_vector_type(a::PatchFESpace)      = get_vector_type(a.Vh)
-FESpaces.get_fe_dof_basis(a::PatchFESpace)     = get_fe_dof_basis(a.Vh)
+FESpaces.get_dof_value_type(a::PatchFESpace)     = Gridap.FESpaces.get_dof_value_type(a.Vh)
+FESpaces.get_free_dof_ids(a::PatchFESpace)       = Base.OneTo(a.num_dofs)
+FESpaces.get_fe_basis(a::PatchFESpace)           = get_fe_basis(a.Vh)
+FESpaces.ConstraintStyle(::PatchFESpace)         = Gridap.FESpaces.UnConstrained()
+FESpaces.ConstraintStyle(::Type{<:PatchFESpace}) = Gridap.FESpaces.UnConstrained()
+FESpaces.get_vector_type(a::PatchFESpace)        = get_vector_type(a.Vh)
+FESpaces.get_fe_dof_basis(a::PatchFESpace)       = get_fe_dof_basis(a.Vh)
 
 function Gridap.CellData.get_triangulation(a::PatchFESpace)
   PD = a.patch_decomposition
