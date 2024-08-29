@@ -164,7 +164,7 @@ function ModelHierarchy(models::Vector{<:GridapDistributed.DistributedDiscreteMo
     @check Adaptivity.is_child(models[lev],models[lev+1]) "Incorrect hierarchy of models."
   end
   ranks = get_parts(models[1])
-  @check all(m -> get_parts(m) === ranks, models) "Models have different communicators."
+  @check all(m -> length(get_parts(m)) === length(ranks), models) "Models have different communicators."
 
   level_parts = fill(ranks,nlevs)
   meshes = Vector{ModelHierarchyLevel}(undef,nlevs)
