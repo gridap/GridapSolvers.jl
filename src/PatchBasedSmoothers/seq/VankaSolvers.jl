@@ -107,7 +107,7 @@ function Algebra.numerical_setup(ss::VankaSS,mat::PSparseMatrix)
 end
 
 function Algebra.solve!(x::PVector,ns::DistributedVankaNS,b::PVector)
-  map(solve!,x,ns.ns,b)
+  map(solve!,partition(x),ns.ns,partition(b))
   assemble!(x) |> wait
   consistent!(x) |> wait
   return x
