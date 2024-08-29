@@ -65,11 +65,11 @@ function _get_interpolation_cache(lev::Int,sh::FESpaceHierarchy,qdegree::Int,mod
   if i_am_in(cparts)
     model_h = get_model_before_redist(sh,lev)
     Uh   = get_fe_space_before_redist(sh,lev)
-    fv_h = pfill(0.0,partition(Uh.gids))
+    fv_h = zero_free_values(Uh)
     dv_h = (mode == :solution) ? get_dirichlet_dof_values(Uh) : zero_dirichlet_values(Uh)
 
     UH   = get_fe_space(sh,lev+1)
-    fv_H = pfill(0.0,partition(UH.gids))
+    fv_H = zero_free_values(UH)
     dv_H = (mode == :solution) ? get_dirichlet_dof_values(UH) : zero_dirichlet_values(UH)
 
     cache_refine = model_h, Uh, fv_h, dv_h, UH, fv_H, dv_H
@@ -222,7 +222,7 @@ end
 ### Applying the operators:
 
 # A) Prolongation, without redistribution
-function LinearAlgebra.mul!(y::PVector,A::DistributedGridTransferOperator{Val{:prolongation},Val{false}},x::PVector)
+function LinearAlgebra.mul!(y::AbstractVector,A::DistributedGridTransferOperator{Val{:prolongation},Val{false}},x::AbstractVector)
   cache_refine, cache_redist = A.cache
   model_h, Uh, fv_h, dv_h, UH, fv_H, dv_H = cache_refine
 
@@ -235,7 +235,7 @@ function LinearAlgebra.mul!(y::PVector,A::DistributedGridTransferOperator{Val{:p
 end
 
 # B.1) Restriction, without redistribution, by interpolation
-function LinearAlgebra.mul!(y::PVector,A::DistributedGridTransferOperator{Val{:restriction},Val{false},Val{:interpolation}},x::PVector)
+function LinearAlgebra.mul!(y::AbstractVector,A::DistributedGridTransferOperator{Val{:restriction},Val{false},Val{:interpolation}},x::AbstractVector)
   cache_refine, cache_redist = A.cache
   model_h, Uh, fv_h, dv_h, UH, fv_H, dv_H = cache_refine
 
@@ -248,7 +248,7 @@ function LinearAlgebra.mul!(y::PVector,A::DistributedGridTransferOperator{Val{:r
 end
 
 # B.2) Restriction, without redistribution, by projection
-function LinearAlgebra.mul!(y::PVector,A::DistributedGridTransferOperator{Val{:restriction},Val{false},Val{:projection}},x::PVector)
+function LinearAlgebra.mul!(y::AbstractVector,A::DistributedGridTransferOperator{Val{:restriction},Val{false},Val{:projection}},x::AbstractVector)
   cache_refine, cache_redist = A.cache
   model_h, Uh, fv_h, dv_h, VH, AH_ns, lH, xH, bH, bH0, assem = cache_refine
 
@@ -265,7 +265,7 @@ function LinearAlgebra.mul!(y::PVector,A::DistributedGridTransferOperator{Val{:r
 end
 
 # B.3) Restriction, without redistribution, by dof selection (only nodal dofs)
-function LinearAlgebra.mul!(y::PVector,A::DistributedGridTransferOperator{Val{:restriction},Val{false},Val{:dof_mask}},x::PVector)
+function LinearAlgebra.mul!(y::AbstractVector,A::DistributedGridTransferOperator{Val{:restriction},Val{false},Val{:dof_mask}},x::AbstractVector)
   cache_refine, cache_redist = A.cache
   model_h, Uh, fv_h, dv_h, UH, fv_H, dv_H = cache_refine
 
@@ -366,6 +366,19 @@ function LinearAlgebra.mul!(y::Union{PVector,Nothing},A::DistributedGridTransfer
 end
 
 ###############################################################
+
+function LinearAlgebra.mul!(y::AbstractVector,A::DistributedGridTransferOperator{Val{:restriction},Val{false},Val{:dual_projection}},x::AbstractVector)
+  cache_refine, cache_redist = A.cache
+  model_h, Uh, VH, Mh_ns, rh, uh, assem, dΩhH = cache_refine
+  fv_h = get_free_dof_values(uh)
+
+  solve!(rh,Mh_ns,x)
+  copy!(fv_h,rh)
+  v = get_fe_basis(VH)
+  assemble_vector!(y,assem,collect_cell_vector(VH,∫(v⋅uh)*dΩhH))
+  
+  return y
+end
 
 function LinearAlgebra.mul!(y::PVector,A::DistributedGridTransferOperator{Val{:restriction},Val{false},Val{:dual_projection}},x::PVector)
   cache_refine, cache_redist = A.cache
