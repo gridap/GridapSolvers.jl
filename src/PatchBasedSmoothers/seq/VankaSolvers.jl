@@ -34,19 +34,16 @@ function VankaSolver(space::MultiFieldFESpace,patch_cells::Table{<:Integer})
 end
 
 function VankaSolver(space::GridapDistributed.DistributedMultiFieldFESpace)
-  patch_ids = map(local_views(space)) do space 
-    solver = VankaSolver(space)
-    return solver.patch_ids
-  end
-  return VankaSolver(patch_ids)
+  local_solvers = map(VankaSolver,local_views(space))
+  return SchwarzLinearSolver(local_solvers)
 end
 
-function VankaSolver(space::GridapDistributed.DistributedMultiFieldFESpace,patch_decomposition::DistributedPatchDecomposition)
-  patch_ids = map(local_views(space),local_views(patch_decomposition)) do space, patch_decomposition
-    solver = VankaSolver(space,patch_decomposition)
-    return solver.patch_ids
-  end
-  return VankaSolver(patch_ids)
+function VankaSolver(
+  space::GridapDistributed.DistributedMultiFieldFESpace,
+  patch_decomposition::DistributedPatchDecomposition
+)
+  local_solvers = map(VankaSolver,local_views(space),local_views(patch_decomposition))
+  return SchwarzLinearSolver(local_solvers)
 end
 
 struct VankaSS{A} <: Algebra.SymbolicSetup
@@ -91,24 +88,5 @@ function Algebra.solve!(x::AbstractVector,ns::VankaNS,b::AbstractVector)
     x[ids] .+= bk
   end
 
-  return x
-end
-
-struct DistributedVankaNS{A,B} <: Algebra.NumericalSetup
-  solver::VankaSolver{A}
-  ns::B
-end
-
-function Algebra.numerical_setup(ss::VankaSS,mat::PSparseMatrix)
-  ns = map(partition(mat)) do mat
-    numerical_setup(ss,mat)
-  end
-  return DistributedVankaNS(ss.solver,ns)
-end
-
-function Algebra.solve!(x::PVector,ns::DistributedVankaNS,b::PVector)
-  map(solve!,partition(x),ns.ns,partition(b))
-  assemble!(x) |> wait
-  consistent!(x) |> wait
   return x
 end
