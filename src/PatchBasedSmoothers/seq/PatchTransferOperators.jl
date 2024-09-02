@@ -268,15 +268,13 @@ function LinearAlgebra.mul!(y::AbstractVector,A::PatchRestrictionOperator{Val{fa
     solve!(dxp,Ap_ns,rp)
   end
   inject!(dxh,Ph,dxp)
-  consistent!(dxh) |> fetch
 
   assemble_vector!(v->A.rhs(duh,v),rh,Uh)
   fv_h .= fv_h .- rh
-  consistent!(fv_h) |> fetch
 
   solve!(rh,Mh_ns,fv_h)
   copy!(fv_h,rh)
-  consistent!(fv_h) |> fetch
+  isa(y,PVector) && wait(consistent!(fv_h))
   v = get_fe_basis(VH)
   assemble_vector!(y,assem,collect_cell_vector(VH,∫(v⋅uh)*dΩhH))
 
