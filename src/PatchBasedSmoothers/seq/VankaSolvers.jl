@@ -9,22 +9,25 @@ struct VankaSolver{A} <: Algebra.LinearSolver
   end
 end
 
-function VankaSolver(space::MultiFieldFESpace)
+function VankaSolver(space::FESpace)
   trian = get_triangulation(space)
   ncells = num_cells(trian)
   patch_cells = Table(1:ncells,1:ncells+1)
   return VankaSolver(space,patch_cells)
 end
 
-function VankaSolver(space::MultiFieldFESpace,patch_decomposition::PatchDecomposition)
+function VankaSolver(space::FESpace,patch_decomposition::PatchDecomposition)
   patch_cells = patch_decomposition.patch_cells
   return VankaSolver(space,patch_cells)
 end
 
-function VankaSolver(space::MultiFieldFESpace,patch_cells::Table{<:Integer})
+function VankaSolver(space::FESpace,patch_cells::Table{<:Integer})
+  collect_ids(ids::AbstractArray) = ids
+  collect_ids(ids::ArrayBlock) = vcat(ids.array...)
+
   cell_ids = get_cell_dof_ids(space)
   patch_ids = map(patch_cells) do cells
-    ids = vcat([vcat(cell_ids[cell].array...) for cell in cells]...)
+    ids = vcat([collect_ids(cell_ids[cell]) for cell in cells]...)
     filter!(x->x>0,ids)
     sort!(ids)
     unique!(ids)

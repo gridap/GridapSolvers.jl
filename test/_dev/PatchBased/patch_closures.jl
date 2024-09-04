@@ -71,9 +71,34 @@ a(u,v)  = biform(u,v,dΩ)
 ap(u,v) = biform(u,v,dΩp)
 ac(u,v) = biform(u,v,dΩc)
 
-A = assemble_matrix(a,Vh,Vh)
+A  = assemble_matrix(a,Vh,Vh)
 Ap = assemble_matrix(ap,Ph,Ph)
 Ac = assemble_matrix(ac,Ph,Ph)
 
+vanka_PD = PatchDecomposition(model;patch_boundary_style=PatchBasedSmoothers.PatchBoundaryExclude())
+vanka = PatchBasedSmoothers.VankaSolver(Vh,vanka_PD)
+vanka_ids = vanka.patch_ids
 
+dof_to_pdof = Ph.dof_to_pdof
+patch_cell_ids = get_cell_dof_ids(Ph)
+pdof_to_dof = flatten_partition(dof_to_pdof)
 
+for (patch,ids) in enumerate(vanka_ids)
+  patch_ids = unique(vcat(PatchBasedSmoothers.patch_view(PD,patch_cell_ids,patch)...))
+
+  perm = sortperm(pdof_to_dof[patch_ids])
+  patch_ids = patch_ids[perm]
+
+  println("> Patch $patch")
+  println("   > Vanka: ",ids)
+  println("   > Space: ",pdof_to_dof[patch_ids])
+  @assert ids == pdof_to_dof[patch_ids]
+
+  A_vanka = A[ids,ids]
+  A_vanka_bis = Ac[patch_ids,patch_ids]
+  @assert A_vanka ≈ A_vanka_bis
+end
+
+b(u,v) = ∫(u⋅v)dΩc + ∫(u⋅v)dΩp
+B = assemble_matrix(b,Ph,Ph)
+@assert B ≈ Ac + Ap
