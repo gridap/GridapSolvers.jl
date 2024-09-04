@@ -22,6 +22,7 @@ export setup_patch_prolongation_operators, setup_patch_restriction_operators
 include("seq/PatchDecompositions.jl")
 include("mpi/PatchDecompositions.jl")
 include("seq/PatchTriangulations.jl")
+include("seq/PatchClosures.jl")
 include("seq/CoarsePatchDecompositions.jl")
 
 # FESpaces

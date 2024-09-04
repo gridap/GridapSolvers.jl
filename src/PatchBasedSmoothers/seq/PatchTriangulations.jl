@@ -5,7 +5,7 @@
 
 Wrapper around a Triangulation, for patch-based assembly.
 """
-struct PatchTriangulation{Dc,Dp,A,B,C,D} <: Gridap.Geometry.Triangulation{Dc,Dp}
+struct PatchTriangulation{Dc,Dp,A,B,C,D} <: Triangulation{Dc,Dp}
   trian          :: A
   PD             :: B
   patch_faces    :: C
@@ -56,7 +56,7 @@ end
 # Constructors 
 
 function Geometry.Triangulation(PD::PatchDecomposition)
-  patch_cells = Gridap.Arrays.Table(PD.patch_cells)
+  patch_cells = PD.patch_cells
   trian = Triangulation(PD.model)
   return PatchTriangulation(trian,PD,patch_cells,nothing)
 end
@@ -144,7 +144,6 @@ function OverlappingBoundaryTriangulation(
   face_to_bgface::AbstractVector{<:Integer},
   face_to_lcell::AbstractVector{<:Integer}
 )
-
   D = num_cell_dims(model)
   topo = get_grid_topology(model)
   bgface_grid = Grid(ReferenceFE{D-1},model)
@@ -195,7 +194,8 @@ function OverlappingFaceToCellGlue(
     face_to_ftype,
     cell_to_ctype,
     cell_to_lface_to_pindex,
-    ctype_to_lface_to_ftype)
+    ctype_to_lface_to_ftype
+  )
 end
 
 function overlapped_find_local_index(

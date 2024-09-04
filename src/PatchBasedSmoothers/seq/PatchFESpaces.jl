@@ -104,10 +104,11 @@ function PatchFESpace(
   patches_mask = Fill(false,num_patches(patch_decomposition))
 )
   cell_dofs_ids = get_cell_dof_ids(space)
+  patch_cells_overlapped = get_patch_cells_overlapped(patch_decomposition)
   patch_cell_dofs_ids, num_dofs = generate_patch_cell_dofs_ids(
     get_grid_topology(patch_decomposition.model),
     patch_decomposition.patch_cells,
-    patch_decomposition.patch_cells_overlapped,
+    patch_cells_overlapped,
     patch_decomposition.patch_cells_faces_on_boundary,
     cell_dofs_ids,cell_conformity,patches_mask
   )
@@ -166,6 +167,11 @@ function FESpaces.get_cell_dof_ids(::SkeletonTriangulation,a::PatchFESpace,trian
   return lazy_map(Fields.BlockMap(2,[1,2]),plus,minus)
 end
 
+function FESpaces.get_cell_dof_ids(a::PatchFESpace,trian::PatchClosureTriangulation)
+  patch_cells = trian.trian.patch_faces
+  return propagate_patch_dof_ids(a,patch_cells)
+end
+
 # scatter dof values
 
 function FESpaces.scatter_free_and_dirichlet_values(f::PatchFESpace,free_values,dirichlet_values)
@@ -184,7 +190,7 @@ function generate_patch_cell_dofs_ids(
   cell_conformity,
   patches_mask
 )
-  patch_cell_dofs_ids = allocate_patch_cell_dofs_ids(patch_cells,cell_dofs_ids)
+  patch_cell_dofs_ids = allocate_patch_cell_array(patch_cells,cell_dofs_ids;init=Int32(-1))
   num_dofs = generate_patch_cell_dofs_ids!(
     patch_cell_dofs_ids,topology,
     patch_cells,patch_cells_overlapped,
@@ -192,27 +198,6 @@ function generate_patch_cell_dofs_ids(
     cell_dofs_ids,cell_conformity,patches_mask
   )
   return patch_cell_dofs_ids, num_dofs
-end
-
-function allocate_patch_cell_dofs_ids(patch_cells,cell_dofs_ids)
-  cache_cells = array_cache(patch_cells)
-  cache_cdofs = array_cache(cell_dofs_ids)
-
-  num_overlapped_cells = length(patch_cells.data)
-  ptrs    = Vector{Int}(undef,num_overlapped_cells+1)
-  ptrs[1] = 1; ncells = 1
-  for patch = 1:length(patch_cells)
-    cells = getindex!(cache_cells,patch_cells,patch)
-    for cell in cells
-      current_cell_dof_ids = getindex!(cache_cdofs,cell_dofs_ids,cell)
-      ptrs[ncells+1] = ptrs[ncells]+length(current_cell_dof_ids)
-      ncells += 1
-    end
-  end
-
-  @check num_overlapped_cells+1 == ncells
-  data = Vector{Int}(undef,ptrs[end]-1)
-  return Gridap.Arrays.Table(data,ptrs)
 end
 
 function generate_patch_cell_dofs_ids!(
@@ -246,11 +231,6 @@ function generate_patch_cell_dofs_ids!(
   return current_dof-1
 end
 
-# TO-THINK/STRESS:
-#  1. MultiFieldFESpace case?
-#  2. FESpaces which are directly defined on physical space? We think this case is covered by
-#     the fact that we are using a CellConformity instance to rely on ownership info.
-# free_dofs_offset     : the ID from which we start to assign free DoF IDs upwards
 # Note: we do not actually need to generate a global numbering for Dirichlet DoFs. We can
 #       tag all as them with -1, as we are always imposing homogenous Dirichlet boundary
 #       conditions, and thus there is no need to address the result of interpolating Dirichlet
@@ -389,6 +369,68 @@ function _generate_dof_to_pdof!(dof_to_pdof,Vh,PD,patch_cell_dofs_ids)
     end
     empty!(touched)
   end
+end
+
+"""
+    propagate_patch_dof_ids(patch_space::PatchFESpace,new_patch_cells::Table)
+
+Propagates the DoF ids of the patch_space to a new set of patch cells given by 
+a patch-wise Table `new_patch_cells`.
+"""
+function propagate_patch_dof_ids(
+  patch_space::PatchFESpace,
+  new_patch_cells::Table
+)
+  space = patch_space.Vh
+  patch_decomposition = patch_space.patch_decomposition
+  patch_cells = get_patch_cells(patch_decomposition)
+  patch_pcells = get_patch_cells_overlapped(patch_decomposition)
+
+  cell_dof_ids = get_cell_dof_ids(space)
+  patch_cell_dof_ids = patch_space.patch_cell_dofs_ids
+  ext_dof_ids = allocate_patch_cell_array(new_patch_cells,cell_dof_ids;init=Int32(-1))
+
+  new_pcell = 1
+  n_patches = length(patch_cells)
+  for patch in 1:n_patches
+    cells = view(patch_cells,patch)
+    pcells = view(patch_pcells,patch)
+
+    # Create local dof to pdof maps
+    dof_to_pdof = Dict{Int,Int}()
+    for (cell,pcell) in zip(cells,pcells)
+      dofs = view(cell_dof_ids,cell)
+      pdofs = view(patch_cell_dof_ids,pcell)
+      for (dof,pdof) in zip(dofs,pdofs)
+        if pdof != -1
+          dof_to_pdof[dof] = pdof
+        end
+      end
+    end
+
+    # Propagate dofs to patch extensions
+    for new_cell in view(new_patch_cells,patch)
+      dofs = view(cell_dof_ids,new_cell)
+      pdofs = view(ext_dof_ids,new_pcell)
+
+      pos = findfirst(c -> c == new_cell, cells)
+      if !isnothing(pos) # Cell is in the patch
+        pcell = pcells[pos]
+        pdofs .= view(patch_cell_dof_ids,pcell)
+      else # Cell is new (not in the patch)
+        for (ldof,dof) in enumerate(dofs)
+          if haskey(dof_to_pdof,dof)
+            pdofs[ldof] = dof_to_pdof[dof]
+          else
+            pdofs[ldof] = -1
+          end
+        end
+      end
+      new_pcell += 1
+    end
+  end
+
+  return ext_dof_ids
 end
 
 # x \in  PatchFESpace

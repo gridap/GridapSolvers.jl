@@ -1,0 +1,79 @@
+using Gridap
+using Gridap.Geometry, Gridap.Arrays
+
+using GridapSolvers
+using GridapSolvers: PatchBasedSmoothers  
+
+function generate_dual_graph(
+  topo::GridTopology{Dc}, D::Integer = Dc
+) where Dc
+  @assert 0 < D <= Dc
+  edge_to_face = Geometry.get_faces(topo,D-1,D)
+  n_faces = Geometry.num_faces(topo,D)
+  return generate_dual_graph(edge_to_face,n_faces)
+end
+
+# Given a table `edge_to_face`, creates the dual graph `face_to_face`.
+function generate_dual_graph(
+  edge_to_face::Table,
+  n_faces = maximum(edge_to_face.data)
+)
+  n_edges = length(edge_to_face)
+
+  ptrs = zeros(Int,n_faces+1)
+  for e in 1:n_edges
+    faces = view(edge_to_face,e)
+    if length(faces) > 1
+      @assert length(faces) == 2
+      f1, f2 = faces
+      ptrs[f1+1] += 1
+      ptrs[f2+1] += 1
+    end
+  end
+  Arrays.length_to_ptrs!(ptrs)
+
+  data = zeros(Int,ptrs[end]-1)
+  for e in 1:n_edges
+    faces = view(edge_to_face,e)
+    if length(faces) > 1
+      f1, f2 = faces
+      data[ptrs[f1]] = f2
+      data[ptrs[f2]] = f1
+      ptrs[f1] += 1
+      ptrs[f2] += 1
+    end
+  end
+  Arrays.rewind_ptrs!(ptrs)
+
+  return Table(data,ptrs)
+end
+
+model = CartesianDiscreteModel((0,1,0,1),(2,2))
+topo = get_grid_topology(model)
+
+PD = PatchDecomposition(model;patch_boundary_style=PatchBasedSmoothers.PatchBoundaryInclude())
+
+order = 2
+reffe = ReferenceFE(lagrangian,Float64,order)
+Vh = FESpace(model,reffe)
+Ph = PatchFESpace(Vh,PD,reffe)
+
+Ω  = Triangulation(model)
+Ωp = Triangulation(PD)
+Ωc = PatchBasedSmoothers.Closure(PD)
+
+dΩ  = Measure(Ω,2*order)
+dΩp = Measure(Ωp,2*order)
+dΩc = Measure(Ωc,2*order)
+
+biform(u,v,dΩ) = ∫(u⋅v)dΩ
+a(u,v)  = biform(u,v,dΩ)
+ap(u,v) = biform(u,v,dΩp)
+ac(u,v) = biform(u,v,dΩc)
+
+A = assemble_matrix(a,Vh,Vh)
+Ap = assemble_matrix(ap,Ph,Ph)
+Ac = assemble_matrix(ac,Ph,Ph)
+
+
+

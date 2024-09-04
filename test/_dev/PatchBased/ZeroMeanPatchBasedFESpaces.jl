@@ -67,7 +67,7 @@ norm(A*x - b)
 
 ############################################################################################
 
-patch_pcells = PD.patch_cells_overlapped
+patch_pcells = get_patch_cells_overlapped(PD)
 pcell_to_pdofs_u = Ph.patch_cell_dofs_ids
 pcell_to_pdofs_p = Lh.patch_cell_dofs_ids
 
