@@ -63,6 +63,26 @@ end
 @inline get_tabulation(log::ConvergenceLog,n::Int) = repeat(' ', n + 2*log.depth)
 
 """
+    set_depth!(log::ConvergenceLog,depth::Int)
+    set_depth!(log::LinearSolver,depth::Int)
+
+Sets the tabulation depth of the convergence log `log` to `depth`.
+"""
+function set_depth!(log::ConvergenceLog,depth::Int)
+  log.depth = depth
+  return log
+end
+
+function set_depth!(solver::Algebra.LinearSolver,depth::Int)
+  if hasproperty(solver,:log)
+    set_depth!(solver.log,depth)
+  end
+  map(children(solver)) do child
+    set_depth!(child,depth)
+  end
+end
+
+"""
     reset!(log::ConvergenceLog{T})
 
   Resets the convergence log `log` to its initial state.
