@@ -78,7 +78,7 @@ function set_depth!(solver::Algebra.LinearSolver,depth::Int)
     set_depth!(solver.log,depth)
   end
   map(children(solver)) do child
-    set_depth!(child,depth)
+    set_depth!(child,depth+2)
   end
 end
 

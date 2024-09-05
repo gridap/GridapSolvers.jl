@@ -73,14 +73,14 @@ struct PatchBasedSmootherNumericalSetup{A,B,C,D} <: Gridap.Algebra.NumericalSetu
   caches   :: D
 end
 
-function assemble_patch_matrices(Ph::PatchFESpace,ap;local_solver=LUSolver())
+function assemble_patch_matrices(Ph::FESpace,ap;local_solver=LUSolver())
   assem = SparseMatrixAssembler(Ph,Ph)
   Ap    = assemble_matrix(ap,assem,Ph,Ph)
   Ap_ns = numerical_setup(symbolic_setup(local_solver,Ap),Ap)
   return Ap, Ap_ns
 end
 
-function assemble_patch_matrices(Ph::DistributedPatchFESpace,ap;local_solver=LUSolver())
+function assemble_patch_matrices(Ph::GridapDistributed.DistributedFESpace,ap;local_solver=LUSolver())
   u, v  = get_trial_fe_basis(Vh), get_fe_basis(Vh)
   matdata = collect_cell_matrix(Ph,Ph,ap(u,v))
   Ap, Ap_ns = map(local_views(Ph),matdata) do Ph, matdata
@@ -92,13 +92,13 @@ function assemble_patch_matrices(Ph::DistributedPatchFESpace,ap;local_solver=LUS
   return Ap, Ap_ns
 end
 
-function update_patch_matrices!(Ap,Ap_ns,Ph::PatchFESpace,ap)
+function update_patch_matrices!(Ap,Ap_ns,Ph::FESpace,ap)
   assem = SparseMatrixAssembler(Ph,Ph)
   assemble_matrix!(Ap,assem,Ph,Ph,ap)
   numerical_setup!(Ap_ns,Ap)
 end
 
-function update_patch_matrices!(Ap,Ap_ns,Ph::DistributedPatchFESpace,ap)
+function update_patch_matrices!(Ap,Ap_ns,Ph::GridapDistributed.DistributedFESpace,ap)
   u, v  = get_trial_fe_basis(Vh), get_fe_basis(Vh)
   matdata = collect_cell_matrix(Ph,Ph,ap(u,v))
   map(Ap, Ap_ns, local_views(Ph), matdata) do Ap, Ap_ns, Ph, matdata
@@ -108,13 +108,13 @@ function update_patch_matrices!(Ap,Ap_ns,Ph::DistributedPatchFESpace,ap)
   end
 end
 
-function allocate_patch_workvectors(Ph::PatchFESpace,Vh::FESpace)
+function allocate_patch_workvectors(Ph::FESpace,Vh::FESpace)
   rp     = zero_free_values(Ph)
   dxp    = zero_free_values(Ph)
   return rp,dxp
 end
 
-function allocate_patch_workvectors(Ph::DistributedPatchFESpace,Vh::GridapDistributed.DistributedFESpace)
+function allocate_patch_workvectors(Ph::GridapDistributed.DistributedFESpace,Vh::GridapDistributed.DistributedFESpace)
   rp     = zero_free_values(Ph)
   dxp    = zero_free_values(Ph)
   r      = zero_free_values(Vh)
