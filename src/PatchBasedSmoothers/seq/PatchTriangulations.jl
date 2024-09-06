@@ -49,8 +49,8 @@ end
 #         the inverse map mface_to_tface.
 # I believe this could technically be relaxed in the future, but for now I don't see a 
 # scenario where we would need this.
-function Geometry.is_change_possible(strian::PatchTriangulation,ttrian::Triangulation)
-  return strian === ttrian
+function Geometry.is_change_possible(strian::PatchTriangulation,ttrian::PatchTriangulation)
+  return (strian === ttrian) || (strian.PD === ttrian.PD)
 end
 
 # Constructors 

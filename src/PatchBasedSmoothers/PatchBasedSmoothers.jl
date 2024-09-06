@@ -11,7 +11,7 @@ using GridapDistributed
 
 using GridapSolvers.MultilevelTools
 
-export PatchDecomposition
+export PatchDecomposition, Closure
 export PatchFESpace
 export PatchBasedLinearSolver, VankaSolver
 

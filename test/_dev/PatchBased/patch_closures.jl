@@ -60,7 +60,7 @@ Ph = PatchFESpace(Vh,PD,reffe)
 
 Ω  = Triangulation(model)
 Ωp = Triangulation(PD)
-Ωc = PatchBasedSmoothers.Closure(PD)
+Ωc = Closure(PD)
 
 dΩ  = Measure(Ω,2*order)
 dΩp = Measure(Ωp,2*order)
@@ -102,3 +102,17 @@ end
 b(u,v) = ∫(u⋅v)dΩc + ∫(u⋅v)dΩp
 B = assemble_matrix(b,Ph,Ph)
 @assert B ≈ Ac + Ap
+
+# Multifield
+
+Xh = MultiFieldFESpace([Vh,Vh])
+Zh = MultiFieldFESpace([Ph,Ph])
+
+biform_mf((u1,u2),(v1,v2),dΩ) = ∫(u1⋅v1 + u2⋅v2)dΩ
+a_mf(u,v)  = biform_mf(u,v,dΩ)
+ap_mf(u,v) = biform_mf(u,v,dΩp)
+ac_mf(u,v) = biform_mf(u,v,dΩc)
+
+A  = assemble_matrix(a_mf,Xh,Xh)
+Ap = assemble_matrix(ap_mf,Zh,Zh)
+Ac = assemble_matrix(ac_mf,Zh,Zh)

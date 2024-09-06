@@ -26,8 +26,12 @@ function Geometry.get_facet_normal(trian::PatchClosureTriangulation)
   get_facet_normal(trian.trian)
 end
 
-function Geometry.is_change_possible(strian::PatchClosureTriangulation,ttrian::Triangulation)
-  return is_change_possible(strian.trian,ttrian)
+function Geometry.is_change_possible(strian::PatchClosureTriangulation,ttrian::PatchClosureTriangulation)
+  return is_change_possible(strian.trian,ttrian.trian)
+end
+
+function Geometry.is_change_possible(strian::PatchTriangulation,ttrian::PatchClosureTriangulation)
+  return is_change_possible(strian,ttrian.trian)
 end
 
 function Geometry.move_contributions(scell_to_val::AbstractArray,strian::PatchClosureTriangulation)
