@@ -23,7 +23,7 @@ SparseMatricesCSR = "a0a7dd2c-ebf4-11e9-1f05-cf50bc540ca1"
 
 [compat]
 AbstractTrees = "0.4"
-BlockArrays = "0.16"
+BlockArrays = "0.16, 1"
 FillArrays = "0.13, 1"
 Gridap = "0.18"
 GridapDistributed = "0.4"
