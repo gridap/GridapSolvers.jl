@@ -33,7 +33,7 @@ IterativeSolvers = "0.9"
 LineSearches = "7.0.1"
 MPI = "0.20"
 NLsolve = "4.3.0"
-PartitionedArrays = "0.3"
+PartitionedArrays = "0.3, 0.5"
 SparseMatricesCSR = "0.6.7"
 julia = "1.7"
 
