@@ -258,7 +258,7 @@ function generate_patch_cell_dofs_ids!(
   else
     g2l = Dict{Int,Int}()
     Dc  = length(patch_cells_faces_on_boundary)
-    d_to_cell_to_dface = [Gridap.Geometry.get_faces(topology,Dc,d) for d in 0:Dc-1]
+    d_to_cell_to_dface = [Gridap.Geometry.get_faces(topology,Dc,d) for d in 0:Dc]
 
     # Loop over cells of the patch (local_cell_id_within_patch)
     for (lpatch_cell,patch_cell) in enumerate(patch_cells)
@@ -268,15 +268,14 @@ function generate_patch_cell_dofs_ids!(
       current_patch_cell_dofs_ids = view(patch_cell_dofs_ids.data,s:e)
       ctype = cell_conformity.cell_ctype[patch_cell]
 
-      # 1) DoFs belonging to faces (Df < Dc)
       face_offset = 0
-      for d = 0:Dc-1
+      for d = 0:Dc
         num_cell_faces = length(d_to_cell_to_dface[d+1][patch_cell])
         for lface in 1:num_cell_faces
           for ldof in cell_conformity.ctype_lface_own_ldofs[ctype][face_offset+lface]
             gdof = global_space_cell_dofs_ids[patch_cell][ldof]
             
-            face_in_patch_boundary = patch_cells_faces_on_boundary[d+1][cell_overlapped_mesh][lface]
+            face_in_patch_boundary = (d != Dc) && patch_cells_faces_on_boundary[d+1][cell_overlapped_mesh][lface]
             dof_is_dirichlet = (gdof < 0)
             if face_in_patch_boundary || dof_is_dirichlet
               current_patch_cell_dofs_ids[ldof] = -1
@@ -290,12 +289,6 @@ function generate_patch_cell_dofs_ids!(
           end
         end
         face_offset += cell_conformity.d_ctype_num_dfaces[d+1][ctype]
-      end
-
-      # 2) Interior DoFs
-      for ldof in cell_conformity.ctype_lface_own_ldofs[ctype][face_offset+1]
-        current_patch_cell_dofs_ids[ldof] = free_dofs_offset
-        free_dofs_offset += 1
       end
     end
   end

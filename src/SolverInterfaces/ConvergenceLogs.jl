@@ -142,7 +142,7 @@ function finalize!(log::ConvergenceLog{T},r::T) where T
     msg = @sprintf("Iterations: %3i - Residuals: %.2e,   %.2e ", log.num_iters, r, r_rel)
     println(t,msg)
     if log.verbose > SOLVER_VERBOSE_LOW
-      footer =  " Exiting $(log.name) solver "
+      footer = " Exiting $(log.name) solver "
       println(t,rpad(string(repeat('-',15),footer),55,'-'))
     end
   end

@@ -19,21 +19,21 @@ export PatchProlongationOperator, PatchRestrictionOperator
 export setup_patch_prolongation_operators, setup_patch_restriction_operators
 
 # Geometry
-include("seq/PatchDecompositions.jl")
-include("mpi/PatchDecompositions.jl")
-include("seq/PatchTriangulations.jl")
-include("seq/PatchClosures.jl")
-include("seq/CoarsePatchDecompositions.jl")
+include("PatchDecompositions.jl")
+include("DistributedPatchDecompositions.jl")
+include("PatchTriangulations.jl")
+include("PatchClosures.jl")
+include("CoarsePatchDecompositions.jl")
 
 # FESpaces
-include("seq/PatchFESpaces.jl")
-include("mpi/PatchFESpaces.jl")
-include("seq/ZeroMeanPatchFESpaces.jl")
-include("seq/PatchMultiFieldFESpaces.jl")
+include("PatchFESpaces.jl")
+include("DistributedPatchFESpaces.jl")
+include("ZeroMeanPatchFESpaces.jl")
+include("PatchMultiFieldFESpaces.jl")
 
 # Solvers
-include("seq/PatchBasedLinearSolvers.jl")
-include("seq/PatchTransferOperators.jl")
-include("seq/VankaSolvers.jl")
+include("PatchBasedLinearSolvers.jl")
+include("PatchTransferOperators.jl")
+include("VankaSolvers.jl")
 
 end

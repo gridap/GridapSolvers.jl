@@ -153,6 +153,19 @@ function allocate_patch_cell_array(
   return Arrays.Table(data,ptrs)
 end
 
+function allocate_patch_cell_array(
+  patch_cells::Table, cell_to_data::AbstractVector{<:AbstractVector{T}}; init = zero(T)
+) where T
+  ptrs = zeros(Int,length(patch_cells.data)+1)
+  ptrs[1] = 1
+  for (pcell,cell) in enumerate(patch_cells.data)
+    n = length(cell_to_data[cell])
+    ptrs[pcell+1] = ptrs[pcell] + n
+  end
+  data = fill(init,ptrs[end]-1)
+  return Arrays.Table(data,ptrs)
+end
+
 # patch_cell_faces_on_boundary :: 
 #    [Df][overlapped cell][lface] -> Face is boundary of the patch
 function compute_patch_cells_faces_on_boundary(

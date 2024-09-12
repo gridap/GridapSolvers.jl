@@ -114,7 +114,7 @@ end
 
   Returns `true` if the solver has finished, `false` otherwise.
 """
-function finished(tols::SolverTolerances,niter,e_a,e_r) :: Bool
+@inline function finished(tols::SolverTolerances,niter,e_a,e_r) :: Bool
   return (niter >= tols.maxiter) || converged(tols,niter,e_a,e_r)
 end
 
@@ -123,7 +123,7 @@ end
 
   Returns `true` if the solver has converged, `false` otherwise.
 """
-function converged(tols::SolverTolerances,niter,e_a,e_r) :: Bool
+@inline function converged(tols::SolverTolerances,niter,e_a,e_r) :: Bool
   return (e_r < tols.rtol) || (e_a < tols.atol)
 end
 
