@@ -8,14 +8,13 @@ function CoarsePatchDecomposition(
   glue = Gridap.Adaptivity.get_adaptivity_glue(model)
 
   patch_cells = glue.o2n_faces_map
-  patch_cells_overlapped = compute_patch_overlapped_cells(patch_cells)
   patch_facets = get_coarse_patch_facets(model, patch_cells)
   patch_cells_faces_on_boundary = compute_patch_cells_faces_on_boundary(
     model, patch_cells, patch_facets, patch_boundary_style, boundary_tag_names
   )
 
   return PatchDecomposition{Dc,Dc,Dp}(
-    model, patch_cells, patch_cells_overlapped, patch_cells_faces_on_boundary
+    model, patch_cells, patch_cells_faces_on_boundary, patch_boundary_style
   )
 end
 

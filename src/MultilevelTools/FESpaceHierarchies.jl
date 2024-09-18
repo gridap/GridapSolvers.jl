@@ -144,6 +144,31 @@ function Gridap.MultiField.MultiFieldFESpace(spaces::Vector{<:HierarchicalArray}
   end
 end
 
+# Constant FESpaces
+
+function FESpaces.ConstantFESpace(mh::ModelHierarchy)
+  map(mh) do mhl
+    ConstantFESpace(mhl)
+  end
+end
+
+function FESpaces.ConstantFESpace(mh::MultilevelTools.ModelHierarchyLevel)
+  reffe = ReferenceFE(lagrangian,Float64,0)
+  if has_redistribution(mh)
+    cparts, _ = get_old_and_new_parts(mh.red_glue,Val(false))
+    Vh     = i_am_in(cparts) ? ConstantFESpace(get_model_before_redist(mh)) : nothing
+    Vh_red = ConstantFESpace(get_model(mh))
+    cell_conformity = i_am_in(cparts) ? _cell_conformity(get_model_before_redist(mh),reffe) : nothing
+    cell_conformity_red = _cell_conformity(get_model(mh),reffe)
+  else
+    Vh = ConstantFESpace(get_model(mh))
+    Vh_red = nothing
+    cell_conformity = _cell_conformity(get_model(mh),reffe)
+    cell_conformity_red = nothing
+  end
+  return FESpaceHierarchyLevel(mh.level,Vh,Vh_red,cell_conformity,cell_conformity_red,mh)
+end
+
 # Computing system matrices
 
 function compute_hierarchy_matrices(

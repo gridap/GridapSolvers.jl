@@ -128,6 +128,17 @@ function patch_reindex(PD::PatchDecomposition,cell_to_data)
   return pcell_to_data
 end
 
+function patch_extend(PD::PatchDecomposition,patch_to_data)
+  pcell_to_patch = fill(0,num_cells(PD))
+  patch_offsets = get_patch_cell_offsets(PD)
+  for patch in 1:num_patches(PD)
+    pcell_to_patch[patch_offsets[patch]:patch_offsets[patch+1]-1] .= patch
+  end
+
+  pcell_to_data = lazy_map(Reindex(patch_to_data),pcell_to_patch)
+  return pcell_to_data
+end
+
 """
     allocate_patch_cell_array(PD::PatchDecomposition,cell_to_data::Table{T};init=zero(T))
   

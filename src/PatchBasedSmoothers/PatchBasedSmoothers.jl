@@ -35,5 +35,6 @@ include("PatchMultiFieldFESpaces.jl")
 include("PatchBasedLinearSolvers.jl")
 include("PatchTransferOperators.jl")
 include("VankaSolvers.jl")
+include("PatchSolvers.jl")
 
 end
