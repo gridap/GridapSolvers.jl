@@ -37,7 +37,7 @@ The ever-increasing demand for resolution and accuracy in mathematical models of
 One of the biggest scalability bottlenecks within Finite Element (FE) parallel codes is the solution of linear systems arising from the discretization of PDEs.
 The implementation of exact factorization-based solvers in parallel environments is an extremely challenging task, and even state-of-the-art libraries such as MUMPS [@MUMPS1; @MUMPS2] or PARDISO [@PARDISO] have severe limitations in terms of scalability and memory consumption above a certain number of CPU cores.
 Hence the use of iterative methods is crucial to maintain scalability of FE codes. Unfortunately, the convergence of iterative methods is not guaranteed and rapidly deteriorates as the size of the linear system increases. To retain performance, the use of highly scalable preconditioners is mandatory.
-For simple problems, algebraic solvers and preconditioners (i.e based uniquelly on the algebraic system) are enough to obtain robust convergence. Many well-known libraries providing algebraic solvers already exist, such as PETSc [@petsc-user-ref], Trilinos [@trilinos], or Hypre [@hypre]. However, algebraic solvers are not always suited to deal with more challenging problems.
+For simple problems, algebraic solvers and preconditioners (i.e based solely on the algebraic system) are enough to obtain robust convergence. Many well-known libraries providing algebraic solvers already exist, such as PETSc [@petsc-user-ref], Trilinos [@trilinos], or Hypre [@hypre]. However, algebraic solvers are not always suited to deal with more challenging problems.
 
 In these cases, solvers that exploit the physics and mathematical discretization of the particular problem are required. This is the case of many multiphysics problems involving differential operators with a large kernel such as the divergence [@Arnold1] and the curl [@Arnold2]. Examples can be found amongst highly relevant problems such as Navier-Stokes, Maxwell or Darcy. Scalable solvers for this type of multiphysics problems rely on exploiting the block structure of such systems to find a spectrally equivalent block-preconditioner, and are often tied to a specific discretization of the underlying equations.
 
@@ -58,7 +58,7 @@ GridapSolvers complements GridapPETSc with a modular and extensible interface fo
 - A modular, high-level interface for designing block-based preconditioners for multiphysics problems. These preconditioners can be used together with any solver compliant with Gridap's API, including those provided by GridapPETSc.
 - A generic interface to handle multi-level distributed meshes, with full support for Adaptative Mesh Refinement (AMR) using p4est [@p4est] through GridapP4est [@gridap4est].
 - A modular implementation of Geometric MultiGrid (GMG) solvers [@gmg-book], allowing different types of smoothers and restriction/prolongation operators.
-- A generic interface for patch-based subdomain decomposition methods, and an implementation of patch-based smoothers for GMG solvers.
+- A generic interface for patch-based subdomain decomposition methods, and an implementation of patch-based smoothers for GMG solvers. Here the term "patch-based" refers to the use of local overlapping subdomains (patches) built by aggregation of cells around a given vertex, face or cell. See [@fenics-patch; @dealII-patch] for more details.
 
 ![GridapSolvers and its relation to other packages in the Julia package ecosystem. In this diagram, each node represents  a Julia package, while the (directed) arrows represent relations (dependencies) among packages. Dashed arrows mean the package can be used, but is not required. \label{fig:packages}](packages.png){ width=50% }
 
@@ -72,7 +72,7 @@ $$
 
 where $V_0$ is the space of velocity functions with homogeneous boundary conditions everywhere.
 
-The system is block-assembled and solved using a flexible Generalised Minimum Residual (F-GMRES) solver, together with a block-triangular Shur-complement-based preconditioner. We eliminate the velocity block and approximate the resulting Shur complement by a pressure mass matrix. A more detailed overview of this preconditioner as well as it's spectral analysis can be found in [@Elman2014]. The resulting block structure for the system matrix $\mathcal{A}$ and our preconditioner $\mathcal{P}$ is 
+The system is block-assembled and solved using a flexible Generalised Minimum Residual (F-GMRES) solver, together with a block-triangular Schur-complement-based preconditioner. We eliminate the velocity block and approximate the resulting Schur complement by a pressure mass matrix. A more detailed overview of this preconditioner as well as its spectral analysis can be found in [@Elman2014]. The resulting block structure for the system matrix $\mathcal{A}$ and our preconditioner $\mathcal{P}$ is 
 
 $$
 \mathcal{A} = \begin{bmatrix}
@@ -88,8 +88,8 @@ $$
 
 with $A$ the velocity laplacian block, and $M$ a pressure mass matrix.
 
-The mass matrix is approximated by a Conjugate Gradient (CG) solver with Jacobi preconditioner. The eliminated velocity block is approximated by a 2-level V-cycle GMG solver, where the coarsest level is solved exactly in a single processor.
-The code for this example can be found [here](https://github.com/gridap/GridapSolvers.jl/tree/joss-paper/joss_paper/demo.jl). It is setup to run in parallel with 4 MPI tasks and can be executed with the following command: `mpiexec -n 4 julia --project=. demo.jl`.
+Application of the above block-preconditioner requires both diagonal sub-matrices to be solved. The pressure block $M$ is solved using a Conjugate Gradient (CG) solver with Jacobi preconditioner. The velocity block $A$ is solved by a 2-level V-cycle GMG solver, where the coarsest level is solved exactly in a single processor.
+The code for this example can be found [here](https://github.com/gridap/GridapSolvers.jl/tree/joss-paper/joss_paper/demo.jl). It is set up to run in parallel with 4 MPI tasks and can be executed with the following command: `mpiexec -n 4 julia --project=. demo.jl`.
 
 ## Parallel scaling benchmark
 
