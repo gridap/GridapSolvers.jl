@@ -27,7 +27,7 @@ pkg> add GridapSolvers
 pkg> build
 ```
 
-Building is required to link the external artifacts (e.g., PETSc, p4est) to the Julia environment.
+Building is required to link the external artifacts (e.g., PETSc, p4est) to the Julia environment. Restarting Julia is required after building in order to make the changes take effect.
 
 ### Using custom binaries
 

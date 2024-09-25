@@ -8,7 +8,7 @@ function run_tests(testdir)
   @time @testset "$f" for f in testfiles
     MPI.mpiexec() do cmd
       np = 4
-      cmd = `$cmd -n $(np) --allow-run-as-root --oversubscribe $(Base.julia_cmd()) --project=. $(joinpath(testdir, f))`
+      cmd = `$cmd -n $(np) --oversubscribe $(Base.julia_cmd()) --project=. $(joinpath(testdir, f))`
       @show cmd
       run(cmd)
       @test true
