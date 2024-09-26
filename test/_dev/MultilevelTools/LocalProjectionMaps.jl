@@ -87,4 +87,3 @@ Gridap.Geometry._similar_empty(val.array[1])
 val1 = val.array[1]
 zs = 0 .* size(val1)
 void = similar(val,eltype(val1),zs)
-
