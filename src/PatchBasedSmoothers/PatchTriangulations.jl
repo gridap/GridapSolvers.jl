@@ -45,7 +45,7 @@ end
 
 # For now, I am disabling changes from PatchTriangulations to other Triangulations.
 # Reason: When the tface_to_mface map is not injective (i.e when we have overlapping), 
-#         the glue is not well defined. Gridap will throe an error when trying to create 
+#         the glue is not well defined. Gridap will throw an error when trying to create 
 #         the inverse map mface_to_tface.
 # I believe this could technically be relaxed in the future, but for now I don't see a 
 # scenario where we would need this.
@@ -75,7 +75,6 @@ function Geometry.BoundaryTriangulation(
   pface_to_pcell, pface_to_lcell = get_pface_to_pcell(PD,Df,patch_faces)
 
   trian = OverlappingBoundaryTriangulation(model,patch_faces.data,pface_to_lcell)
-
   return PatchTriangulation(trian,PD,patch_faces,pface_to_pcell)
 end
 
@@ -88,11 +87,7 @@ function Geometry.SkeletonTriangulation(PD::PatchDecomposition{Dr,Dc}) where {Dr
   patch_faces = get_patch_faces(PD,Df,is_interior)
   pface_to_pcell, _ = get_pface_to_pcell(PD,Df,patch_faces)
 
-  nfaces = length(patch_faces.data)
-  plus  = OverlappingBoundaryTriangulation(model,patch_faces.data,fill(Int8(1),nfaces))
-  minus = OverlappingBoundaryTriangulation(model,patch_faces.data,fill(Int8(2),nfaces))
-  trian = SkeletonTriangulation(plus,minus)
-
+  trian = OverlappingSkeletonTriangulation(model,patch_faces.data)
   return PatchTriangulation(trian,PD,patch_faces,pface_to_pcell)
 end
 
@@ -128,7 +123,6 @@ function Geometry.move_contributions(
   return scell_to_val, strian
 end
 
-
 # Overlapping BoundaryTriangulation
 #
 # This is the situation: I do not see any show-stopper for us to have an overlapping
@@ -138,6 +132,19 @@ end
 # 
 # The following code does just that, and returns a regular BoundaryTriangulation. It is 
 # mostly copied from Gridap/Geometry/BoundaryTriangulations.jl
+
+function OverlappingBoundaryTriangulation(
+  model::Gridap.Adaptivity.AdaptedDiscreteModel,
+  face_to_bgface::AbstractVector{<:Integer},
+  face_to_lcell::AbstractVector{<:Integer}
+)
+  trian = OverlappingBoundaryTriangulation(
+    Gridap.Adaptivity.get_model(model),
+    face_to_bgface,
+    face_to_lcell,
+  )
+  return Gridap.Adaptivity.AdaptedTriangulation(trian,model)
+end
 
 function OverlappingBoundaryTriangulation(
   model::DiscreteModel,
@@ -216,4 +223,28 @@ function overlapped_find_local_index(
     end
   end
   return c_to_lc
+end
+
+
+# Overlapping SkeletonTriangulation
+
+function OverlappingSkeletonTriangulation(
+  model::Gridap.Adaptivity.AdaptedDiscreteModel,
+  face_to_bgface::AbstractVector{<:Integer},
+)
+  trian = OverlappingSkeletonTriangulation(
+    Gridap.Adaptivity.get_model(model),
+    face_to_bgface,
+  )
+  return Gridap.Adaptivity.AdaptedTriangulation(trian,model)
+end
+
+function OverlappingSkeletonTriangulation(
+  model::DiscreteModel,
+  face_to_bgface::AbstractVector{<:Integer},
+)
+  nfaces = length(face_to_bgface)
+  plus  = OverlappingBoundaryTriangulation(model,face_to_bgface,fill(Int8(1),nfaces))
+  minus = OverlappingBoundaryTriangulation(model,face_to_bgface,fill(Int8(2),nfaces))
+  return SkeletonTriangulation(plus,minus)
 end
