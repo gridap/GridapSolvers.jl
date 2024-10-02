@@ -65,8 +65,8 @@ function PatchDecomposition(
 end
 
 function PatchDecomposition(
-  model::Gridap.Adaptivity.AdaptedDiscreteModel{Dc,Dp},
-  patch_cells,
+  model::DiscreteModel{Dc,Dp},
+  patch_cells::AbstractArray{<:AbstractVector{<:Integer}},
   patch_boundary_style::PatchBoundaryStyle=PatchBoundaryExclude(),
   boundary_tag_names::AbstractArray{String}=["boundary"]
 ) where {Dc,Dp}
