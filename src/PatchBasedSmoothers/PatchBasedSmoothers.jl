@@ -23,7 +23,6 @@ include("PatchDecompositions.jl")
 include("DistributedPatchDecompositions.jl")
 include("PatchTriangulations.jl")
 include("PatchClosures.jl")
-include("CoarsePatchDecompositions.jl")
 
 # FESpaces
 include("PatchFESpaces.jl")
