@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width, initial-scale=1.0"/><title>Navier-Stokes (GMG) · GridapSolvers.jl</title><meta name="title" content="Navier-Stokes (GMG) · GridapSolvers.jl"/><meta property="og:title" content="Navier-Stokes (GMG) · GridapSolvers.jl"/><meta property="twitter:title" content="Navier-Stokes (GMG) · GridapSolvers.jl"/><meta name="description" content="Documentation for GridapSolvers.jl."/><meta property="og:description" content="Documentation for GridapSolvers.jl."/><meta property="twitter:description" content="Documentation for GridapSolvers.jl."/><meta property="og:url" content="https://gridap.github.io/GridapSolvers.jl/Examples/NavierStokesGMG/"/><meta property="twitter:url" content="https://gridap.github.io/GridapSolvers.jl/Examples/NavierStokesGMG/"/><link rel="canonical" href="https://gridap.github.io/GridapSolvers.jl/Examples/NavierStokesGMG/"/><script data-outdated-warner src="../../assets/warner.js"></script><link href="https://cdnjs.cloudflare.com/ajax/libs/lato-font/3.0.0/css/lato-font.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/juliamono/0.050/juliamono.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/fontawesome.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/solid.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/brands.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.8/katex.min.css" rel="stylesheet" type="text/css"/><script>documenterBaseURL="../.."</script><script src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.6/require.min.js" data-main="../../assets/documenter.js"></script><script src="../../search_index.js"></script><script src="../../siteinfo.js"></script><script src="../../../versions.js"></script><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/catppuccin-mocha.css" data-theme-name="catppuccin-mocha"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/catppuccin-macchiato.css" data-theme-name="catppuccin-macchiato"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/catppuccin-frappe.css" data-theme-name="catppuccin-frappe"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/catppuccin-latte.css" data-theme-name="catppuccin-latte"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/documenter-dark.css" data-theme-name="documenter-dark" data-theme-primary-dark/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/documenter-light.css" data-theme-name="documenter-light" data-theme-primary/><script src="../../assets/themeswap.js"></script></head><body><div id="documenter"><nav class="docs-sidebar"><div class="docs-package-name"><span class="docs-autofit"><a href="../../">GridapSolvers.jl</a></span></div><button class="docs-search-query input is-rounded is-small is-clickable my-2 mx-auto py-1 px-2" id="documenter-search-query">Search docs (Ctrl + /)</button><ul class="docs-menu"><li><a class="tocitem" href="../../">Home</a></li><li><a class="tocitem" href="../../SolverInterfaces/">SolverInterfaces</a></li><li><a class="tocitem" href="../../MultilevelTools/">MultilevelTools</a></li><li><a class="tocitem" href="../../LinearSolvers/">LinearSolvers</a></li><li><a class="tocitem" href="../../NonlinearSolvers/">NonlinearSolvers</a></li><li><a class="tocitem" href="../../BlockSolvers/">BlockSolvers</a></li><li><a class="tocitem" href="../../PatchBasedSmoothers/">PatchBasedSmoothers</a></li><li><span class="tocitem">Examples</span><ul><li><a class="tocitem" href="../Stokes/">Stokes</a></li><li><a class="tocitem" href="../NavierStokes/">Navier-Stokes</a></li><li><a class="tocitem" href="../StokesGMG/">Stokes (GMG)</a></li><li class="is-active"><a class="tocitem" href>Navier-Stokes (GMG)</a></li><li><a class="tocitem" href="../DarcyGMG/">Darcy (GMG)</a></li></ul></li></ul><div class="docs-version-selector field has-addons"><div class="control"><span class="docs-label button is-static is-size-7">Version</span></div><div class="docs-selector control is-expanded"><div class="select is-fullwidth is-size-7"><select id="documenter-version-selector"></select></div></div></div></nav><div class="docs-main"><header class="docs-navbar"><a class="docs-sidebar-button docs-navbar-link fa-solid fa-bars is-hidden-desktop" id="documenter-sidebar-button" href="#"></a><nav class="breadcrumb"><ul class="is-hidden-mobile"><li><a class="is-disabled">Examples</a></li><li class="is-active"><a href>Navier-Stokes (GMG)</a></li></ul><ul class="is-hidden-tablet"><li class="is-active"><a href>Navier-Stokes (GMG)</a></li></ul></nav><div class="docs-right"><a class="docs-navbar-link" href="https://github.com/gridap/GridapSolvers.jl/blob/main/test/Applications/NavierStokesGMG.jl#" title="Edit source on GitHub"><span class="docs-icon fa-solid"></span></a><a class="docs-settings-button docs-navbar-link fa-solid fa-gear" id="documenter-settings-button" href="#" title="Settings"></a><a class="docs-article-toggle-button fa-solid fa-chevron-up" id="documenter-article-toggle-button" href="javascript:;" title="Collapse all docstrings"></a></div></header><article class="content" id="documenter-page"><h1 id="Incompressible-Navier-Stokes-equations-in-a-2D/3D-cavity,-using-GMG."><a class="docs-heading-anchor" href="#Incompressible-Navier-Stokes-equations-in-a-2D/3D-cavity,-using-GMG.">Incompressible Navier-Stokes equations in a 2D/3D cavity, using GMG.</a><a id="Incompressible-Navier-Stokes-equations-in-a-2D/3D-cavity,-using-GMG.-1"></a><a class="docs-heading-anchor-permalink" href="#Incompressible-Navier-Stokes-equations-in-a-2D/3D-cavity,-using-GMG." title="Permalink"></a></h1><p>This example solves the incompressible Stokes equations, given by</p><p class="math-container">\[\begin{align*}
+-\Delta u + \text{R}_e (u \nabla) u - \nabla p &amp;= f \quad \text{in} \quad \Omega, \\
+\nabla \cdot u &amp;= 0 \quad \text{in} \quad \Omega, \\
+u &amp;= \hat{x} \quad \text{in} \quad \Gamma_\text{top} \subset \partial \Omega, \\
+u &amp;= 0 \quad \text{in} \quad \partial \Omega \backslash \Gamma_\text{top} \\
+\end{align*}\]</p><p>where <span>$\Omega = [0,1]^d$</span>.</p><p>We use a mixed finite-element scheme, with <span>$Q_k \times P_{k-1}^{-}$</span> elements for the velocity-pressure pair.</p><p>To solve the linear system, we use a FGMRES solver preconditioned by a block-triangular Shur-complement-based preconditioner. We use an Augmented Lagrangian approach to get a better approximation of the Schur complement. Details for this preconditoner can be found in <a href="https://epubs.siam.org/doi/10.1137/050646421">Benzi and Olshanskii (2006)</a>.</p><p>The velocity block is solved using a Geometric Multigrid (GMG) solver. Due to the kernel introduced by the Augmented-Lagrangian operator, we require special smoothers and prolongation/restriction operators. See <a href="https://link.springer.com/article/10.1007/s002110050465">Schoberl (1999)</a> for more details.</p><pre><code class="language- hljs">module NavierStokesGMGApplication
+
+using Test
+using LinearAlgebra
+using FillArrays, BlockArrays
+
+using Gridap
+using Gridap.ReferenceFEs, Gridap.Algebra, Gridap.Geometry, Gridap.FESpaces
+using Gridap.CellData, Gridap.MultiField, Gridap.Algebra
+using PartitionedArrays
+using GridapDistributed
+using GridapP4est
+
+using GridapSolvers
+using GridapSolvers.LinearSolvers, GridapSolvers.MultilevelTools
+using GridapSolvers.PatchBasedSmoothers, GridapSolvers.NonlinearSolvers
+using GridapSolvers.BlockSolvers: NonlinearSystemBlock, LinearSystemBlock, BiformBlock, BlockTriangularSolver
+
+function get_patch_smoothers(mh,tests,biform,patch_decompositions,qdegree;is_nonlinear=false)
+  patch_spaces = PatchFESpace(tests,patch_decompositions)
+  nlevs = num_levels(mh)
+  smoothers = map(view(tests,1:nlevs-1),patch_decompositions,patch_spaces) do tests, PD, Ph
+    Vh = get_fe_space(tests)
+    Ω  = Triangulation(PD)
+    dΩ = Measure(Ω,qdegree)
+    ap = (u,du,dv) -&gt; biform(u,du,dv,dΩ)
+    patch_smoother = PatchBasedLinearSolver(ap,Ph,Vh;is_nonlinear)
+    return RichardsonSmoother(patch_smoother,10,0.2)
+  end
+  return smoothers
+end
+
+function get_trilinear_form(mh_lev,triform,qdegree)
+  model = get_model(mh_lev)
+  Ω = Triangulation(model)
+  dΩ = Measure(Ω,qdegree)
+  return (u,du,dv) -&gt; triform(u,du,dv,dΩ)
+end
+
+function add_labels_2d!(labels)
+  add_tag_from_tags!(labels,&quot;top&quot;,[6])
+  add_tag_from_tags!(labels,&quot;walls&quot;,[1,2,3,4,5,7,8])
+end
+
+function add_labels_3d!(labels)
+  add_tag_from_tags!(labels,&quot;top&quot;,[22])
+  add_tag_from_tags!(labels,&quot;walls&quot;,[1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,23,24,25,26])
+end
+
+function main(distribute,np,nc,np_per_level)
+  parts = distribute(LinearIndices((prod(np),)))
+
+  Dc = length(nc)
+  domain = (Dc == 2) ? (0,1,0,1) : (0,1,0,1,0,1)
+  add_labels! = (Dc == 2) ? add_labels_2d! : add_labels_3d!
+  mh = CartesianModelHierarchy(parts,np_per_level,domain,nc;add_labels! = add_labels!)
+  model = get_model(mh,1)
+
+  order = 2
+  qdegree = 2*(order+1)
+  reffe_u = ReferenceFE(lagrangian,VectorValue{Dc,Float64},order)
+  reffe_p = ReferenceFE(lagrangian,Float64,order-1;space=:P)
+
+  u_walls = (Dc==2) ? VectorValue(0.0,0.0) : VectorValue(0.0,0.0,0.0)
+  u_top = (Dc==2) ? VectorValue(1.0,0.0) : VectorValue(1.0,0.0,0.0)
+
+  tests_u  = TestFESpace(mh,reffe_u,dirichlet_tags=[&quot;walls&quot;,&quot;top&quot;]);
+  trials_u = TrialFESpace(tests_u,[u_walls,u_top]);
+  U, V = get_fe_space(trials_u,1), get_fe_space(tests_u,1)
+  Q = TestFESpace(model,reffe_p;conformity=:L2,constraint=:zeromean)
+
+  mfs = Gridap.MultiField.BlockMultiFieldStyle()
+  X = MultiFieldFESpace([U,Q];style=mfs)
+  Y = MultiFieldFESpace([V,Q];style=mfs)
+
+  Re = 10.0
+  ν = 1/Re
+  α = 1.e2
+  f = (Dc==2) ? VectorValue(1.0,1.0) : VectorValue(1.0,1.0,1.0)
+
+  Π_Qh = LocalProjectionMap(divergence,reffe_p,qdegree)
+  graddiv(u,v,dΩ) = ∫(α*(∇⋅v)⋅Π_Qh(u))dΩ
+
+  conv(u,∇u) = (∇u&#39;)⋅u
+  dconv(du,∇du,u,∇u) = conv(u,∇du)+conv(du,∇u)
+  c(u,v,dΩ) = ∫(v⊙(conv∘(u,∇(u))))dΩ
+  dc(u,du,dv,dΩ) = ∫(dv⊙(dconv∘(du,∇(du),u,∇(u))))dΩ
+
+  lap(u,v,dΩ) = ∫(ν*∇(v)⊙∇(u))dΩ
+  rhs(v,dΩ) = ∫(v⋅f)dΩ
+
+  jac_u(u,du,dv,dΩ) = lap(du,dv,dΩ) + dc(u,du,dv,dΩ) + graddiv(du,dv,dΩ)
+  jac((u,p),(du,dp),(dv,dq),dΩ) = jac_u(u,du,dv,dΩ) - ∫(divergence(dv)*dp)dΩ - ∫(divergence(du)*dq)dΩ
+
+  res_u(u,v,dΩ) = lap(u,v,dΩ) + c(u,v,dΩ) + graddiv(u,v,dΩ) - rhs(v,dΩ)
+  res((u,p),(v,q),dΩ) = res_u(u,v,dΩ) - ∫(divergence(v)*p)dΩ - ∫(divergence(u)*q)dΩ
+
+  Ω = Triangulation(model)
+  dΩ = Measure(Ω,qdegree)
+  jac_h(x,dx,dy) = jac(x,dx,dy,dΩ)
+  res_h(x,dy) = res(x,dy,dΩ)
+  op = FEOperator(res_h,jac_h,X,Y)
+
+  biforms = map(mhl -&gt; get_trilinear_form(mhl,jac_u,qdegree),mh)
+  patch_decompositions = PatchDecomposition(mh)
+  smoothers = get_patch_smoothers(
+    mh,trials_u,jac_u,patch_decompositions,qdegree;is_nonlinear=true
+  )
+  prolongations = setup_patch_prolongation_operators(
+    tests_u,jac_u,graddiv,qdegree;is_nonlinear=true
+  )
+  restrictions = setup_patch_restriction_operators(
+    tests_u,prolongations,graddiv,qdegree;solver=IS_ConjugateGradientSolver(;reltol=1.e-6)
+  )
+  gmg = GMGLinearSolver(
+    mh,trials_u,tests_u,biforms,
+    prolongations,restrictions,
+    pre_smoothers=smoothers,
+    post_smoothers=smoothers,
+    coarsest_solver=LUSolver(),
+    maxiter=2,mode=:preconditioner,verbose=i_am_main(parts),is_nonlinear=true
+  )
+
+  solver_u = gmg
+  solver_p = CGSolver(JacobiLinearSolver();maxiter=20,atol=1e-14,rtol=1.e-6,verbose=i_am_main(parts))
+  solver_u.log.depth = 3
+  solver_p.log.depth = 3
+
+  bblocks  = [NonlinearSystemBlock([1]) LinearSystemBlock();
+              LinearSystemBlock()       BiformBlock((p,q) -&gt; ∫(-(1.0/α)*p*q)dΩ,Q,Q)]
+  coeffs = [1.0 1.0;
+            0.0 1.0]
+  P = BlockTriangularSolver(bblocks,[solver_u,solver_p],coeffs,:upper)
+  solver = FGMRESSolver(20,P;atol=1e-11,rtol=1.e-8,verbose=i_am_main(parts))
+  solver.log.depth = 2
+
+  nlsolver = NewtonSolver(solver;maxiter=20,atol=1e-10,rtol=1.e-12,verbose=i_am_main(parts))
+  xh = solve(nlsolver,op)
+
+  @test true
+end
+
+end # module</code></pre><hr/><p><em>This page was generated using <a href="https://github.com/fredrikekre/Literate.jl">Literate.jl</a>.</em></p></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="../StokesGMG/">« Stokes (GMG)</a><a class="docs-footer-nextpage" href="../DarcyGMG/">Darcy (GMG) »</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="auto">Automatic (OS)</option><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option><option value="catppuccin-latte">catppuccin-latte</option><option value="catppuccin-frappe">catppuccin-frappe</option><option value="catppuccin-macchiato">catppuccin-macchiato</option><option value="catppuccin-mocha">catppuccin-mocha</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 1.5.0 on <span class="colophon-date" title="Wednesday 2 October 2024 05:31">Wednesday 2 October 2024</span>. Using Julia version 1.10.5.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>
