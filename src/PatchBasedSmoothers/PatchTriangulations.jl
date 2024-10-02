@@ -119,7 +119,6 @@ function Geometry.move_contributions(
   scell_to_val::AbstractArray,
   strian::PatchTriangulation
 )
-  display(ndims(eltype(scell_to_val)))
   return scell_to_val, strian
 end
 

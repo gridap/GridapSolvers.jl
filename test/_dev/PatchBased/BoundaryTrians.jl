@@ -42,10 +42,16 @@ function weakforms(model)
 end
 
 model = CartesianDiscreteModel((0,1,0,1),(2,2))
+model = Gridap.Adaptivity.refine(model)
 
-order = 1
+#order = 1
+#qorder = 2*order+1
+#reffe = ReferenceFE(raviart_thomas,Float64,order-1)
+#Vh = FESpace(model,reffe)
+
+order = 2
 qorder = 2*order+1
-reffe = ReferenceFE(raviart_thomas,Float64,order-1)
+reffe = ReferenceFE(lagrangian,VectorValue{2,Float64},order)
 Vh = FESpace(model,reffe)
 
 Ω = Triangulation(model)
@@ -77,5 +83,14 @@ A4 = assemble_matrix(a4,Vh,Vh)
 Ap4 = assemble_matrix(ap4,Ph,Ph)
 
 
+Λ = SkeletonTriangulation(PD)
+dΛ = Measure(Λ, qorder)
+n_Λ = get_normal_vector(Λ)
+
+up = get_trial_fe_basis(Ph)
+ap(u,v) = ∫(jump(u⋅n_Λ)⋅jump(v⋅n_Λ))dΛ
+
+A = assemble_matrix(ap,Ph,Ph)
 
 
+@which is_change_possible(Ω,Λ)

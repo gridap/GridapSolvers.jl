@@ -148,14 +148,14 @@ function FESpaces.get_cell_dof_ids(::Triangulation,a::PatchFESpace,trian::PatchT
 end
 
 function FESpaces.get_cell_dof_ids(::BoundaryTriangulation,a::PatchFESpace,trian::PatchTriangulation)
-  cell_dof_ids     = get_cell_dof_ids(a)
+  cell_dof_ids   = get_cell_dof_ids(a)
   pface_to_pcell = trian.pface_to_pcell
   pcells = isempty(pface_to_pcell) ? Int[] : lazy_map(x->x[1],pface_to_pcell)
   return lazy_map(Reindex(cell_dof_ids),pcells)
 end
 
 function FESpaces.get_cell_dof_ids(::SkeletonTriangulation,a::PatchFESpace,trian::PatchTriangulation)
-  cell_dof_ids     = get_cell_dof_ids(a)
+  cell_dof_ids   = get_cell_dof_ids(a)
   pface_to_pcell = trian.pface_to_pcell
 
   pcells_plus  = isempty(pface_to_pcell) ? Int[] : lazy_map(x->x[1],pface_to_pcell)
