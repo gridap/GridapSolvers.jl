@@ -37,3 +37,7 @@ The previous installations steps will setup GridapSolvers to work using Julia's 
 - [MPI.jl](https://juliaparallel.org/MPI.jl/stable/configuration/)
 - [GridapPETSc.jl](https://github.com/gridap/GridapPETSc.jl)
 - [GridapP4est.jl](https://github.com/gridap/GridapP4est.jl), and [P4est_wrapper.jl](https://github.com/gridap/p4est_wrapper.jl)
+
+## Citation
+
+In order to give credit to the `GridapSolvers` contributors, we ask that you please reference our [JOSS paper](https://joss.theoj.org/papers/10.21105/joss.07162) along with the required citations for [Gridap](https://github.com/gridap/Gridap.jl?tab=readme-ov-file#how-to-cite-gridap).
