@@ -66,10 +66,8 @@ function _get_patch_cache(lev,sh,PD,lhs,rhs,is_nonlinear,cache_refine)
   cparts = get_level_parts(sh,lev+1)
   if i_am_in(cparts)
     # Patch-based correction fespace
-    glue = sh[lev].mh_level.ref_glue
-    patches_mask = get_coarse_node_mask(model_h,glue)
     cell_conformity = MultilevelTools.get_cell_conformity_before_redist(sh,lev)
-    Ph = PatchFESpace(Uh,PD,cell_conformity;patches_mask)
+    Ph = PatchFESpace(Uh,PD,cell_conformity)
 
     # Solver caches
     ap(u,v) = is_nonlinear ? lhs(zero(Uh),u,v) : lhs(u,v)
@@ -161,7 +159,7 @@ function setup_patch_prolongation_operators(sh,lhs,rhs,qdegrees;is_nonlinear=fal
     cparts = get_level_parts(sh,lev+1)
     if i_am_in(cparts)
       model = get_model_before_redist(sh,lev)
-      PD = PatchDecomposition(model)
+      PD = CoarsePatchDecomposition(model)
       Ω = Triangulation(PD)
       dΩ = Measure(Ω,qdegree)
       lhs_i = is_nonlinear ? (u,du,dv) -> lhs(u,du,dv,dΩ) : (u,v) -> lhs(u,v,dΩ)
