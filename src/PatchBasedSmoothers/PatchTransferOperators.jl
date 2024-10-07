@@ -155,7 +155,7 @@ end
 
 function setup_patch_prolongation_operators(sh,lhs,rhs,qdegrees;is_nonlinear=false)
   map(view(linear_indices(sh),1:num_levels(sh)-1)) do lev
-    qdegree = isa(qdegrees,Number) ? qdegrees : qdegrees[lev]
+    qdegree = isa(qdegrees,Vector) ? qdegrees[lev] : qdegrees
     cparts = get_level_parts(sh,lev+1)
     if i_am_in(cparts)
       model = get_model_before_redist(sh,lev)
@@ -235,7 +235,7 @@ end
 
 function setup_patch_restriction_operators(sh,patch_prolongations,rhs,qdegrees;kwargs...)
   map(view(linear_indices(sh),1:num_levels(sh)-1)) do lev
-    qdegree = isa(qdegrees,Number) ? qdegrees : qdegrees[lev]
+    qdegree = isa(qdegrees,Vector) ? qdegrees[lev] : qdegrees
     cparts = get_level_parts(sh,lev+1)
     if i_am_in(cparts)
       model = get_model_before_redist(sh,lev)
