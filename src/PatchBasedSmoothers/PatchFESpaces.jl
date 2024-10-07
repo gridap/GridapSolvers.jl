@@ -469,7 +469,9 @@ end
 
 # x \in  PatchFESpace
 # y \in  SingleFESpace
-function prolongate!(x,Ph::PatchFESpace,y;dof_ids=LinearIndices(y))
+function prolongate!(
+  x::AbstractVector,Ph::PatchFESpace,y::AbstractVector;dof_ids=LinearIndices(y)
+)
   dof_to_pdof = Ph.dof_to_pdof
   
   ptrs = dof_to_pdof.ptrs
@@ -484,7 +486,9 @@ end
 
 # x \in  SingleFESpace
 # y \in  PatchFESpace
-function inject!(x,Ph::PatchFESpace,y)
+function inject!(
+  x::AbstractVector,Ph::PatchFESpace,y::AbstractVector
+)
   dof_to_pdof = Ph.dof_to_pdof
   
   ptrs = dof_to_pdof.ptrs
@@ -498,7 +502,9 @@ function inject!(x,Ph::PatchFESpace,y)
   end
 end
 
-function inject!(x,Ph::PatchFESpace,y,w,w_sums)
+function inject!(
+  x::AbstractVector,Ph::PatchFESpace,y::AbstractVector,w,w_sums
+)
   dof_to_pdof = Ph.dof_to_pdof
   
   ptrs = dof_to_pdof.ptrs
