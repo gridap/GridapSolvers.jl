@@ -59,7 +59,7 @@ function DistributedGridTransferOperator(
   return DistributedGridTransferOperator(op_type,redist,restriction_method,sh,cache)
 end
 
-function _get_interpolation_cache(lev::Int,sh::FESpaceHierarchy,qdegree::Int,mode::Symbol)
+function _get_interpolation_cache(lev::Int,sh::FESpaceHierarchy,qdegree,mode::Symbol)
   cparts = get_level_parts(sh,lev+1)
 
   if i_am_in(cparts)
@@ -82,7 +82,7 @@ function _get_interpolation_cache(lev::Int,sh::FESpaceHierarchy,qdegree::Int,mod
   return cache_refine
 end
 
-function _get_projection_cache(lev::Int,sh::FESpaceHierarchy,qdegree::Int,mode::Symbol,solver)
+function _get_projection_cache(lev::Int,sh::FESpaceHierarchy,qdegree,mode::Symbol,solver)
   cparts = get_level_parts(sh,lev+1)
 
   if i_am_in(cparts)
@@ -126,7 +126,7 @@ function _get_projection_cache(lev::Int,sh::FESpaceHierarchy,qdegree::Int,mode::
   return cache_refine
 end
 
-function _get_dual_projection_cache(lev::Int,sh::FESpaceHierarchy,qdegree::Int,solver)
+function _get_dual_projection_cache(lev::Int,sh::FESpaceHierarchy,qdegree,solver)
   cparts = get_level_parts(sh,lev+1)
 
   if i_am_in(cparts)
