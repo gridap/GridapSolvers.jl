@@ -35,7 +35,7 @@ function CoarsePatchDecomposition(
   model::GridapDistributed.DistributedAdaptedDiscreteModel{Dc,Dp};
   patch_boundary_style::PatchBoundaryStyle=PatchBoundaryExclude()
 ) where {Dc,Dp}
-  gids = get_cell_gids(get_parent(model))
+  gids = get_cell_gids(Gridap.Adaptivity.get_parent(model))
   mark_interface_facets!(model)
   patch_decompositions = map(local_views(model),partition(gids)) do model, cids
     own_cells = own_to_local(cids)
