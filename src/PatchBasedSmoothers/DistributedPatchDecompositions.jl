@@ -42,9 +42,7 @@ function CoarsePatchDecomposition(
     glue = Gridap.Adaptivity.get_adaptivity_glue(model)
     patch_cells = glue.o2n_faces_map[own_cells]
     PatchDecomposition(
-      model,patch_cells,
-      patch_boundary_style=patch_boundary_style,
-      boundary_tag_names=["boundary","interface"]
+      model,patch_cells,patch_boundary_style,["boundary","interface"]
     )
   end
   return DistributedPatchDecomposition(patch_decompositions,model)
