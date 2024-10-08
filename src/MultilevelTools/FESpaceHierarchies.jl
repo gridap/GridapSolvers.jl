@@ -61,8 +61,8 @@ function _cell_conformity(
   reffe::ReferenceFE; 
   conformity=nothing, kwargs...
 ) :: CellConformity
-  cell_reffe = Fill(reffe,num_cells(model))
-  conformity = Conformity(Gridap.Arrays.testitem(cell_reffe),conformity)
+  cell_reffe = CompressedArray([reffe],fill(one(Int8),num_cells(model)))
+  conformity = Conformity(reffe,conformity)
   return CellConformity(cell_reffe,conformity)
 end
 
