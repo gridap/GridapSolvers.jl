@@ -1,60 +1,42 @@
 
+# Necessary when integrating the result from LocalProjectionMaps onto MultiFieldFEBasisComponents 
+# in parallel. In general, this would also get triggered when doing a change_domain operation
+# between two different Triangulation views.
+# It has to do with blocks and how `extend` and `pos_neg_data` are getting dispatched. 
+function Geometry._similar_empty(val::Fields.LinearCombinationFieldVector)
+  #Fields.VoidBasis(val,true)
+  values = zeros(eltype(val.values),size(val.values))
+  Gridap.Fields.LinearCombinationFieldVector(values,val.fields)
+end
+
+# This below is another attempt to fix the issue. 
+# I'm close, but doesn't work. 
 """
-function Base.map(::typeof(Gridap.Arrays.testitem),
-  a::Tuple{<:AbstractVector{<:AbstractVector{<:VectorValue}},<:AbstractVector{<:Gridap.Fields.LinearCombinationFieldVector}})
-  a2=Gridap.Arrays.testitem(a[2])
-  a1=Vector{eltype(eltype(a[1]))}(undef,size(a2,1))
-  a1.=zero(Gridap.Arrays.testitem(a1))
-  (a1,a2)
-end
-"""
-
-# MultiField/DistributedMultiField missing API
-
-"""
-function Gridap.FESpaces.zero_dirichlet_values(f::MultiFieldFESpace)
-  map(zero_dirichlet_values,f.spaces)
+function Geometry._similar_empty(val::ArrayBlock{<:AbstractArray{<:Field},N}) where N
+  T = typeof(Geometry._similar_empty(testitem(val.array)))
+  array = Array{T,N}(undef,size(val.array))
+  touched = copy(val.touched)
+  a = ArrayBlock(array,touched)
+  for i in eachindex(a)
+    if a.touched[i]
+      a.array[i] = Geometry._similar_empty(val.array[i])
+    end
+  end
+  a
 end
 
-function Gridap.FESpaces.interpolate_everywhere!(objects,free_values::AbstractVector,dirichlet_values::Vector,fe::MultiFieldFESpace)
-  blocks = SingleFieldFEFunction[]
-  for (field, (U,object)) in enumerate(zip(fe.spaces,objects))
-    free_values_i = restrict_to_field(fe,free_values,field)
-    dirichlet_values_i = dirichlet_values[field]
-    uhi = interpolate!(object, free_values_i, dirichlet_values_i, U)
-    push!(blocks,uhi)
-  end
-  Gridap.MultiField.MultiFieldFEFunction(free_values,fe,blocks)
+function Gridap.Geometry.pos_neg_data(
+  ipos_to_val::AbstractArray{<:ArrayBlock{<:AbstractArray{<:Field}}},i_to_iposneg::PosNegPartition
+)
+  nineg = length(i_to_iposneg.ineg_to_i)
+  void = Geometry._similar_empty(testitem(ipos_to_val))
+  ineg_to_val = Fill(void,nineg)
+  _ipos_to_val = lazy_map(Broadcasting(Fields.VoidBasisMap(false)),ipos_to_val)
+  _ipos_to_val, ineg_to_val
 end
 
-function Gridap.FESpaces.interpolate!(objects::GridapDistributed.DistributedMultiFieldFEFunction,free_values::AbstractVector,fe::GridapDistributed.DistributedMultiFieldFESpace)
-  part_fe_fun = map(local_views(objects),partition(free_values),local_views(fe)) do objects,x,f
-    interpolate!(objects,x,f)
-  end
-  field_fe_fun = GridapDistributed.DistributedSingleFieldFEFunction[]
-  for i in 1:num_fields(fe)
-    free_values_i = Gridap.MultiField.restrict_to_field(fe,free_values,i)
-    fe_space_i = fe.field_fe_space[i]
-    fe_fun_i = FEFunction(fe_space_i,free_values_i)
-    push!(field_fe_fun,fe_fun_i)
-  end
-  GridapDistributed.DistributedMultiFieldFEFunction(field_fe_fun,part_fe_fun,free_values)
-end
-
-function Gridap.FESpaces.FEFunction(
-  f::GridapDistributed.DistributedMultiFieldFESpace,x::AbstractVector,
-  dirichlet_values::AbstractArray{<:AbstractVector},isconsistent=false
-  )
-  free_values  = GridapDistributed.change_ghost(x,f.gids;is_consistent=isconsistent,make_consistent=true)
-  part_fe_fun  = map(FEFunction,f.part_fe_space,partition(free_values))
-  field_fe_fun = GridapDistributed.DistributedSingleFieldFEFunction[]
-  for i in 1:num_fields(f)
-    free_values_i = Gridap.MultiField.restrict_to_field(f,free_values,i)
-    dirichlet_values_i = dirichlet_values[i]
-    fe_space_i = f.field_fe_space[i]
-    fe_fun_i = FEFunction(fe_space_i,free_values_i,dirichlet_values_i,true)
-    push!(field_fe_fun,fe_fun_i)
-  end
-  GridapDistributed.DistributedMultiFieldFEFunction(field_fe_fun,part_fe_fun,free_values)
+function Arrays.lazy_map(k::Broadcasting{<:Fields.VoidBasisMap},a::Arrays.LazyArray{<:Fill{<:Fields.BlockMap}})
+  args = map(ai -> lazy_map(k.f, ai), a.args)
+  lazy_map(a.maps.value,args)
 end
 """

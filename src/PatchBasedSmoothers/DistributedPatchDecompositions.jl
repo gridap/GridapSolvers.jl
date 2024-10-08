@@ -2,6 +2,14 @@
 struct DistributedPatchDecomposition{Dr,Dc,Dp,A,B} <: GridapType
   patch_decompositions::A
   model::B
+  function DistributedPatchDecomposition(
+    patch_decompositions::AbstractVector{<:PatchDecomposition{Dr,Dc,Dp}},
+    model::GridapDistributed.DistributedDiscreteModel{Dc,Dp}
+  ) where {Dr,Dc,Dp}
+    A = typeof(patch_decompositions)
+    B = typeof(model)
+    new{Dr,Dc,Dp,A,B}(patch_decompositions,model)
+  end
 end
 
 GridapDistributed.local_views(a::DistributedPatchDecomposition) = a.patch_decompositions
@@ -12,17 +20,32 @@ function PatchDecomposition(
   patch_boundary_style::PatchBoundaryStyle=PatchBoundaryExclude()
 ) where {Dc,Dp}
   mark_interface_facets!(model)
-  patch_decompositions = map(local_views(model)) do lmodel
+  patch_decompositions = map(local_views(model)) do model
     PatchDecomposition(
-      lmodel;
+      model;
       Dr=Dr,
       patch_boundary_style=patch_boundary_style,
       boundary_tag_names=["boundary","interface"]
     )
   end
-  A = typeof(patch_decompositions)
-  B = typeof(model)
-  return DistributedPatchDecomposition{Dr,Dc,Dp,A,B}(patch_decompositions,model)
+  return DistributedPatchDecomposition(patch_decompositions,model)
+end
+
+function CoarsePatchDecomposition(
+  model::GridapDistributed.DistributedAdaptedDiscreteModel{Dc,Dp};
+  patch_boundary_style::PatchBoundaryStyle=PatchBoundaryExclude()
+) where {Dc,Dp}
+  gids = get_cell_gids(Gridap.Adaptivity.get_parent(model))
+  mark_interface_facets!(model)
+  patch_decompositions = map(local_views(model),partition(gids)) do model, cids
+    own_cells = own_to_local(cids)
+    glue = Gridap.Adaptivity.get_adaptivity_glue(model)
+    patch_cells = glue.o2n_faces_map[own_cells]
+    PatchDecomposition(
+      model,patch_cells,patch_boundary_style,["boundary","interface"]
+    )
+  end
+  return DistributedPatchDecomposition(patch_decompositions,model)
 end
 
 function PatchDecomposition(mh::ModelHierarchy;kwargs...)

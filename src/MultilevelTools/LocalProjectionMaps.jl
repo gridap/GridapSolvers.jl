@@ -135,11 +135,6 @@ function _compute_local_projections(
   return lazy_map(k,lhs_data,rhs_data,basis_data)
 end
 
-# Note on the caches: 
-#  - We CANNOT overwrite `lhs`: In the case of constant cell_maps and `u` being a `FEFunction`,
-#    the lhs will be a Fill, but the rhs will not be optimized (regular LazyArray). 
-#    In that case, we will see multiple times the same `lhs` being used for different `rhs`.
-#  - The converse never happens (I think), so we can overwrite `rhs` since it will always be recomputed.
 function Arrays.return_cache(::LocalProjectionMap,lhs::Matrix{T},rhs::A,basis) where {T,A<:Union{Matrix{T},Vector{T}}}
   return CachedArray(copy(lhs)), CachedArray(copy(rhs))
 end

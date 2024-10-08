@@ -42,11 +42,12 @@ function MultiFieldTransferOperator(sh::FESpaceHierarchy,operators;op_type=:prol
   return mfops
 end
 
-function update_transfer_operator!(op::MultiFieldTransferOperator,x::PVector)
+function update_transfer_operator!(op::MultiFieldTransferOperator,x::AbstractVector)
   xh, _ = op.cache
 
   if !isnothing(xh)
     copy!(x,xh)
+    isa(x,PVector) && wait(consistent!(x))
   end
 
   for (i,op_i) in enumerate(op.ops)
@@ -55,7 +56,11 @@ function update_transfer_operator!(op::MultiFieldTransferOperator,x::PVector)
   end
 end
 
-function LinearAlgebra.mul!(x,op::MultiFieldTransferOperator,y)
+function LinearAlgebra.mul!(
+  x::Union{Nothing,<:AbstractVector},
+  op::MultiFieldTransferOperator,
+  y::Union{Nothing,<:AbstractVector}
+)
   xh, yh = op.cache
 
   if !isnothing(yh)
@@ -70,7 +75,7 @@ function LinearAlgebra.mul!(x,op::MultiFieldTransferOperator,y)
 
   if !isnothing(xh)
     copy!(x,xh)
-    consistent!(x) |> fetch
+    isa(x,PVector) && wait(consistent!(x))
   end
 
   return x

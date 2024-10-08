@@ -51,7 +51,7 @@ include("RefinementTools.jl")
 include("ModelHierarchies.jl")
 include("FESpaceHierarchies.jl")
 include("LocalProjectionMaps.jl")
-include("DistributedGridTransferOperators.jl")
+include("GridTransferOperators.jl")
 include("MultiFieldTransferOperators.jl")
 
 end

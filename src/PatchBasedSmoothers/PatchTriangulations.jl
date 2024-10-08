@@ -5,7 +5,7 @@
 
 Wrapper around a Triangulation, for patch-based assembly.
 """
-struct PatchTriangulation{Dc,Dp,A,B,C,D} <: Gridap.Geometry.Triangulation{Dc,Dp}
+struct PatchTriangulation{Dc,Dp,A,B,C,D} <: Triangulation{Dc,Dp}
   trian          :: A
   PD             :: B
   patch_faces    :: C
@@ -45,18 +45,18 @@ end
 
 # For now, I am disabling changes from PatchTriangulations to other Triangulations.
 # Reason: When the tface_to_mface map is not injective (i.e when we have overlapping), 
-#         the glue is not well defined. Gridap will throe an error when trying to create 
+#         the glue is not well defined. Gridap will throw an error when trying to create 
 #         the inverse map mface_to_tface.
 # I believe this could technically be relaxed in the future, but for now I don't see a 
 # scenario where we would need this.
-function Geometry.is_change_possible(strian::PatchTriangulation,ttrian::Triangulation)
-  return strian === ttrian
+function Geometry.is_change_possible(strian::PatchTriangulation,ttrian::PatchTriangulation)
+  return (strian === ttrian) || (strian.PD === ttrian.PD)
 end
 
 # Constructors 
 
 function Geometry.Triangulation(PD::PatchDecomposition)
-  patch_cells = Gridap.Arrays.Table(PD.patch_cells)
+  patch_cells = PD.patch_cells
   trian = Triangulation(PD.model)
   return PatchTriangulation(trian,PD,patch_cells,nothing)
 end
@@ -75,7 +75,6 @@ function Geometry.BoundaryTriangulation(
   pface_to_pcell, pface_to_lcell = get_pface_to_pcell(PD,Df,patch_faces)
 
   trian = OverlappingBoundaryTriangulation(model,patch_faces.data,pface_to_lcell)
-
   return PatchTriangulation(trian,PD,patch_faces,pface_to_pcell)
 end
 
@@ -88,11 +87,7 @@ function Geometry.SkeletonTriangulation(PD::PatchDecomposition{Dr,Dc}) where {Dr
   patch_faces = get_patch_faces(PD,Df,is_interior)
   pface_to_pcell, _ = get_pface_to_pcell(PD,Df,patch_faces)
 
-  nfaces = length(patch_faces.data)
-  plus  = OverlappingBoundaryTriangulation(model,patch_faces.data,fill(Int8(1),nfaces))
-  minus = OverlappingBoundaryTriangulation(model,patch_faces.data,fill(Int8(2),nfaces))
-  trian = SkeletonTriangulation(plus,minus)
-
+  trian = OverlappingSkeletonTriangulation(model,patch_faces.data)
   return PatchTriangulation(trian,PD,patch_faces,pface_to_pcell)
 end
 
@@ -124,10 +119,8 @@ function Geometry.move_contributions(
   scell_to_val::AbstractArray,
   strian::PatchTriangulation
 )
-  display(ndims(eltype(scell_to_val)))
   return scell_to_val, strian
 end
-
 
 # Overlapping BoundaryTriangulation
 #
@@ -140,11 +133,23 @@ end
 # mostly copied from Gridap/Geometry/BoundaryTriangulations.jl
 
 function OverlappingBoundaryTriangulation(
+  model::Gridap.Adaptivity.AdaptedDiscreteModel,
+  face_to_bgface::AbstractVector{<:Integer},
+  face_to_lcell::AbstractVector{<:Integer}
+)
+  trian = OverlappingBoundaryTriangulation(
+    Gridap.Adaptivity.get_model(model),
+    face_to_bgface,
+    face_to_lcell,
+  )
+  return Gridap.Adaptivity.AdaptedTriangulation(trian,model)
+end
+
+function OverlappingBoundaryTriangulation(
   model::DiscreteModel,
   face_to_bgface::AbstractVector{<:Integer},
   face_to_lcell::AbstractVector{<:Integer}
 )
-
   D = num_cell_dims(model)
   topo = get_grid_topology(model)
   bgface_grid = Grid(ReferenceFE{D-1},model)
@@ -195,7 +200,8 @@ function OverlappingFaceToCellGlue(
     face_to_ftype,
     cell_to_ctype,
     cell_to_lface_to_pindex,
-    ctype_to_lface_to_ftype)
+    ctype_to_lface_to_ftype
+  )
 end
 
 function overlapped_find_local_index(
@@ -216,4 +222,28 @@ function overlapped_find_local_index(
     end
   end
   return c_to_lc
+end
+
+
+# Overlapping SkeletonTriangulation
+
+function OverlappingSkeletonTriangulation(
+  model::Gridap.Adaptivity.AdaptedDiscreteModel,
+  face_to_bgface::AbstractVector{<:Integer},
+)
+  trian = OverlappingSkeletonTriangulation(
+    Gridap.Adaptivity.get_model(model),
+    face_to_bgface,
+  )
+  return Gridap.Adaptivity.AdaptedTriangulation(trian,model)
+end
+
+function OverlappingSkeletonTriangulation(
+  model::DiscreteModel,
+  face_to_bgface::AbstractVector{<:Integer},
+)
+  nfaces = length(face_to_bgface)
+  plus  = OverlappingBoundaryTriangulation(model,face_to_bgface,fill(Int8(1),nfaces))
+  minus = OverlappingBoundaryTriangulation(model,face_to_bgface,fill(Int8(2),nfaces))
+  return SkeletonTriangulation(plus,minus)
 end

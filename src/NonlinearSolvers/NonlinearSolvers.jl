@@ -12,7 +12,6 @@ module NonlinearSolvers
 
   using GridapSolvers.SolverInterfaces
   using GridapSolvers.MultilevelTools
-  using GridapSolvers.SolverInterfaces
 
   include("NewtonRaphsonSolver.jl")
   export NewtonSolver

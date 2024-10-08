@@ -24,6 +24,9 @@ export SymGaussSeidelSmoother
 export GMGLinearSolver
 export BlockDiagonalSmoother
 export SchurComplementSolver
+export SchwarzLinearSolver
+
+export CallbackSolver
 
 # Wrappers for IterativeSolvers.jl
 export IS_ConjugateGradientSolver
@@ -56,5 +59,8 @@ include("GMGLinearSolvers.jl")
 include("IterativeLinearSolvers.jl")
 include("SchurComplementSolvers.jl")
 include("MatrixSolvers.jl")
+include("SchwarzLinearSolvers.jl")
+
+include("CallbackSolver.jl")
 
 end
