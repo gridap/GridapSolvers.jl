@@ -81,7 +81,7 @@ function assemble_patch_matrices(Ph::FESpace,ap;local_solver=LUSolver())
 end
 
 function assemble_patch_matrices(Ph::GridapDistributed.DistributedFESpace,ap;local_solver=LUSolver())
-  u, v  = get_trial_fe_basis(Vh), get_fe_basis(Vh)
+  u, v  = get_trial_fe_basis(Ph), get_fe_basis(Ph)
   matdata = collect_cell_matrix(Ph,Ph,ap(u,v))
   Ap, Ap_ns = map(local_views(Ph),matdata) do Ph, matdata
     assem = SparseMatrixAssembler(Ph,Ph)
@@ -99,7 +99,7 @@ function update_patch_matrices!(Ap,Ap_ns,Ph::FESpace,ap)
 end
 
 function update_patch_matrices!(Ap,Ap_ns,Ph::GridapDistributed.DistributedFESpace,ap)
-  u, v  = get_trial_fe_basis(Vh), get_fe_basis(Vh)
+  u, v  = get_trial_fe_basis(Ph), get_fe_basis(Ph)
   matdata = collect_cell_matrix(Ph,Ph,ap(u,v))
   map(Ap, Ap_ns, local_views(Ph), matdata) do Ap, Ap_ns, Ph, matdata
     assem = SparseMatrixAssembler(Ph,Ph)
