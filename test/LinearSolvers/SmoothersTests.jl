@@ -29,7 +29,7 @@ function smoothers_driver(parts,model,P)
   A, b = get_matrix(op), get_vector(op)
 
   solver = CGSolver(P;rtol=1.0e-8,verbose=i_am_main(parts))
-  ns = numerical_setup(sumbolic_setup(solver,A),A)
+  ns = numerical_setup(symbolic_setup(solver,A),A)
   x = allocate_in_domain(A); fill!(x,zero(eltype(x)))
   solve!(x,ns,b)
 
