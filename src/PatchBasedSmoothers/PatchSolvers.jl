@@ -8,16 +8,14 @@ struct PatchSolver{A,B,C,D,E} <: Algebra.LinearSolver
 end
 
 function PatchSolver(
-  space::FESpace,patch_decomposition::PatchDecomposition,biform,reffe;conformity=nothing
+  space::FESpace,patch_decomposition::PatchDecomposition,biform::Function
 )
-  cell_conformity = MultilevelTools._cell_conformity(
-    get_background_model(get_triangulation(space)),reffe;conformity
-  )
+  cell_conformity = get_cell_conformity(space)
   return PatchSolver(space,patch_decomposition,biform,cell_conformity)
 end
 
 function PatchSolver(
-  space::FESpace,patch_decomposition::PatchDecomposition,biform,cell_conformity::CellConformity
+  space::FESpace,patch_decomposition::PatchDecomposition,biform::Function,cell_conformity::CellConformity
 )
   cell_dof_ids = get_cell_dof_ids(space)
   patch_cells = get_patch_cells(patch_decomposition)
