@@ -1,3 +1,14 @@
+module IterativeSolversExt
+
+using LinearAlgebra, PartitionedArrays, SparseArrays
+
+using Gridap, GridapSolvers
+using IterativeSolvers
+
+export IS_ConjugateGradientSolver
+export IS_GMRESSolver
+export IS_MINRESSolver
+export IS_SSORSolver
 
 abstract type IterativeLinearSolverType end
 struct CGIterativeSolverType     <: IterativeLinearSolverType end
@@ -214,3 +225,5 @@ function Gridap.Algebra.solve!(::SSORIterativeSolverType,
   consistent!(x) |> fetch
   return x
 end
+
+end # module

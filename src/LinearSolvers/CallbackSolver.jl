@@ -1,4 +1,18 @@
 
+"""
+    CallbackSolver(solver::LinearSolver,callback::Function)
+
+A linear solver that runs a callback function after solving the linear system. The callback
+function should take the solution vector as its only argument and return nothing, i.e 
+`callback(x::AbstractVector) -> nothing`.
+
+This structure is useful to add functionality to any linear solver, such as: 
+
+- Logging the solution, residuals, etc.
+- Monitoring properties of the solution, as it's divergence or mean. 
+- Modifying the solution in-place after solving the linear system, to apply a correction, 
+  for example.
+"""
 struct CallbackSolver{A,B} <: Algebra.LinearSolver
   solver :: A
   callback :: B

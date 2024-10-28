@@ -6,12 +6,10 @@ using LinearAlgebra
 using SparseArrays
 using SparseMatricesCSR
 using BlockArrays
-using IterativeSolvers
 
 using Gridap
 using Gridap.Helpers, Gridap.Algebra, Gridap.CellData, Gridap.Arrays, Gridap.FESpaces, Gridap.MultiField
 using PartitionedArrays
-using GridapPETSc
 
 using GridapDistributed
 using GridapSolvers.MultilevelTools
@@ -46,17 +44,11 @@ include("Krylov/GMRESSolvers.jl")
 include("Krylov/FGMRESSolvers.jl")
 include("Krylov/MINRESSolvers.jl")
 
-include("PETSc/PETScUtils.jl")
-include("PETSc/PETScCaches.jl")
-include("PETSc/ElasticitySolvers.jl")
-include("PETSc/HipmairXuSolvers.jl")
-
 include("IdentityLinearSolvers.jl")
 include("JacobiLinearSolvers.jl")
 include("RichardsonSmoothers.jl")
 include("SymGaussSeidelSmoothers.jl")
 include("GMGLinearSolvers.jl")
-include("IterativeLinearSolvers.jl")
 include("SchurComplementSolvers.jl")
 include("MatrixSolvers.jl")
 include("SchwarzLinearSolvers.jl")
