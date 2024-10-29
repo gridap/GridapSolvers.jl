@@ -28,7 +28,6 @@ function PatchFESpace(
   cell_conformity::Vector;
   patches_mask = default_patches_mask(patch_decomposition)
 )
-
   field_spaces = map((s,c) -> PatchFESpace(s,patch_decomposition,c;patches_mask),space,cell_conformity)
   part_spaces = map(MultiFieldFESpace,GridapDistributed.to_parray_of_arrays(map(local_views,field_spaces)))
   
