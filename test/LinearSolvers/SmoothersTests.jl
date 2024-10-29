@@ -18,7 +18,6 @@ function smoothers_driver(parts,model,P)
   reffe  = ReferenceFE(lagrangian,Float64,order)
   Vh     = TestFESpace(model,reffe;conformity=:H1,dirichlet_tags="boundary")
   Uh     = TrialFESpace(Vh,sol)
-  u      = interpolate(sol,Uh)
 
   Ω      = Triangulation(model)
   dΩ     = Measure(Ω,qorder)
@@ -46,12 +45,13 @@ end
 
 function main_smoother_driver(parts,model,smoother)
   if smoother === :richardson
-    P = RichardsonSmoother(JacobiLinearSolver(),5,2.0/3.0)
+    S = RichardsonSmoother(JacobiLinearSolver(),5,2.0/3.0)
   elseif smoother === :sym_gauss_seidel
-    P = SymGaussSeidelSmoother(5)
+    S = SymGaussSeidelSmoother(5)
   else
     error("Unknown smoother")
   end
+  P = LinearSolverFromSmoother(S)
   smoothers_driver(parts,model,P)
 end
 
