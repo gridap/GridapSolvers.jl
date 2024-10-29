@@ -60,28 +60,14 @@ end
 
 @doc """
     function PatchFESpace(
-      space::FESpaces.SingleFieldFESpace,
-      patch_decomposition::PatchDecomposition,
-      reffe::Union{ReferenceFE,Tuple{<:ReferenceFEs.ReferenceFEName,Any,Any}};
-      conformity=nothing,
-      patches_mask=Fill(false,num_patches(patch_decomposition))
+      space::FESpace,patch_decomposition;kwargs...
     )
-
-Constructs a `PatchFESpace` from a global `SingleFieldFESpace` and a `PatchDecomposition`.
-The conformity of the FESpace is deduced from `reffe` and `conformity`, which need to be 
-the same as the ones used to construct the global FESpace.
-
-If `patches_mask[p] = true`, the patch `p` is ignored. Used in parallel.
 """
 function PatchFESpace(
-  space::FESpaces.SingleFieldFESpace,
-  patch_decomposition::PatchDecomposition,
-  reffe::Union{ReferenceFE,Tuple{<:ReferenceFEs.ReferenceFEName,Any,Any}};
-  conformity=nothing,
-  patches_mask=Fill(false,num_patches(patch_decomposition))
+  space::FESpace,patch_decomposition;kwargs...
 )
-  cell_conformity = MultilevelTools._cell_conformity(patch_decomposition.model,reffe;conformity=conformity)
-  return PatchFESpace(space,patch_decomposition,cell_conformity;patches_mask=patches_mask)
+  cell_conformity = get_cell_conformity(space)
+  return PatchFESpace(space,patch_decomposition,cell_conformity;kwargs...)
 end
 
 @doc """

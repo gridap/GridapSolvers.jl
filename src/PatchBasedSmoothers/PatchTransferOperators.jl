@@ -66,8 +66,7 @@ function _get_patch_cache(lev,sh,PD,lhs,rhs,is_nonlinear,cache_refine)
   cparts = get_level_parts(sh,lev+1)
   if i_am_in(cparts)
     # Patch-based correction fespace
-    cell_conformity = MultilevelTools.get_cell_conformity_before_redist(sh,lev)
-    Ph = PatchFESpace(Uh,PD,cell_conformity)
+    Ph = PatchFESpace(Uh,PD)
 
     # Solver caches
     ap(u,v) = is_nonlinear ? lhs(zero(Uh),u,v) : lhs(u,v)

@@ -10,6 +10,7 @@ using PartitionedArrays
 using GridapDistributed
 
 using GridapSolvers.MultilevelTools
+using GridapSolvers.MultilevelTools: get_cell_conformity
 
 export PatchDecomposition, Closure
 export PatchFESpace
