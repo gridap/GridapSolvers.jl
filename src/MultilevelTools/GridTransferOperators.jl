@@ -219,6 +219,12 @@ function setup_restriction_operators(sh::FESpaceHierarchy,qdegrees::AbstractArra
   end
 end
 
+function update_transfer_operator!(
+  op::DistributedGridTransferOperator,x::AbstractVector
+)
+  nothing
+end
+
 ### Applying the operators:
 
 # A) Prolongation, without redistribution
