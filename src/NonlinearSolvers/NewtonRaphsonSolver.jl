@@ -19,6 +19,8 @@ function NewtonSolver(ls;maxiter=100,atol=1e-12,rtol=1.e-6,verbose=0,name="Newto
   return NewtonSolver(ls,log)
 end
 
+AbstractTrees.children(s::NewtonSolver) = [s.ls]
+
 struct NewtonCache
   A::AbstractMatrix
   b::AbstractVector
