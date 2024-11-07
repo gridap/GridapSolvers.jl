@@ -62,8 +62,6 @@ end
     function PatchFESpace(
       space::FESpaces.SingleFieldFESpace,
       patch_decomposition::PatchDecomposition,
-      reffe::Union{ReferenceFE,Tuple{<:ReferenceFEs.ReferenceFEName,Any,Any}};
-      conformity=nothing,
       patches_mask=Fill(false,num_patches(patch_decomposition))
     )
 
@@ -76,11 +74,9 @@ If `patches_mask[p] = true`, the patch `p` is ignored. Used in parallel.
 function PatchFESpace(
   space::FESpaces.SingleFieldFESpace,
   patch_decomposition::PatchDecomposition,
-  reffe::Union{ReferenceFE,Tuple{<:ReferenceFEs.ReferenceFEName,Any,Any}};
-  conformity=nothing,
   patches_mask=Fill(false,num_patches(patch_decomposition))
 )
-  cell_conformity = MultilevelTools._cell_conformity(patch_decomposition.model,reffe;conformity=conformity)
+  cell_conformity = get_cell_conformity(space)
   return PatchFESpace(space,patch_decomposition,cell_conformity;patches_mask=patches_mask)
 end
 
