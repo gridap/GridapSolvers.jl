@@ -1,4 +1,5 @@
 
+
 const DistributedPatchFESpace = GridapDistributed.DistributedSingleFieldFESpace{<:AbstractVector{<:PatchFESpace}}
 
 function PatchFESpace(
@@ -44,8 +45,7 @@ function default_patches_mask(patch_decomposition::DistributedPatchDecomposition
 end
 
 function PatchFESpace(
-  sh::FESpaceHierarchy,
-  patch_decompositions::AbstractArray{<:DistributedPatchDecomposition}
+  sh::FESpaceHierarchy,patch_decompositions::AbstractArray
 )
   nlevs = num_levels(sh)
   psh = map(view(sh,1:nlevs-1),patch_decompositions) do shl,decomp

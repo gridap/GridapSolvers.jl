@@ -4,10 +4,15 @@ struct SolverInfo
   data :: Dict{Symbol, Any}
 end
 
-SolverInfo(name::String) = SolverInfo(name,Dict{Symbol, Any}())
+SolverInfo(name::String;kwargs...) = SolverInfo(name,Dict{Symbol,Any}(kwargs))
 
 function get_solver_info(solver::Gridap.Algebra.LinearSolver)
-  return SolverInfo(string(typeof(solver)))
+  info = SolverInfo(string(typeof(solver)))
+  if hasproperty(solver,:log)
+    add_tolerance_info!(info,solver.log)
+    add_convergence_info!(info,solver.log)
+  end
+  return info
 end
 
 function merge_info!(a::SolverInfo,b::SolverInfo;prefix=b.name)

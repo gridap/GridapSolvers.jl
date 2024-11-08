@@ -415,7 +415,9 @@ function gmg_work_vectors(smatrices::AbstractVector{<:AbstractMatrix})
   return work_vectors
 end
 
-function apply_GMG_level!(lev::Integer,xh::Union{PVector,Nothing},rh::Union{PVector,Nothing},ns::GMGNumericalSetup)
+function apply_GMG_level!(
+  lev::Integer,xh::Union{<:AbstractVector,Nothing},rh::Union{<:AbstractVector,Nothing},ns::GMGNumericalSetup
+)
   mh = ns.solver.mh
   parts = get_level_parts(mh,lev)
   if i_am_in(parts)

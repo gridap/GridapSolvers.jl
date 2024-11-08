@@ -11,25 +11,29 @@ using GridapDistributed
 
 using GridapSolvers.MultilevelTools
 
-export PatchDecomposition
+export PatchDecomposition, Closure
 export PatchFESpace
-export PatchBasedLinearSolver
+export PatchBasedLinearSolver, VankaSolver
 
 export PatchProlongationOperator, PatchRestrictionOperator
 export setup_patch_prolongation_operators, setup_patch_restriction_operators
 
 # Geometry
-include("seq/PatchDecompositions.jl")
-include("mpi/PatchDecompositions.jl")
-include("seq/PatchTriangulations.jl")
+include("PatchDecompositions.jl")
+include("DistributedPatchDecompositions.jl")
+include("PatchTriangulations.jl")
+include("PatchClosures.jl")
 
 # FESpaces
-include("seq/PatchFESpaces.jl")
-include("mpi/PatchFESpaces.jl")
-include("seq/PatchMultiFieldFESpaces.jl")
+include("PatchFESpaces.jl")
+include("DistributedPatchFESpaces.jl")
+include("ZeroMeanPatchFESpaces.jl")
+include("PatchMultiFieldFESpaces.jl")
 
 # Solvers
-include("seq/PatchBasedLinearSolvers.jl")
-include("seq/PatchTransferOperators.jl")
+include("PatchBasedLinearSolvers.jl")
+include("PatchTransferOperators.jl")
+include("VankaSolvers.jl")
+include("PatchSolvers.jl")
 
 end
