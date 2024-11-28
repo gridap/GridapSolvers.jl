@@ -89,7 +89,7 @@ struct ReffeProjectionMap{T,A} <: LocalProjectionMap{T}
   qdegree::Int
   function ReffeProjectionMap(
     op::Function,
-    reffe::Tuple{<:ReferenceFEName,Any,Any},
+    reffe::Union{<:Tuple{<:ReferenceFEName,Any,Any},<:ReferenceFE},
     qdegree::Integer
   )
     T = typeof(op)
@@ -100,7 +100,7 @@ end
 
 function LocalProjectionMap(
   op::Function,
-  reffe::Tuple{<:ReferenceFEName,Any,Any},
+  reffe::Union{<:Tuple{<:ReferenceFEName,Any,Any},<:ReferenceFE},
   qdegree::Integer=2*maximum(reffe[2][2])
 )
   ReffeProjectionMap(op,reffe,qdegree)
@@ -118,11 +118,16 @@ end
 function _compute_local_projections(
   k::ReffeProjectionMap,u::CellField
 )
+  function _cell_reffe(reffe::Tuple,Ω)
+    basis, args, kwargs = reffe
+    cell_polytopes = lazy_map(get_polytope,get_cell_reffe(Ω))
+    return lazy_map(p -> ReferenceFE(p,basis,args...;kwargs...),cell_polytopes)
+  end
+  _cell_reffe(reffe::ReferenceFE,Ω) = Fill(reffe,num_cells(Ω))
+  
   Ω = get_triangulation(u)
   dΩ = Measure(Ω,k.qdegree)
-  basis, args, kwargs = k.reffe
-  cell_polytopes = lazy_map(get_polytope,get_cell_reffe(Ω))
-  cell_reffe = lazy_map(p -> ReferenceFE(p,basis,args...;kwargs...),cell_polytopes)
+  cell_reffe = _cell_reffe(k.reffe,Ω)
   test_shapefuns =  lazy_map(get_shapefuns,cell_reffe)
   trial_shapefuns = lazy_map(transpose,test_shapefuns)
   p = SingleFieldFEBasis(trial_shapefuns,Ω,TrialBasis(),ReferenceDomain())
