@@ -94,7 +94,9 @@ end
 
 function update_patch_matrices!(Ap,Ap_ns,Ph::FESpace,ap)
   assem = SparseMatrixAssembler(Ph,Ph)
-  assemble_matrix!(Ap,assem,Ph,Ph,ap)
+  u, v  = get_trial_fe_basis(Ph), get_fe_basis(Ph)
+  matdata = collect_cell_matrix(Ph,Ph,ap(u,v))
+  assemble_matrix!(Ap,assem,matdata)
   numerical_setup!(Ap_ns,Ap)
 end
 

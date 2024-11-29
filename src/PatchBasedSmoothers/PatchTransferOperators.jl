@@ -82,7 +82,7 @@ function _get_patch_cache(lev,sh,PD,lhs,rhs,is_nonlinear,cache_refine)
 end
 
 # Please make this a standard API or something
-function MultilevelTools.update_transfer_operator!(op::PatchProlongationOperator,x::Union{PVector,Nothing})
+function MultilevelTools.update_transfer_operator!(op::PatchProlongationOperator,x::Union{AbstractVector,Nothing})
   cache_refine, cache_patch, cache_redist = op.caches
   model_h, Uh, fv_h, dv_h, UH, fv_H, dv_H = cache_refine
   Ph, Ap_ns, Ap, duh, dxp, rp = cache_patch
