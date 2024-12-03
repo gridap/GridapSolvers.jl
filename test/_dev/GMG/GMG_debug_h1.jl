@@ -12,6 +12,7 @@ using LinearAlgebra
 order = 2
 poly  = QUAD
 
+
 # Geometry 
 n = 6
 cmodel = CartesianDiscreteModel((0,1,0,1),(n,n))
