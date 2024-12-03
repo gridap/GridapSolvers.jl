@@ -27,10 +27,10 @@ jobs:
         arch:
           - x64
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v4
       - name: Cache p4est
         id: cache-p4est
-        uses: actions/cache@v2
+        uses: actions/cache@v4
         with:
          path: ${{env.P4EST_ROOT_DIR}}
          key: ${{ runner.os }}-build-${{ env.P4EST_ROOT_DIR }}-
@@ -38,7 +38,7 @@ jobs:
            ${{ runner.os }}-build-${{ env.P4EST_ROOT_DIR }}-
            ${{ runner.os }}-build-
            ${{ runner.os }}-
-      - uses: julia-actions/setup-julia@v1
+      - uses: julia-actions/setup-julia@v2
         with:
           version: ${{ matrix.version }}
           arch: ${{ matrix.arch }}
@@ -106,7 +106,7 @@ jobs:
       - run: echo $PWD
       - run: julia --project=. -e 'using Pkg; Pkg.instantiate(); Pkg.build(); Pkg.precompile()'
       - run: julia --project=. --color=yes --check-bounds=yes test/runtests.jl
-      - uses: codecov/codecov-action@v1
+      - uses: codecov/codecov-action@v4
         with:
           file: lcov.info
   docs:
@@ -115,8 +115,8 @@ jobs:
     permissions:
       contents: write
     steps:
-      - uses: actions/checkout@v2
-      - uses: julia-actions/setup-julia@v1
+      - uses: actions/checkout@v4
+      - uses: julia-actions/setup-julia@v2
         with:
           version: '1'
       - uses: julia-actions/julia-buildpkg@v1

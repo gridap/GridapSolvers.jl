@@ -105,8 +105,8 @@ function _get_projection_cache(lev::Int,sh::FESpaceHierarchy,qdegree,mode::Symbo
 
     fv_H   = zero_free_values(UH)
     dv_H   = zero_dirichlet_values(UH)
-    u0     = FEFunction(UH,fv_H,true)      # Zero at free dofs
-    u00    = FEFunction(UH,fv_H,dv_H,true) # Zero everywhere
+    u0     = FEFunction(UH,fv_H)      # Zero at free dofs
+    u00    = FEFunction(UH,fv_H,dv_H) # Zero everywhere
 
     u_dir  = (mode == :solution) ? u0 : u00
     u,v    = get_trial_fe_basis(UH), get_fe_basis(VH)
@@ -217,6 +217,12 @@ function setup_restriction_operators(sh::FESpaceHierarchy,qdegrees::AbstractArra
     qdegree = qdegrees[lev]
     RestrictionOperator(lev,sh,qdegree;kwargs...)
   end
+end
+
+function update_transfer_operator!(
+  op::DistributedGridTransferOperator,x::AbstractVector
+)
+  nothing
 end
 
 ### Applying the operators:

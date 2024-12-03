@@ -1,4 +1,5 @@
 module NonlinearSolvers
+  using AbstractTrees
   using LinearAlgebra
   using SparseArrays
   using SparseMatricesCSR
@@ -12,6 +13,9 @@ module NonlinearSolvers
 
   using GridapSolvers.SolverInterfaces
   using GridapSolvers.MultilevelTools
+
+  include("ContinuationFEOperators.jl")
+  export ContinuationFEOperator
 
   include("NewtonRaphsonSolver.jl")
   export NewtonSolver
