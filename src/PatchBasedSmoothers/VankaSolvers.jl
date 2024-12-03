@@ -37,6 +37,7 @@ function VankaSolver(space::FESpace,patch_cells::Table{<:Integer})
 end
 
 function VankaSolver(space::GridapDistributed.DistributedMultiFieldFESpace)
+  @notimplemented "Distributed not implemented yet"
   local_solvers = map(VankaSolver,local_views(space))
   return SchwarzLinearSolver(local_solvers)
 end
@@ -45,6 +46,7 @@ function VankaSolver(
   space::GridapDistributed.DistributedMultiFieldFESpace,
   patch_decomposition::DistributedPatchDecomposition
 )
+  @notimplemented "Distributed not implemented yet"
   local_solvers = map(VankaSolver,local_views(space),local_views(patch_decomposition))
   return SchwarzLinearSolver(local_solvers)
 end

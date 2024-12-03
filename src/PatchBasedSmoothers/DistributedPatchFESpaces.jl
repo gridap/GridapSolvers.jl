@@ -5,16 +5,6 @@ const DistributedPatchFESpace = GridapDistributed.DistributedSingleFieldFESpace{
 function PatchFESpace(
   space::GridapDistributed.DistributedSingleFieldFESpace,
   patch_decomposition::DistributedPatchDecomposition,
-  reffe::Union{ReferenceFE,Tuple{<:ReferenceFEs.ReferenceFEName,Any,Any}};
-  conformity=nothing
-)
-  cell_conformity = MultilevelTools._cell_conformity(patch_decomposition.model,reffe;conformity=conformity)
-  return PatchFESpace(space,patch_decomposition,cell_conformity)
-end
-
-function PatchFESpace(
-  space::GridapDistributed.DistributedSingleFieldFESpace,
-  patch_decomposition::DistributedPatchDecomposition,
   cell_conformity::AbstractArray{<:CellConformity};
   patches_mask = default_patches_mask(patch_decomposition)
 )
@@ -48,10 +38,9 @@ function PatchFESpace(
   sh::FESpaceHierarchy,patch_decompositions::AbstractArray
 )
   nlevs = num_levels(sh)
-  psh = map(view(sh,1:nlevs-1),patch_decompositions) do shl,decomp
+  psh = map(view(sh,1:nlevs-1),patch_decompositions) do shl, decomp
     space = MultilevelTools.get_fe_space(shl)
-    cell_conformity = MultilevelTools.get_cell_conformity(shl)
-    return PatchFESpace(space,decomp,cell_conformity)
+    return PatchFESpace(space,decomp)
   end
   return psh
 end
