@@ -64,7 +64,7 @@ end
 
 """
     set_depth!(log::ConvergenceLog,depth::Int)
-    set_depth!(log::LinearSolver,depth::Int)
+    set_depth!(log::NonlinearSolver,depth::Int)
 
 Sets the tabulation depth of the convergence log `log` to `depth`.
 """
@@ -73,7 +73,7 @@ function set_depth!(log::ConvergenceLog,depth::Int)
   return log
 end
 
-function set_depth!(solver::Algebra.LinearSolver,depth::Int)
+function set_depth!(solver::Algebra.NonlinearSolver,depth::Int)
   if hasproperty(solver,:log)
     set_depth!(solver.log,depth)
   end
