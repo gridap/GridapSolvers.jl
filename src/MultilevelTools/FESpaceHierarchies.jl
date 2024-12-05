@@ -22,11 +22,6 @@ FESpaces.get_fe_space(a::FESpaceHierarchyLevel{A,B}) where {A,B} = a.fe_space_re
 get_fe_space_before_redist(sh::FESpaceHierarchy,lev::Int) = get_fe_space_before_redist(sh[lev])
 get_fe_space_before_redist(a::FESpaceHierarchyLevel) = a.fe_space
 
-get_cell_conformity(sh::FESpaceHierarchy,lev::Int) = get_cell_conformity(sh[lev])
-get_cell_conformity(a::FESpaceHierarchyLevel) = get_cell_conformity(get_fe_space(a))
-get_cell_conformity_before_redist(sh::FESpaceHierarchy,lev::Int) = get_cell_conformity_before_redist(sh[lev])
-get_cell_conformity_before_redist(a::FESpaceHierarchyLevel) = get_cell_conformity(get_fe_space_before_redist(a))
-
 get_model(sh::FESpaceHierarchy,level::Integer) = get_model(sh[level])
 get_model(a::FESpaceHierarchyLevel) = get_model(a.mh_level)
 

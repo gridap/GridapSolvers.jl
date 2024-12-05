@@ -13,7 +13,9 @@ using Gridap.Algebra
 using GridapSolvers
 using GridapSolvers.NonlinearSolvers, GridapSolvers.LinearSolvers
 
-function main(ranks,model,solver)
+const ModelTypes = Union{<:DiscreteModel,<:GridapDistributed.DistributedDiscreteModel}
+
+function main(ranks,model::ModelTypes,solver::Symbol)
   u_sol(x) = sum(x)
 
   order = 1
@@ -40,6 +42,9 @@ function main(ranks,model,solver)
     nls = NLsolveNonlinearSolver(ls; show_trace=true, method=:anderson, linesearch=BackTracking(), iterations=40, m=10)
   elseif solver == :newton
     nls = NewtonSolver(ls,maxiter=20,verbose=true)
+  elseif solver == :newton_continuation
+    op = ContinuationFEOperator(op,op,2;reuse_caches=true)
+    nls = NewtonSolver(ls,maxiter=20,verbose=true)
   else
     @error "Unknown solver"
   end
@@ -52,15 +57,15 @@ function main(ranks,model,solver)
 end
 
 # Serial
-function main(solver)
+function main(solver::Symbol)
   model = CartesianDiscreteModel((0,1,0,1),(8,8))
   ranks = DebugArray([1])
   main(ranks,model,solver)
 end
 
 # Distributed
-function main(distribute,solver)
-  ranks = distribute(LinearIndices((4,)))
+function main(distribute,np,solver::Symbol)
+  ranks = distribute(LinearIndices((prod(np),)))
   model = CartesianDiscreteModel((0,1,0,1),(8,8))
   main(ranks,model,solver)
 end

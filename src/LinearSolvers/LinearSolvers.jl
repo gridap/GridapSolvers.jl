@@ -16,6 +16,7 @@ using GridapSolvers.MultilevelTools
 using GridapSolvers.SolverInterfaces
 using GridapSolvers.PatchBasedSmoothers
 
+export LinearSolverFromSmoother
 export JacobiLinearSolver
 export RichardsonSmoother
 export SymGaussSeidelSmoother
@@ -45,9 +46,12 @@ include("Krylov/FGMRESSolvers.jl")
 include("Krylov/MINRESSolvers.jl")
 
 include("IdentityLinearSolvers.jl")
+
+include("LinearSolverFromSmoothers.jl")
 include("JacobiLinearSolvers.jl")
 include("RichardsonSmoothers.jl")
 include("SymGaussSeidelSmoothers.jl")
+
 include("GMGLinearSolvers.jl")
 include("SchurComplementSolvers.jl")
 include("MatrixSolvers.jl")

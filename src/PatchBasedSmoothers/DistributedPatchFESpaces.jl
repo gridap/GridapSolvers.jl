@@ -4,14 +4,6 @@ const DistributedPatchFESpace = GridapDistributed.DistributedSingleFieldFESpace{
 
 function PatchFESpace(
   space::GridapDistributed.DistributedSingleFieldFESpace,
-  patch_decomposition::DistributedPatchDecomposition
-)
-  cell_conformity = get_cell_conformity(space)
-  return PatchFESpace(space,patch_decomposition,cell_conformity)
-end
-
-function PatchFESpace(
-  space::GridapDistributed.DistributedSingleFieldFESpace,
   patch_decomposition::DistributedPatchDecomposition,
   cell_conformity::AbstractArray{<:CellConformity};
   patches_mask = default_patches_mask(patch_decomposition)

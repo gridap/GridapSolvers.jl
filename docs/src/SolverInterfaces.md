@@ -26,5 +26,6 @@ CurrentModule = GridapSolvers.SolverInterfaces
   init!
   update!
   finalize!
+  set_depth!
   print_message
 ```

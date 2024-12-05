@@ -34,4 +34,24 @@ function P4estCartesianModelHierarchy(
   return mh
 end
 
+function GridapDistributed.DistributedAdaptedDiscreteModel(
+  model  :: GridapP4est.OctreeDistributedDiscreteModel,
+  parent :: GridapDistributed.DistributedDiscreteModel,
+  glue   :: AbstractArray{<:Gridap.Adaptivity.AdaptivityGlue};
+)
+  GridapDistributed.DistributedAdaptedDiscreteModel(
+    model.dmodel,parent,glue
+  )
+end
+
+function GridapDistributed.DistributedAdaptedDiscreteModel(
+  model  :: GridapP4est.OctreeDistributedDiscreteModel,
+  parent :: GridapP4est.OctreeDistributedDiscreteModel,
+  glue   :: AbstractArray{<:Gridap.Adaptivity.AdaptivityGlue};
+)
+  GridapDistributed.DistributedAdaptedDiscreteModel(
+    model.dmodel,parent.dmodel,glue
+  )
+end
+
 end # module
