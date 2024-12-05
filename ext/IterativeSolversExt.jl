@@ -1,9 +1,12 @@
 module IterativeSolversExt
 
-using LinearAlgebra, PartitionedArrays, SparseArrays
+using LinearAlgebra, SparseArrays
+using PartitionedArrays
 
 using Gridap, GridapSolvers
 using IterativeSolvers
+
+using Gridap.Helpers, Gridap.Algebra
 
 export IS_ConjugateGradientSolver
 export IS_GMRESSolver
@@ -35,7 +38,7 @@ struct SSORIterativeSolverType   <: IterativeLinearSolverType end
   - [`IS_MINRESSolver`](@ref)
   - [`IS_SSORSolver`](@ref)
 """
-struct IterativeLinearSolver{A} <: Gridap.Algebra.LinearSolver
+struct IterativeLinearSolver{A} <: Algebra.LinearSolver
   args
   kwargs
 
@@ -94,7 +97,7 @@ end
 
 # Symbolic setup
 
-struct IterativeLinearSolverSS <: Gridap.Algebra.SymbolicSetup
+struct IterativeLinearSolverSS <: Algebra.SymbolicSetup
   solver
 end
 
@@ -104,7 +107,7 @@ end
 
 # Numerical setup
 
-struct IterativeLinearSolverNS <: Gridap.Algebra.NumericalSetup
+struct IterativeLinearSolverNS <: Algebra.NumericalSetup
   solver
   A
   caches
@@ -115,23 +118,29 @@ function Gridap.Algebra.numerical_setup(ss::IterativeLinearSolverSS,A::AbstractM
   numerical_setup(solver_type,ss,A)
 end
 
-function Gridap.Algebra.numerical_setup(::IterativeLinearSolverType,
-                                        ss::IterativeLinearSolverSS,
-                                        A::AbstractMatrix)
+function Gridap.Algebra.numerical_setup(
+  ::IterativeLinearSolverType,
+  ss::IterativeLinearSolverSS,
+  A::AbstractMatrix
+)
   IterativeLinearSolverNS(ss.solver,A,nothing)
 end
 
-function Gridap.Algebra.numerical_setup(::CGIterativeSolverType,
-                                        ss::IterativeLinearSolverSS,
-                                        A::AbstractMatrix)
+function Gridap.Algebra.numerical_setup(
+  ::CGIterativeSolverType,
+  ss::IterativeLinearSolverSS,
+  A::AbstractMatrix
+)
   x = allocate_in_domain(A); fill!(x,zero(eltype(x)))
   caches = IterativeSolvers.CGStateVariables(zero(x), similar(x), similar(x))
   return IterativeLinearSolverNS(ss.solver,A,caches)
 end
 
-function Gridap.Algebra.numerical_setup(::SSORIterativeSolverType,
-                                        ss::IterativeLinearSolverSS,
-                                        A::AbstractMatrix)
+function Gridap.Algebra.numerical_setup(
+  ::SSORIterativeSolverType,
+  ss::IterativeLinearSolverSS,
+  A::AbstractMatrix
+)
   x = allocate_in_range(A); fill!(x,zero(eltype(x)))
   b = allocate_in_domain(A); fill!(b,zero(eltype(b)))
   ω       = ss.solver.args[:ω]
@@ -140,11 +149,13 @@ function Gridap.Algebra.numerical_setup(::SSORIterativeSolverType,
   return IterativeLinearSolverNS(ss.solver,A,caches)
 end
 
-function IterativeSolvers.ssor_iterable(x::PVector,
-                                        A::PSparseMatrix,
-                                        b::PVector,
-                                        ω::Real;
-                                        maxiter::Int = 10)
+function IterativeSolvers.ssor_iterable(
+  x::PVector,
+  A::PSparseMatrix,
+  b::PVector,
+  ω::Real;
+  maxiter::Int = 10
+)
   iterables = map(own_values(x),own_values(A),own_values(b)) do _xi,_Aii,_bi
     xi  = Vector(_xi)
     Aii = SparseMatrixCSC(_Aii)
@@ -160,48 +171,60 @@ function LinearAlgebra.ldiv!(x::AbstractVector,ns::IterativeLinearSolverNS,b::Ab
   solve!(x,ns,b)
 end
 
-function Gridap.Algebra.solve!(x::AbstractVector,
-                               ns::IterativeLinearSolverNS,
-                               y::AbstractVector)
+function Algebra.solve!(
+  x::AbstractVector,
+  ns::IterativeLinearSolverNS,
+  y::AbstractVector
+)
   solver_type = SolverType(ns.solver)
   solve!(solver_type,x,ns,y)
 end
 
-function Gridap.Algebra.solve!(::IterativeLinearSolverType,
-                               ::AbstractVector,
-                               ::IterativeLinearSolverNS,
-                               ::AbstractVector)
+function Algebra.solve!(
+  ::IterativeLinearSolverType,
+  ::AbstractVector,
+  ::IterativeLinearSolverNS,
+  ::AbstractVector
+)
   @abstractmethod
 end
 
-function Gridap.Algebra.solve!(::CGIterativeSolverType,
-                               x::AbstractVector,
-                               ns::IterativeLinearSolverNS,
-                               y::AbstractVector)
+function Algebra.solve!(
+  ::CGIterativeSolverType,
+  x::AbstractVector,
+  ns::IterativeLinearSolverNS,
+  y::AbstractVector
+)
   A, kwargs, caches = ns.A, ns.solver.kwargs, ns.caches
   return cg!(x,A,y;kwargs...,statevars=caches)
 end
 
-function Gridap.Algebra.solve!(::GMRESIterativeSolverType,
-                               x::AbstractVector,
-                               ns::IterativeLinearSolverNS,
-                               y::AbstractVector)
+function Algebra.solve!(
+  ::GMRESIterativeSolverType,
+  x::AbstractVector,
+  ns::IterativeLinearSolverNS,
+  y::AbstractVector
+)
   A, kwargs = ns.A, ns.solver.kwargs
   return gmres!(x,A,y;kwargs...)
 end
 
-function Gridap.Algebra.solve!(::MINRESIterativeSolverType,
-                               x::AbstractVector,
-                               ns::IterativeLinearSolverNS,
-                               y::AbstractVector)
+function Algebra.solve!(
+  ::MINRESIterativeSolverType,
+  x::AbstractVector,
+  ns::IterativeLinearSolverNS,
+  y::AbstractVector
+)
   A, kwargs = ns.A, ns.solver.kwargs
   return minres!(x,A,y;kwargs...)
 end
 
-function Gridap.Algebra.solve!(::SSORIterativeSolverType,
-                               x::AbstractVector,
-                               ns::IterativeLinearSolverNS,
-                               y::AbstractVector)
+function Algebra.solve!(
+  ::SSORIterativeSolverType,
+  x::AbstractVector,
+  ns::IterativeLinearSolverNS,
+  y::AbstractVector
+)
   iterable = ns.caches
   iterable.x = x
   iterable.b = y
@@ -210,10 +233,12 @@ function Gridap.Algebra.solve!(::SSORIterativeSolverType,
   return x
 end
 
-function Gridap.Algebra.solve!(::SSORIterativeSolverType,
-                               x::PVector,
-                               ns::IterativeLinearSolverNS,
-                               y::PVector)
+function Algebra.solve!(
+  ::SSORIterativeSolverType,
+  x::PVector,
+  ns::IterativeLinearSolverNS,
+  y::PVector
+)
   iterables = ns.caches
   map(iterables,own_values(x),own_values(y)) do iterable, xi, yi
     iterable.x .= xi
