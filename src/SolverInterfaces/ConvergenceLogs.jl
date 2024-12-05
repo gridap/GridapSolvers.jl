@@ -63,6 +63,26 @@ end
 @inline get_tabulation(log::ConvergenceLog,n::Int) = repeat(' ', n + 2*log.depth)
 
 """
+    set_depth!(log::ConvergenceLog,depth::Int)
+    set_depth!(log::NonlinearSolver,depth::Int)
+
+Sets the tabulation depth of the convergence log `log` to `depth`.
+"""
+function set_depth!(log::ConvergenceLog,depth::Int)
+  log.depth = depth
+  return log
+end
+
+function set_depth!(solver::Algebra.NonlinearSolver,depth::Int)
+  if hasproperty(solver,:log)
+    set_depth!(solver.log,depth)
+  end
+  map(children(solver)) do child
+    set_depth!(child,depth+2)
+  end
+end
+
+"""
     reset!(log::ConvergenceLog{T})
 
   Resets the convergence log `log` to its initial state.
@@ -122,7 +142,7 @@ function finalize!(log::ConvergenceLog{T},r::T) where T
     msg = @sprintf("Iterations: %3i - Residuals: %.2e,   %.2e ", log.num_iters, r, r_rel)
     println(t,msg)
     if log.verbose > SOLVER_VERBOSE_LOW
-      footer =  " Exiting $(log.name) solver "
+      footer = " Exiting $(log.name) solver "
       println(t,rpad(string(repeat('-',15),footer),55,'-'))
     end
   end

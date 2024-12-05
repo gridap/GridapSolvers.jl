@@ -18,7 +18,6 @@ reffes = Fill(LagrangianRefFE(VectorValue{2,Float64},TRI,order),Adaptivity.num_s
 reffe_u = Adaptivity.MacroReferenceFE(rrule,reffes)
 
 reffe_p = LagrangianRefFE(Float64,TRI,order-1)
-#reffe_p = Adaptivity.MacroReferenceFE(rrule,reffes;conformity=L2Conformity())
 
 qdegree = 2*order
 quad  = Quadrature(TRI,Adaptivity.CompositeQuadrature(),rrule,qdegree)

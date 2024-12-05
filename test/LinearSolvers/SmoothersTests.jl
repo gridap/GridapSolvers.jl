@@ -5,7 +5,6 @@ using MPI
 using Gridap, Gridap.Algebra
 using GridapDistributed
 using PartitionedArrays
-using IterativeSolvers
 
 using GridapSolvers
 using GridapSolvers.LinearSolvers
@@ -19,7 +18,6 @@ function smoothers_driver(parts,model,P)
   reffe  = ReferenceFE(lagrangian,Float64,order)
   Vh     = TestFESpace(model,reffe;conformity=:H1,dirichlet_tags="boundary")
   Uh     = TrialFESpace(Vh,sol)
-  u      = interpolate(sol,Uh)
 
   Ω      = Triangulation(model)
   dΩ     = Measure(Ω,qorder)
@@ -29,15 +27,10 @@ function smoothers_driver(parts,model,P)
   op = AffineFEOperator(a,l,Uh,Vh)
   A, b = get_matrix(op), get_vector(op)
 
-  ss = symbolic_setup(P,A)
-  ns = numerical_setup(ss,A)
-
-  x = allocate_in_domain(A); ; fill!(x,zero(eltype(x)))
-  x, history = IterativeSolvers.cg!(x,A,b;
-                                    verbose=i_am_main(parts),
-                                    reltol=1.0e-8,
-                                    Pl=ns,
-                                    log=true)
+  solver = CGSolver(P;rtol=1.0e-8,verbose=i_am_main(parts))
+  ns = numerical_setup(symbolic_setup(solver,A),A)
+  x = allocate_in_domain(A); fill!(x,zero(eltype(x)))
+  solve!(x,ns,b)
 
   u  = interpolate(sol,Uh)
   uh = FEFunction(Uh,x)
@@ -52,12 +45,13 @@ end
 
 function main_smoother_driver(parts,model,smoother)
   if smoother === :richardson
-    P = RichardsonSmoother(JacobiLinearSolver(),5,2.0/3.0)
+    S = RichardsonSmoother(JacobiLinearSolver(),5,2.0/3.0)
   elseif smoother === :sym_gauss_seidel
-    P = SymGaussSeidelSmoother(5)
+    S = SymGaussSeidelSmoother(5)
   else
     error("Unknown smoother")
   end
+  P = LinearSolverFromSmoother(S)
   smoothers_driver(parts,model,P)
 end
 

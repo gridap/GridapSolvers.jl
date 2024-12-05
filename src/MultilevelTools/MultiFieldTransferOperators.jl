@@ -42,11 +42,14 @@ function MultiFieldTransferOperator(sh::FESpaceHierarchy,operators;op_type=:prol
   return mfops
 end
 
-function update_transfer_operator!(op::MultiFieldTransferOperator,x::PVector)
+function update_transfer_operator!(
+  op::MultiFieldTransferOperator{Val{:prolongation}},x::Union{AbstractVector,Nothing}
+)
   xh, _ = op.cache
 
-  if !isnothing(xh)
-    copy!(x,xh)
+  if !isnothing(x)
+    copy!(xh,x)
+    isa(xh,PVector) && wait(consistent!(xh))
   end
 
   for (i,op_i) in enumerate(op.ops)
@@ -55,7 +58,27 @@ function update_transfer_operator!(op::MultiFieldTransferOperator,x::PVector)
   end
 end
 
-function LinearAlgebra.mul!(x,op::MultiFieldTransferOperator,y)
+function update_transfer_operator!(
+  op::MultiFieldTransferOperator{Val{:restriction}},y::Union{AbstractVector,Nothing}
+)
+  _, yh = op.cache
+
+  if !isnothing(y)
+    copy!(yh,y)
+    isa(yh,PVector) && wait(consistent!(yh))
+  end
+
+  for (i,op_i) in enumerate(op.ops)
+    yh_i = isnothing(yh) ? nothing : MultiField.restrict_to_field(op.Vh_in,yh,i)
+    update_transfer_operator!(op_i,yh_i)
+  end
+end
+
+function LinearAlgebra.mul!(
+  x::Union{Nothing,<:AbstractVector},
+  op::MultiFieldTransferOperator,
+  y::Union{Nothing,<:AbstractVector}
+)
   xh, yh = op.cache
 
   if !isnothing(yh)
@@ -70,7 +93,7 @@ function LinearAlgebra.mul!(x,op::MultiFieldTransferOperator,y)
 
   if !isnothing(xh)
     copy!(x,xh)
-    consistent!(x) |> fetch
+    isa(x,PVector) && wait(consistent!(x))
   end
 
   return x

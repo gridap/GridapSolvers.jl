@@ -72,7 +72,7 @@ function run(ranks)
   ap(u,v) = biform(u,v,dΩₚ)
   lp(v) = liform(v,dΩₚ)
 
-  assembler_P = SparseMatrixAssembler(Ph,Ph,FullyAssembledRows())
+  assembler_P = SparseMatrixAssembler(Ph,Ph,LocallyAssembled())
   Ahp = assemble_matrix(ap,assembler_P,Ph,Ph)
   fhp = assemble_vector(lp,assembler_P,Ph)
 

@@ -89,7 +89,7 @@ struct ReffeProjectionMap{T,A} <: LocalProjectionMap{T}
   qdegree::Int
   function ReffeProjectionMap(
     op::Function,
-    reffe::Tuple{<:ReferenceFEName,Any,Any},
+    reffe::Union{<:Tuple{<:ReferenceFEName,Any,Any},<:ReferenceFE},
     qdegree::Integer
   )
     T = typeof(op)
@@ -100,7 +100,7 @@ end
 
 function LocalProjectionMap(
   op::Function,
-  reffe::Tuple{<:ReferenceFEName,Any,Any},
+  reffe::Union{<:Tuple{<:ReferenceFEName,Any,Any},<:ReferenceFE},
   qdegree::Integer=2*maximum(reffe[2][2])
 )
   ReffeProjectionMap(op,reffe,qdegree)
@@ -118,28 +118,33 @@ end
 function _compute_local_projections(
   k::ReffeProjectionMap,u::CellField
 )
+  function _cell_reffe(reffe::Tuple,Ω)
+    basis, args, kwargs = reffe
+    cell_polytopes = lazy_map(get_polytope,get_cell_reffe(Ω))
+    return lazy_map(p -> ReferenceFE(p,basis,args...;kwargs...),cell_polytopes)
+  end
+  _cell_reffe(reffe::ReferenceFE,Ω) = Fill(reffe,num_cells(Ω))
+  
   Ω = get_triangulation(u)
   dΩ = Measure(Ω,k.qdegree)
-  basis, args, kwargs = k.reffe
-  cell_polytopes = lazy_map(get_polytope,get_cell_reffe(Ω))
-  cell_reffe = lazy_map(p -> ReferenceFE(p,basis,args...;kwargs...),cell_polytopes)
+  cell_reffe = _cell_reffe(k.reffe,Ω)
   test_shapefuns =  lazy_map(get_shapefuns,cell_reffe)
   trial_shapefuns = lazy_map(transpose,test_shapefuns)
   p = SingleFieldFEBasis(trial_shapefuns,Ω,TrialBasis(),ReferenceDomain())
   q = SingleFieldFEBasis(test_shapefuns,Ω,TestBasis(),ReferenceDomain())
 
   op = k.op.op
-  lhs_data = get_array(∫(p⋅q)dΩ)
+  lhs_data = get_array(∫(q⋅p)dΩ)
   rhs_data = get_array(∫(q⋅op(u))dΩ)
   basis_data = CellData.get_data(q)
   return lazy_map(k,lhs_data,rhs_data,basis_data)
 end
 
-# Note on the caches: 
-#  - We CANNOT overwrite `lhs`: In the case of constant cell_maps and `u` being a `FEFunction`,
-#    the lhs will be a Fill, but the rhs will not be optimized (regular LazyArray). 
-#    In that case, we will see multiple times the same `lhs` being used for different `rhs`.
-#  - The converse never happens (I think), so we can overwrite `rhs` since it will always be recomputed.
+function Arrays.return_value(::LocalProjectionMap,lhs::Matrix{T},rhs::A,basis) where {T,A<:Union{Matrix{T},Vector{T}}}
+  vec = zeros(T,size(rhs))
+  return linear_combination(vec,basis)
+end
+
 function Arrays.return_cache(::LocalProjectionMap,lhs::Matrix{T},rhs::A,basis) where {T,A<:Union{Matrix{T},Vector{T}}}
   return CachedArray(copy(lhs)), CachedArray(copy(rhs))
 end
@@ -231,6 +236,11 @@ function _compute_local_projections(
   rhs_data = get_array(∫(q⋅op(u))dΩ)
   basis_data = CellData.get_data(q)
   return lazy_map(k,lhs_data,rhs_data,basis_data,ids)
+end
+
+function Arrays.return_value(::LocalProjectionMap,lhs::Matrix{T},rhs::A,basis,ids) where {T,A<:Union{Matrix{T},Vector{T}}}
+  vec = zeros(T,size(rhs))
+  return linear_combination(vec,basis)
 end
 
 function Arrays.return_cache(::LocalProjectionMap,lhs::Matrix{T},rhs::A,basis,ids) where {T,A<:Union{Matrix{T},Vector{T}}}

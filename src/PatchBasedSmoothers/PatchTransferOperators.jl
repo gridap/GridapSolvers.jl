@@ -66,22 +66,11 @@ function _get_patch_cache(lev,sh,PD,lhs,rhs,is_nonlinear,cache_refine)
   cparts = get_level_parts(sh,lev+1)
   if i_am_in(cparts)
     # Patch-based correction fespace
-    glue = sh[lev].mh_level.ref_glue
-    patches_mask = get_coarse_node_mask(model_h,glue)
-    cell_conformity = MultilevelTools.get_cell_conformity_before_redist(sh,lev)
-    Ph = PatchFESpace(Uh,PD,cell_conformity;patches_mask)
+    Ph = PatchFESpace(Uh,PD)
 
     # Solver caches
-    u, v = get_trial_fe_basis(Uh), get_fe_basis(Uh)
-    contr = is_nonlinear ? lhs(zero(Uh),u,v) : lhs(u,v)
-    matdata = collect_cell_matrix(Ph,Ph,contr)
-    Ap_ns, Ap = map(local_views(Ph),matdata) do Ph, matdata
-      assem = SparseMatrixAssembler(Ph,Ph)
-      Ap    = assemble_matrix(assem,matdata)
-      Ap_ns = numerical_setup(symbolic_setup(LUSolver(),Ap),Ap)
-      return Ap_ns, Ap
-    end |> tuple_of_arrays
-    Ap = is_nonlinear ? Ap : nothing
+    ap(u,v) = is_nonlinear ? lhs(zero(Uh),u,v) : lhs(u,v)
+    Ap, Ap_ns = assemble_patch_matrices(Ph,ap) # TODO: This is using an LUSolver
 
     duh = zero(Uh)
     dxp, rp = zero_free_values(Ph), zero_free_values(Ph)
@@ -92,7 +81,7 @@ function _get_patch_cache(lev,sh,PD,lhs,rhs,is_nonlinear,cache_refine)
 end
 
 # Please make this a standard API or something
-function MultilevelTools.update_transfer_operator!(op::PatchProlongationOperator,x::Union{PVector,Nothing})
+function MultilevelTools.update_transfer_operator!(op::PatchProlongationOperator,x::Union{AbstractVector,Nothing})
   cache_refine, cache_patch, cache_redist = op.caches
   model_h, Uh, fv_h, dv_h, UH, fv_H, dv_H = cache_refine
   Ph, Ap_ns, Ap, duh, dxp, rp = cache_patch
@@ -107,18 +96,12 @@ function MultilevelTools.update_transfer_operator!(op::PatchProlongationOperator
   end
 
   if !isa(fv_h,Nothing)
-    u, v = get_trial_fe_basis(Uh), get_fe_basis(Uh)
-    contr = op.is_nonlinear ? op.lhs(FEFunction(Uh,fv_h),u,v) : op.lhs(u,v)
-    matdata = collect_cell_matrix(Ph,Ph,contr)
-    map(Ap_ns,Ap,local_views(Ph),matdata) do Ap_ns, Ap, Ph, matdata
-      assem = SparseMatrixAssembler(Ph,Ph)
-      assemble_matrix!(Ap,assem,matdata)
-      numerical_setup!(Ap_ns,Ap)
-    end
+    ap(u,v) = op.is_nonlinear ? op.lhs(FEFunction(Uh,fv_h),u,v) : op.lhs(u,v)
+    update_patch_matrices!(Ap,Ap_ns,Ph,ap)
   end
 end
 
-function LinearAlgebra.mul!(y::PVector,A::PatchProlongationOperator{Val{false}},x::PVector)
+function LinearAlgebra.mul!(y::AbstractVector,A::PatchProlongationOperator{Val{false}},x::AbstractVector)
   cache_refine, cache_patch, cache_redist = A.caches
   model_h, Uh, fv_h, dv_h, UH, fv_H, dv_H = cache_refine
   Ph, Ap_ns, Ap, duh, dxp, rp = cache_patch
@@ -130,7 +113,11 @@ function LinearAlgebra.mul!(y::PVector,A::PatchProlongationOperator{Val{false}},
   uh = FEFunction(Uh,fv_h,dv_h)
 
   assemble_vector!(v->A.rhs(uh,v),rp,Ph)
-  map(solve!,partition(dxp),Ap_ns,partition(rp))
+  if isa(y,PVector)
+    map(solve!,partition(dxp),Ap_ns,partition(rp))
+  else
+    solve!(dxp,Ap_ns,rp)
+  end
   inject!(dxh,Ph,dxp)
   fv_h .= fv_h .- dxh
   copy!(y,fv_h)
@@ -167,11 +154,11 @@ end
 
 function setup_patch_prolongation_operators(sh,lhs,rhs,qdegrees;is_nonlinear=false)
   map(view(linear_indices(sh),1:num_levels(sh)-1)) do lev
-    qdegree = isa(qdegrees,Number) ? qdegrees : qdegrees[lev]
+    qdegree = isa(qdegrees,Vector) ? qdegrees[lev] : qdegrees
     cparts = get_level_parts(sh,lev+1)
     if i_am_in(cparts)
       model = get_model_before_redist(sh,lev)
-      PD = PatchDecomposition(model)
+      PD = CoarsePatchDecomposition(model)
       Ω = Triangulation(PD)
       dΩ = Measure(Ω,qdegree)
       lhs_i = is_nonlinear ? (u,du,dv) -> lhs(u,du,dv,dΩ) : (u,v) -> lhs(u,v,dΩ)
@@ -230,7 +217,6 @@ struct PatchRestrictionOperator{R,A,B}
 end
 
 function PatchRestrictionOperator(lev,sh,Ip,rhs,qdegree;solver=LUSolver())
-
   cache_refine = MultilevelTools._get_dual_projection_cache(lev,sh,qdegree,solver)
   cache_redist = MultilevelTools._get_redistribution_cache(lev,sh,:residual,:restriction,:dual_projection,cache_refine)
   cache_patch = Ip.caches[2]
@@ -242,12 +228,13 @@ function PatchRestrictionOperator(lev,sh,Ip,rhs,qdegree;solver=LUSolver())
 end
 
 function MultilevelTools.update_transfer_operator!(op::PatchRestrictionOperator,x::Union{PVector,Nothing})
+  # Note: Update is done in the prolongation operator, with which we share the cache
   nothing
 end
 
 function setup_patch_restriction_operators(sh,patch_prolongations,rhs,qdegrees;kwargs...)
   map(view(linear_indices(sh),1:num_levels(sh)-1)) do lev
-    qdegree = isa(qdegrees,Number) ? qdegrees : qdegrees[lev]
+    qdegree = isa(qdegrees,Vector) ? qdegrees[lev] : qdegrees
     cparts = get_level_parts(sh,lev+1)
     if i_am_in(cparts)
       model = get_model_before_redist(sh,lev)
@@ -262,7 +249,7 @@ function setup_patch_restriction_operators(sh,patch_prolongations,rhs,qdegrees;k
   end
 end
 
-function LinearAlgebra.mul!(y::PVector,A::PatchRestrictionOperator{Val{false}},x::PVector)
+function LinearAlgebra.mul!(y::AbstractVector,A::PatchRestrictionOperator{Val{false}},x::AbstractVector)
   cache_refine, cache_patch, _ = A.caches
   model_h, Uh, VH, Mh_ns, rh, uh, assem, dΩhH = cache_refine
   Ph, Ap_ns, Ap, duh, dxp, rp = cache_patch
@@ -272,17 +259,19 @@ function LinearAlgebra.mul!(y::PVector,A::PatchRestrictionOperator{Val{false}},x
   copy!(fv_h,x)
   fill!(rp,0.0)
   prolongate!(rp,Ph,fv_h)
-  map(solve!,partition(dxp),Ap_ns,partition(rp))
+  if isa(y,PVector)
+    map(solve!,partition(dxp),Ap_ns,partition(rp))
+  else
+    solve!(dxp,Ap_ns,rp)
+  end
   inject!(dxh,Ph,dxp)
-  consistent!(dxh) |> fetch
 
   assemble_vector!(v->A.rhs(duh,v),rh,Uh)
   fv_h .= fv_h .- rh
-  consistent!(fv_h) |> fetch
 
   solve!(rh,Mh_ns,fv_h)
   copy!(fv_h,rh)
-  consistent!(fv_h) |> fetch
+  isa(y,PVector) && wait(consistent!(fv_h))
   v = get_fe_basis(VH)
   assemble_vector!(y,assem,collect_cell_vector(VH,∫(v⋅uh)*dΩhH))
 

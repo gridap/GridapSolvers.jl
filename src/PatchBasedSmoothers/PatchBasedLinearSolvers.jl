@@ -73,112 +73,94 @@ struct PatchBasedSmootherNumericalSetup{A,B,C,D} <: Gridap.Algebra.NumericalSetu
   caches   :: D
 end
 
+function assemble_patch_matrices(Ph::FESpace,ap;local_solver=LUSolver())
+  assem = SparseMatrixAssembler(Ph,Ph)
+  Ap    = assemble_matrix(ap,assem,Ph,Ph)
+  Ap_ns = numerical_setup(symbolic_setup(local_solver,Ap),Ap)
+  return Ap, Ap_ns
+end
+
+function assemble_patch_matrices(Ph::GridapDistributed.DistributedFESpace,ap;local_solver=LUSolver())
+  u, v  = get_trial_fe_basis(Ph), get_fe_basis(Ph)
+  matdata = collect_cell_matrix(Ph,Ph,ap(u,v))
+  Ap, Ap_ns = map(local_views(Ph),matdata) do Ph, matdata
+    assem = SparseMatrixAssembler(Ph,Ph)
+    Ap    = assemble_matrix(assem,matdata)
+    Ap_ns = numerical_setup(symbolic_setup(local_solver,Ap),Ap)
+    return Ap, Ap_ns
+  end |> PartitionedArrays.tuple_of_arrays
+  return Ap, Ap_ns
+end
+
+function update_patch_matrices!(Ap,Ap_ns,Ph::FESpace,ap)
+  assem = SparseMatrixAssembler(Ph,Ph)
+  u, v  = get_trial_fe_basis(Ph), get_fe_basis(Ph)
+  matdata = collect_cell_matrix(Ph,Ph,ap(u,v))
+  assemble_matrix!(Ap,assem,matdata)
+  numerical_setup!(Ap_ns,Ap)
+end
+
+function update_patch_matrices!(Ap,Ap_ns,Ph::GridapDistributed.DistributedFESpace,ap)
+  u, v  = get_trial_fe_basis(Ph), get_fe_basis(Ph)
+  matdata = collect_cell_matrix(Ph,Ph,ap(u,v))
+  map(Ap, Ap_ns, local_views(Ph), matdata) do Ap, Ap_ns, Ph, matdata
+    assem = SparseMatrixAssembler(Ph,Ph)
+    assemble_matrix!(Ap,assem,matdata)
+    numerical_setup!(Ap_ns,Ap)
+  end
+end
+
+function allocate_patch_workvectors(Ph::FESpace,Vh::FESpace)
+  rp     = zero_free_values(Ph)
+  dxp    = zero_free_values(Ph)
+  return rp,dxp
+end
+
+function allocate_patch_workvectors(Ph::GridapDistributed.DistributedFESpace,Vh::GridapDistributed.DistributedFESpace)
+  rp     = zero_free_values(Ph)
+  dxp    = zero_free_values(Ph)
+  r      = zero_free_values(Vh)
+  x      = zero_free_values(Vh)
+  return rp,dxp,r,x
+end
+
 function Gridap.Algebra.numerical_setup(ss::PatchBasedSymbolicSetup,A::AbstractMatrix)
   @check !ss.solver.is_nonlinear
   solver = ss.solver
+  local_solver = solver.local_solver
   Ph, Vh = solver.patch_space, solver.space
-  weights = solver.weighted ? compute_weight_operators(Ph,Vh) : nothing
   
   ap(u,v) = solver.biform(u,v)
-  assem = SparseMatrixAssembler(Ph,Ph)
-  Ap    = assemble_matrix(ap,assem,Ph,Ph)
-  Ap_ns = numerical_setup(symbolic_setup(solver.local_solver,Ap),Ap)
-
-  # Caches
-  rp     = allocate_in_range(Ap); fill!(rp,0.0)
-  dxp    = allocate_in_domain(Ap); fill!(dxp,0.0)
-  caches = (rp,dxp)
-
+  Ap, Ap_ns = assemble_patch_matrices(Ph,ap;local_solver)
+  weights = solver.weighted ? compute_weight_operators(Ph,Vh) : nothing
+  caches = allocate_patch_workvectors(Ph,Vh)
   return PatchBasedSmootherNumericalSetup(solver,nothing,Ap_ns,weights,caches)
 end
 
 function Gridap.Algebra.numerical_setup(ss::PatchBasedSymbolicSetup,A::AbstractMatrix,x::AbstractVector)
   @check ss.solver.is_nonlinear
   solver = ss.solver
+  local_solver = solver.local_solver
   Ph, Vh = solver.patch_space, solver.space
-  weights = solver.weighted ? compute_weight_operators(Ph,Vh) : nothing
   
   u0 = FEFunction(Vh,x)
   ap(u,v) = solver.biform(u0,u,v)
-  assem = SparseMatrixAssembler(Ph,Ph)
-  Ap    = assemble_matrix(ap,assem,Ph,Ph)
-  Ap_ns = numerical_setup(symbolic_setup(solver.local_solver,Ap),Ap)
-
-  # Caches
-  rp     = allocate_in_range(Ap); fill!(rp,0.0)
-  dxp    = allocate_in_domain(Ap); fill!(dxp,0.0)
-  caches = (rp,dxp)
-
+  Ap, Ap_ns = assemble_patch_matrices(Ph,ap;local_solver)
+  weights = solver.weighted ? compute_weight_operators(Ph,Vh) : nothing
+  caches = allocate_patch_workvectors(Ph,Vh)
   return PatchBasedSmootherNumericalSetup(solver,Ap,Ap_ns,weights,caches)
 end
 
-function Gridap.Algebra.numerical_setup(ss::PatchBasedSymbolicSetup,A::PSparseMatrix)
-  @check !ss.solver.is_nonlinear
-  solver = ss.solver
-  Ph, Vh = solver.patch_space, solver.space
-  weights = solver.weighted ? compute_weight_operators(Ph,Vh) : nothing
-
-  # Patch system solver (only local systems need to be solved)
-  u, v  = get_trial_fe_basis(Vh), get_fe_basis(Vh)
-  contr = solver.biform(u,v)
-  matdata = collect_cell_matrix(Ph,Ph,contr)
-  Ap, Ap_ns = map(local_views(Ph),matdata) do Ph, matdata
-    assem = SparseMatrixAssembler(Ph,Ph)
-    Ap    = assemble_matrix(assem,matdata)
-    Ap_ns = numerical_setup(symbolic_setup(solver.local_solver,Ap),Ap)
-    return Ap, Ap_ns
-  end |> PartitionedArrays.tuple_of_arrays
-
-  # Caches
-  rp     = pfill(0.0,partition(Ph.gids))
-  dxp    = pfill(0.0,partition(Ph.gids))
-  r      = pfill(0.0,partition(Vh.gids))
-  x      = pfill(0.0,partition(Vh.gids))
-  caches = (rp,dxp,r,x)
-  
-  return PatchBasedSmootherNumericalSetup(solver,nothing,Ap_ns,weights,caches)
-end
-
-function Gridap.Algebra.numerical_setup(ss::PatchBasedSymbolicSetup,A::PSparseMatrix,x::PVector)
-  @check ss.solver.is_nonlinear
-  solver = ss.solver
-  Ph, Vh = solver.patch_space, solver.space
-  weights = solver.weighted ? compute_weight_operators(Ph,Vh) : nothing
-
-  # Patch system solver (only local systems need to be solved)
-  u0, u, v = FEFunction(Vh,x), get_trial_fe_basis(Vh), get_fe_basis(Vh)
-  contr = solver.biform(u0,u,v)
-  matdata = collect_cell_matrix(Ph,Ph,contr)
-  Ap, Ap_ns = map(local_views(Ph),matdata) do Ph, matdata
-    assem = SparseMatrixAssembler(Ph,Ph)
-    Ap    = assemble_matrix(assem,matdata)
-    Ap_ns = numerical_setup(symbolic_setup(solver.local_solver,Ap),Ap)
-    return Ap, Ap_ns
-  end |> PartitionedArrays.tuple_of_arrays
-
-  # Caches
-  rp     = pfill(0.0,partition(Ph.gids))
-  dxp    = pfill(0.0,partition(Ph.gids))
-  r      = pfill(0.0,partition(Vh.gids))
-  x      = pfill(0.0,partition(Vh.gids))
-  caches = (rp,dxp,r,x)
-  return PatchBasedSmootherNumericalSetup(solver,Ap,Ap_ns,weights,caches)
-end
-
-function Gridap.Algebra.numerical_setup!(ns::PatchBasedSmootherNumericalSetup,A::PSparseMatrix,x::PVector)
+function Gridap.Algebra.numerical_setup!(ns::PatchBasedSmootherNumericalSetup,A::AbstractMatrix,x::AbstractVector)
   @check ns.solver.is_nonlinear
   solver = ns.solver
   Ph, Vh = solver.patch_space, solver.space
   Ap, Ap_ns = ns.local_A, ns.local_ns
 
-  u0, u, v = FEFunction(Vh,x), get_trial_fe_basis(Vh), get_fe_basis(Vh)
-  contr = solver.biform(u0,u,v)
-  matdata = collect_cell_matrix(Ph,Ph,contr)
-  map(Ap, Ap_ns, local_views(Ph), matdata) do Ap, Ap_ns, Ph, matdata
-    assem = SparseMatrixAssembler(Ph,Ph)
-    assemble_matrix!(Ap,assem,matdata)
-    numerical_setup!(Ap_ns,Ap)
-  end
+  u0 = FEFunction(Vh,x)
+  ap(u,v) = solver.biform(u0,u,v)
+  update_patch_matrices!(Ap,Ap_ns,Ph,ap)
+  return ns
 end
 
 function Gridap.Algebra.solve!(x::AbstractVector,ns::PatchBasedSmootherNumericalSetup,r::AbstractVector)

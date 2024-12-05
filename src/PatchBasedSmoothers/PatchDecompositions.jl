@@ -23,21 +23,17 @@ of `Ω` such that `Ω = Σ_i Ω_i`.
 - `Dr::Integer` : Dimension of the patch root
 - `model::DiscreteModel{Dc,Dp}` : Underlying discrete model
 - `patch_cells::Table` : [patch][local cell] -> cell
-- `patch_cells_overlapped::Table`        : [patch][local cell] -> overlapped cell
 - `patch_cells_faces_on_boundary::Table` : [d][overlapped cell][local face] -> face is on patch boundary
 
 """
 struct PatchDecomposition{Dr,Dc,Dp} <: GridapType
   model                         :: DiscreteModel{Dc,Dp}
-  patch_cells                   :: Gridap.Arrays.Table         # [patch][local cell] -> cell
-  patch_cells_overlapped        :: Gridap.Arrays.Table         # [patch][local cell] -> overlapped cell
-  patch_cells_faces_on_boundary :: Vector{Gridap.Arrays.Table} # [d][overlapped cell][local face] -> face is on patch boundary
+  patch_cells                   :: Arrays.Table         # [patch][local cell] -> cell
+  patch_cells_faces_on_boundary :: Vector{Arrays.Table} # [d][overlapped cell][local face] -> face is on patch boundary
+  patch_boundary_style          :: PatchBoundaryStyle
 end
 
-num_patches(a::PatchDecomposition) = length(a.patch_cells)
-Gridap.Geometry.num_cells(a::PatchDecomposition) = length(a.patch_cells.data)
-
-@doc """
+"""
     function PatchDecomposition(
       model::DiscreteModel{Dc,Dp};
       Dr=0,
@@ -49,31 +45,161 @@ Returns an instance of [`PatchDecomposition`](@ref) from a given discrete model.
 """
 function PatchDecomposition(
   model::DiscreteModel{Dc,Dp};
-  Dr=0,
+  Dr::Integer=0,
   patch_boundary_style::PatchBoundaryStyle=PatchBoundaryExclude(),
   boundary_tag_names::AbstractArray{String}=["boundary"]
 ) where {Dc,Dp}
-  Gridap.Helpers.@check 0 <= Dr <= Dc-1
+  @assert 0 <= Dr <= Dc-1
 
   topology     = get_grid_topology(model)
-  patch_cells  = Gridap.Geometry.get_faces(topology,Dr,Dc)
-  patch_facets = Gridap.Geometry.get_faces(topology,Dr,Dc-1)
-  patch_cells_overlapped = compute_patch_overlapped_cells(patch_cells)
+  patch_cells  = Geometry.get_faces(topology,Dr,Dc)
+  patch_facets = Geometry.get_faces(topology,Dr,Dc-1)
 
   patch_cells_faces_on_boundary = compute_patch_cells_faces_on_boundary(
-    model, patch_cells, patch_cells_overlapped,
-    patch_facets, patch_boundary_style, boundary_tag_names
+    model, patch_cells, patch_facets, patch_boundary_style, boundary_tag_names
   )
 
   return PatchDecomposition{Dr,Dc,Dp}(
-    model, patch_cells, patch_cells_overlapped, patch_cells_faces_on_boundary
+    model, patch_cells, patch_cells_faces_on_boundary, patch_boundary_style
   )
 end
 
-function compute_patch_overlapped_cells(patch_cells)
-  num_overlapped_cells = length(patch_cells.data)
-  data = Gridap.Arrays.IdentityVector(num_overlapped_cells)
-  return Gridap.Arrays.Table(data,patch_cells.ptrs)
+function PatchDecomposition(
+  model::DiscreteModel{Dc,Dp},
+  patch_cells::AbstractArray{<:AbstractVector{<:Integer}},
+  patch_boundary_style::PatchBoundaryStyle=PatchBoundaryExclude(),
+  boundary_tag_names::AbstractArray{String}=["boundary"]
+) where {Dc,Dp}
+  patch_facets = generate_patch_facets(model,patch_cells)
+  patch_cells_faces_on_boundary = compute_patch_cells_faces_on_boundary(
+    model, patch_cells, patch_facets, patch_boundary_style, boundary_tag_names
+  )
+  return PatchDecomposition{Dc,Dc,Dp}(
+    model, patch_cells, patch_cells_faces_on_boundary, patch_boundary_style
+  )
+end
+
+function CoarsePatchDecomposition(
+  model::Gridap.Adaptivity.AdaptedDiscreteModel,
+  patch_boundary_style::PatchBoundaryStyle=PatchBoundaryExclude(),
+  boundary_tag_names::AbstractArray{String}=["boundary"]
+)
+  glue = Gridap.Adaptivity.get_adaptivity_glue(model)
+  patch_cells = glue.o2n_faces_map
+  return PatchDecomposition(model,patch_cells,patch_boundary_style,boundary_tag_names)
+end
+
+"""
+    num_patches(a::PatchDecomposition)
+"""
+num_patches(a::PatchDecomposition) = length(a.patch_cells)
+
+"""
+    get_patch_cells(PD::PatchDecomposition) -> patch_to_cells
+"""
+get_patch_cells(PD::PatchDecomposition) = PD.patch_cells
+
+"""
+    get_patch_cell_offsets(PD::PatchDecomposition)
+"""
+get_patch_cell_offsets(PD::PatchDecomposition) = PD.patch_cells.ptrs
+
+Geometry.num_cells(a::PatchDecomposition) = length(a.patch_cells.data)
+Geometry.get_isboundary_face(PD::PatchDecomposition) = PD.patch_cells_faces_on_boundary
+Geometry.get_isboundary_face(PD::PatchDecomposition,d::Integer) = PD.patch_cells_faces_on_boundary[d+1]
+
+"""
+    get_patch_cells_overlapped(PD::PatchDecomposition) -> patch_to_pcells
+"""
+function get_patch_cells_overlapped(PD::PatchDecomposition)
+  patch_cells = get_patch_cells(PD)
+  n_pcells = length(patch_cells.data)
+  data = Arrays.IdentityVector(n_pcells)
+  return Arrays.Table(data,patch_cells.ptrs)
+end
+
+function Base.view(PD::PatchDecomposition{Dr,Dc,Dp},patch_ids) where {Dr,Dc,Dp}
+  patch_cells = view(get_patch_cells(PD),patch_ids)
+  patch_faces_on_boundary = [
+    view(PD.patch_cells_faces_on_boundary[d+1],patch_ids) for d = 0:Dc-1
+  ]
+  return PatchDecomposition{Dr,Dc,Dp}(PD.model,patch_cells,patch_faces_on_boundary,PD.patch_boundary_style)
+end
+
+"""
+    patch_view(PD::PatchDecomposition,a::AbstractArray,patch::Integer)
+    patch_view(PD::PatchDecomposition,a::AbstractArray,patch_ids::AbstractUnitRange{<:Integer})
+
+Returns a view of the pcell-wise array `a` restricted to the pcells of the patch `patch` or `patch_ids`.
+"""
+function patch_view(PD::PatchDecomposition,a::AbstractArray,patch::Integer)
+  offsets = get_patch_cell_offsets(PD)
+  return view(a,offsets[patch]:offsets[patch+1]-1)
+end
+
+function patch_view(PD::PatchDecomposition,a::AbstractArray,patch_ids::AbstractUnitRange{<:Integer})
+  offsets = get_patch_cell_offsets(PD)
+  start = offsets[first(patch_ids)]
+  stop  = offsets[last(patch_ids)+1]-1
+  return view(a,start:stop)
+end
+
+"""
+    patch_reindex(PD::PatchDecomposition,cell_to_data) -> pcell_to_data
+"""
+function patch_reindex(PD::PatchDecomposition,cell_to_data)
+  patch_cells = get_patch_cells(PD)
+  pcell_to_data = lazy_map(Reindex(cell_to_data),patch_cells.data)
+  return pcell_to_data
+end
+
+function patch_extend(PD::PatchDecomposition,patch_to_data)
+  pcell_to_patch = fill(0,num_cells(PD))
+  patch_offsets = get_patch_cell_offsets(PD)
+  for patch in 1:num_patches(PD)
+    pcell_to_patch[patch_offsets[patch]:patch_offsets[patch+1]-1] .= patch
+  end
+
+  pcell_to_data = lazy_map(Reindex(patch_to_data),pcell_to_patch)
+  return pcell_to_data
+end
+
+"""
+    allocate_patch_cell_array(PD::PatchDecomposition,cell_to_data::Table{T};init=zero(T))
+  
+Allocates a patch-cell-wise array from a cell-wise array.
+"""
+function allocate_patch_cell_array(
+  PD::PatchDecomposition, cell_to_data::Table{T}; init=zero(T)
+) where T
+  patch_cells = get_patch_cells(PD)
+  return allocate_patch_cell_array(patch_cells,cell_to_data;init)
+end
+
+function allocate_patch_cell_array(
+  patch_cells::Table, cell_to_data::Table{T}; init = zero(T)
+) where T
+  ptrs = zeros(Int,length(patch_cells.data)+1)
+  ptrs[1] = 1
+  for (pcell,cell) in enumerate(patch_cells.data)
+    n = cell_to_data.ptrs[cell+1] - cell_to_data.ptrs[cell]
+    ptrs[pcell+1] = ptrs[pcell] + n
+  end
+  data = fill(init,ptrs[end]-1)
+  return Arrays.Table(data,ptrs)
+end
+
+function allocate_patch_cell_array(
+  patch_cells::Table, cell_to_data::AbstractVector{<:AbstractVector{T}}; init = zero(T)
+) where T
+  ptrs = zeros(Int,length(patch_cells.data)+1)
+  ptrs[1] = 1
+  for (pcell,cell) in enumerate(patch_cells.data)
+    n = length(cell_to_data[cell])
+    ptrs[pcell+1] = ptrs[pcell] + n
+  end
+  data = fill(init,ptrs[end]-1)
+  return Arrays.Table(data,ptrs)
 end
 
 # patch_cell_faces_on_boundary :: 
@@ -81,17 +207,16 @@ end
 function compute_patch_cells_faces_on_boundary(
   model::DiscreteModel,
   patch_cells,
-  patch_cells_overlapped,
   patch_facets,
   patch_boundary_style,
   boundary_tag_names
 )
   patch_cell_faces_on_boundary = _allocate_patch_cells_faces_on_boundary(model,patch_cells)
-  if !isa(patch_boundary_style,PatchBoundaryInclude)
+  if isa(patch_boundary_style,PatchBoundaryExclude)
     _compute_patch_cells_faces_on_boundary!(
       patch_cell_faces_on_boundary,
-      model, patch_cells, patch_cells_overlapped,
-      patch_facets, patch_boundary_style, boundary_tag_names
+      model, patch_cells,patch_facets, 
+      patch_boundary_style, boundary_tag_names
     )
   end
   return patch_cell_faces_on_boundary
@@ -103,7 +228,7 @@ function _allocate_patch_cells_faces_on_boundary(model::DiscreteModel{Dc},patch_
   
   patch_cells_faces_on_boundary = Vector{Gridap.Arrays.Table}(undef,Dc)
   for d = 0:Dc-1
-    ctype_to_num_dfaces = map(reffe -> num_faces(reffe,d),ctype_to_reffe)
+    ctype_to_num_dfaces = map(reffe -> num_faces(reffe,d), ctype_to_reffe)
     patch_cells_faces_on_boundary[d+1] =
       _allocate_ocell_to_dface(Bool, patch_cells,cell_to_ctype, ctype_to_num_dfaces)
   end
@@ -111,11 +236,11 @@ function _allocate_patch_cells_faces_on_boundary(model::DiscreteModel{Dc},patch_
 end
 
 function _allocate_ocell_to_dface(::Type{T},patch_cells,cell_to_ctype,ctype_to_num_dfaces) where T<:Number
-  num_overlapped_cells = length(patch_cells.data)
-  ptrs = Vector{Int}(undef,num_overlapped_cells+1)
+  n_pcells = length(patch_cells.data)
+  ptrs = Vector{Int}(undef,n_pcells+1)
 
   ptrs[1] = 1
-  for i = 1:num_overlapped_cells
+  for i = 1:n_pcells
     cell  = patch_cells.data[i]
     ctype = cell_to_ctype[cell]
     ptrs[i+1] = ptrs[i] + ctype_to_num_dfaces[ctype]
@@ -128,7 +253,6 @@ function _compute_patch_cells_faces_on_boundary!(
   patch_cells_faces_on_boundary,
   model::DiscreteModel,
   patch_cells,
-  patch_cells_overlapped,
   patch_facets,
   patch_boundary_style,
   boundary_tag_names
@@ -137,14 +261,14 @@ function _compute_patch_cells_faces_on_boundary!(
   cache_patch_cells  = array_cache(patch_cells)
   cache_patch_facets = array_cache(patch_facets)
   for patch = 1:num_patches
+    first_patch_cell = patch_cells.ptrs[patch]
     current_patch_cells  = getindex!(cache_patch_cells,patch_cells,patch)
     current_patch_facets = getindex!(cache_patch_facets,patch_facets,patch)
     _compute_patch_cells_faces_on_boundary!(
       patch_cells_faces_on_boundary,
       model,
-      patch,
+      first_patch_cell,
       current_patch_cells,
-      patch_cells_overlapped,
       current_patch_facets,
       patch_boundary_style,
       boundary_tag_names
@@ -155,9 +279,8 @@ end
 function _compute_patch_cells_faces_on_boundary!(
   patch_cells_faces_on_boundary,
   model::DiscreteModel{Dc},
-  patch,
+  first_patch_cell,
   patch_cells,
-  patch_cells_overlapped,
   patch_facets,
   patch_boundary_style,
   boundary_tag_names
@@ -166,7 +289,7 @@ function _compute_patch_cells_faces_on_boundary!(
   topology = get_grid_topology(model)
 
   boundary_tags = findall(x -> (x ∈ boundary_tag_names), face_labeling.tag_to_name)
-  Gridap.Helpers.@check !isempty(boundary_tags)
+  @assert !isempty(boundary_tags)
   boundary_entities = vcat(face_labeling.tag_to_entities[boundary_tags]...)
 
   # Cells facets
@@ -182,7 +305,7 @@ function _compute_patch_cells_faces_on_boundary!(
 
   # Go over all cells in the current patch
   for (lcell,cell) in enumerate(patch_cells)
-    overlapped_cell = patch_cells_overlapped.data[patch_cells_overlapped.ptrs[patch]+lcell-1]
+    overlapped_cell = first_patch_cell+lcell-1
     cell_facets = getindex!(cache_cell_to_facets,cell_to_facets,cell)
     # Go over the facets (i.e., faces of dim Dc-1) in the current cell
     for (lfacet,facet) in enumerate(cell_facets)
@@ -216,7 +339,7 @@ function _compute_patch_cells_faces_on_boundary!(
                 lface       = findfirst(x -> x==facet_face, cell_dfaces)
                 lcell2      = findfirst(x -> x==cell_around_face, patch_cells)
 
-                overlapped_cell2 = patch_cells_overlapped.data[patch_cells_overlapped.ptrs[patch]+lcell2-1]
+                overlapped_cell2 = first_patch_cell+lcell2-1
                 position = patch_cells_faces_on_boundary[d+1].ptrs[overlapped_cell2]+lface-1
                 patch_cells_faces_on_boundary[d+1].data[position] = true
               end
@@ -228,11 +351,19 @@ function _compute_patch_cells_faces_on_boundary!(
   end
 end
 
-# Patch cell faces: 
-#   patch_faces[pcell] = [face1, face2, ...]
-#   where face1, face2, ... are the faces of the overlapped cell `pcell` such that 
-#      - they are NOT on the boundary of the patch
-#      - they are flagged `true` in faces_mask
+"""
+    get_patch_cell_faces(PD::PatchDecomposition,Df::Integer)
+    get_patch_cell_faces(PD::PatchDecomposition,Df::Integer,faces_mask::AbstractVector{Bool})
+
+Returns a patch-wise Table containing the faces on each patch cell, i.e 
+
+    patch_faces[pcell] = [face1, face2, ...]
+
+where face1, face2, ... are the faces on the overlapped cell `pcell` such that 
+
+  - they are NOT on the boundary of the patch
+  - they are flagged `true` in `faces_mask`
+"""
 function get_patch_cell_faces(PD::PatchDecomposition,Df::Integer)
   model    = PD.model
   topo     = get_grid_topology(model)
@@ -240,18 +371,19 @@ function get_patch_cell_faces(PD::PatchDecomposition,Df::Integer)
   return get_patch_cell_faces(PD,Df,faces_mask)
 end
 
-function get_patch_cell_faces(PD::PatchDecomposition{Dr,Dc},Df::Integer,faces_mask) where {Dr,Dc}
+function get_patch_cell_faces(
+  PD::PatchDecomposition{Dr,Dc},Df::Integer,faces_mask::AbstractVector{Bool}
+) where {Dr,Dc}
   model    = PD.model
   topo     = get_grid_topology(model)
 
   c2e_map  = Gridap.Geometry.get_faces(topo,Dc,Df)
   patch_cells = Gridap.Arrays.Table(PD.patch_cells)
-  patch_cell_faces  = map(Reindex(c2e_map),patch_cells.data)
+  patch_cell_faces  = lazy_map(Reindex(c2e_map),patch_cells.data)
   faces_on_boundary = PD.patch_cells_faces_on_boundary[Df+1]
 
   patch_faces = _allocate_patch_cell_faces(patch_cell_faces,faces_on_boundary,faces_mask)
   _generate_patch_cell_faces!(patch_faces,patch_cell_faces,faces_on_boundary,faces_mask)
-
   return patch_faces
 end
 
@@ -300,21 +432,29 @@ function _generate_patch_cell_faces!(patch_faces,patch_cell_faces,faces_on_bound
   return patch_faces
 end
 
-# Patch faces: 
-#   patch_faces[patch] = [face1, face2, ...]
-#   where face1, face2, ... are the faces of the patch such that 
-#      - they are NOT on the boundary of the patch
-#      - they are flagged `true` in faces_mask
-#   If `reverse` is `true`, the faces are the ones ON the boundary of the patch.
+"""
+    get_patch_faces(PD::PatchDecomposition,Df::Integer,faces_mask::AbstractVector{Bool};reverse=false)
+
+Returns a patch-wise Table containing the faces on each patch, i.e 
+
+    patch_faces[patch] = [face1, face2, ...]
+
+where face1, face2, ... are the faces on the patch such that 
+
+  - they are NOT on the boundary of the patch
+  - they are flagged `true` in `faces_mask`
+
+If `reverse` is `true`, the faces are the ones ON the boundary of the patch.
+"""
 function get_patch_faces(
-  PD::PatchDecomposition{Dr,Dc},Df::Integer,faces_mask;reverse=false
+  PD::PatchDecomposition{Dr,Dc},Df::Integer,faces_mask::AbstractVector{Bool};reverse=false
 ) where {Dr,Dc}
   model    = PD.model
   topo     = get_grid_topology(model)
 
   c2e_map  = Gridap.Geometry.get_faces(topo,Dc,Df)
   patch_cells = Gridap.Arrays.Table(PD.patch_cells)
-  patch_cell_faces  = map(Reindex(c2e_map),patch_cells.data)
+  patch_cell_faces  = lazy_map(Reindex(c2e_map),patch_cells.data)
   faces_on_boundary = PD.patch_cells_faces_on_boundary[Df+1]
 
   patch_faces = _allocate_patch_faces(patch_cells,patch_cell_faces,faces_on_boundary,faces_mask,reverse)
@@ -392,12 +532,24 @@ function _generate_patch_faces!(
   return patch_faces
 end
 
-# Face connectivity for the patches
-#    pface_to_pcell[pface] = [pcell1, pcell2, ...]
-# This would be the Gridap equivalent to `get_faces(patch_topology,Df,Dc)`.
-# On top of this, we also return the local cell index (within the face connectivity) of cell, 
-# which is needed when a pface touches different cells depending on the patch.
-# The argument `patch_faces` allows to select only some pfaces (i.e boundary/skeleton/etc...).
+"""
+    get_pface_to_pcell(PD::PatchDecomposition{Dr,Dc},Df::Integer,patch_faces)
+
+Returns two pface-wise Tables containing 
+
+  1) the patch cells touched by each patch face and 
+  2) the local cell index (within the face connectivity) of the cell touched by the patch face,
+     which is needed when a pface touches different cells depending on the patch
+
+i.e
+
+    pface_to_pcell[pface] = [pcell1, pcell2, ...]
+    pface_to_lcell[pface] = [lcell1, lcell2, ...]
+
+where pcell1, pcell2, ... are the patch cells touched by the patch face `pface`.
+
+This would be the Gridap equivalent to `get_faces(patch_topology,Df,Dc)`.
+"""
 function get_pface_to_pcell(PD::PatchDecomposition{Dr,Dc},Df::Integer,patch_faces) where {Dr,Dc}
   model    = PD.model
   topo     = get_grid_topology(model)
@@ -405,7 +557,7 @@ function get_pface_to_pcell(PD::PatchDecomposition{Dr,Dc},Df::Integer,patch_face
   faces_to_cells  = Gridap.Geometry.get_faces(topo,Df,Dc)
   pfaces_to_cells = lazy_map(Reindex(faces_to_cells),patch_faces.data)
   patch_cells     = Gridap.Arrays.Table(PD.patch_cells)
-  patch_cells_overlapped = PD.patch_cells_overlapped
+  patch_cells_overlapped = get_patch_cells_overlapped(PD)
 
   num_patches = length(patch_cells)
   num_pfaces  = length(pfaces_to_cells)
@@ -446,4 +598,110 @@ function get_pface_to_pcell(PD::PatchDecomposition{Dr,Dc},Df::Integer,patch_face
 
   pface_to_pcell = Gridap.Arrays.Table(data,ptrs)
   return pface_to_pcell, pface_to_lcell
+end
+
+"""
+    generate_patch_closures(PD::PatchDecomposition{Dr,Dc})
+
+Returns a patch-wise Table containing the closure of each patch.
+"""
+function generate_patch_closures(PD::PatchDecomposition{Dr,Dc}) where {Dr,Dc}
+  topo = get_grid_topology(PD.model)
+  nodes_to_cells = Geometry.get_faces(topo,0,Dc)
+  cells_to_nodes = Geometry.get_faces(topo,Dc,0)
+
+  patch_cells = get_patch_cells(PD)
+
+  n_patches = length(patch_cells)
+  ptrs = zeros(Int,n_patches+1)
+  for patch in 1:n_patches
+    cells = view(patch_cells,patch)
+    closure = Set(cells)
+    for cell in cells
+      nodes = view(cells_to_nodes,cell)
+      for node in nodes
+        nbors = view(nodes_to_cells,node)
+        push!(closure,nbors...)
+      end
+    end
+    ptrs[patch+1] = length(closure)
+  end
+  Arrays.length_to_ptrs!(ptrs)
+
+  data = zeros(Int,ptrs[end]-1)
+  for patch in 1:n_patches
+    cells = view(patch_cells,patch)
+    
+    # First we push the interior patch cells
+    for cell in cells
+      data[ptrs[patch]] = cell
+      ptrs[patch] += 1
+    end
+
+    # Then we push the extra cells in the closure
+    closure = Set(cells)
+    for cell in cells
+      nodes = view(cells_to_nodes,cell)
+      for node in nodes
+        nbors = view(nodes_to_cells,node)
+        for nbor in nbors
+          if nbor ∉ closure
+            data[ptrs[patch]] = nbor
+            push!(closure,nbor)
+            ptrs[patch] += 1
+          end
+        end
+      end
+    end
+  end
+  Arrays.rewind_ptrs!(ptrs)
+
+  return Table(data,ptrs)
+end
+
+"""
+    generate_patch_facets(model::DiscreteModel{Dc,Dp},patch_cells)
+
+Given a model and the cells within each patch, returns a patch-wise Table containing the facets on each patch.
+"""
+function generate_patch_facets(
+  model::DiscreteModel{Dc,Dp},patch_cells
+) where {Dc,Dp}
+  topo = get_grid_topology(model)
+  c2f_map = Geometry.get_faces(topo,Dc,Dc-1)
+  f2c_map = Geometry.get_faces(topo,Dc-1,Dc)
+  
+  touched = fill(false,num_faces(topo,Dc-1))
+  ptrs = fill(0,length(patch_cells)+1)
+  for (patch,cells) in enumerate(patch_cells)
+    for c in cells
+      for f in c2f_map[c]
+        nbors = f2c_map[f]
+        if !touched[f] && (length(nbors) == 2) && all(n -> n ∈ cells, nbors)
+          touched[f] = true
+          ptrs[patch+1] += 1
+        end
+      end
+    end
+  end
+  Arrays.length_to_ptrs!(ptrs)
+  
+  data = fill(0,ptrs[end]-1)
+  fill!(touched,false)
+  for (patch,cells) in enumerate(patch_cells)
+    for c in cells
+      for f in c2f_map[c]
+        nbors = f2c_map[f]
+        if !touched[f] && (length(nbors) == 2) && all(n -> n ∈ cells, nbors)
+          touched[f] = true
+          data[ptrs[patch]] = f
+          ptrs[patch] += 1
+        end
+      end
+    end
+  end
+  Arrays.rewind_ptrs!(ptrs)
+  
+  patch_facets = Table(data,ptrs)
+  return patch_facets
 end

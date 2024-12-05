@@ -18,12 +18,16 @@ using GridapSolvers.MultilevelTools
 using GridapSolvers.SolverInterfaces
 using GridapSolvers.PatchBasedSmoothers
 
+export LinearSolverFromSmoother
 export JacobiLinearSolver
 export RichardsonSmoother
 export SymGaussSeidelSmoother
 export GMGLinearSolver
 export BlockDiagonalSmoother
 export SchurComplementSolver
+export SchwarzLinearSolver
+
+export CallbackSolver
 
 # Wrappers for IterativeSolvers.jl
 export IS_ConjugateGradientSolver
@@ -49,12 +53,18 @@ include("PETSc/ElasticitySolvers.jl")
 include("PETSc/HipmairXuSolvers.jl")
 
 include("IdentityLinearSolvers.jl")
+
+include("LinearSolverFromSmoothers.jl")
 include("JacobiLinearSolvers.jl")
 include("RichardsonSmoothers.jl")
 include("SymGaussSeidelSmoothers.jl")
+
 include("GMGLinearSolvers.jl")
 include("IterativeLinearSolvers.jl")
 include("SchurComplementSolvers.jl")
 include("MatrixSolvers.jl")
+include("SchwarzLinearSolvers.jl")
+
+include("CallbackSolver.jl")
 
 end

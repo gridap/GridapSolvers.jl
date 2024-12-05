@@ -1,10 +1,8 @@
-struct FESpaceHierarchyLevel{A,B,C,D,E}
+struct FESpaceHierarchyLevel{A,B,C}
   level               :: Int
   fe_space            :: A
   fe_space_red        :: B
-  cell_conformity     :: C
-  cell_conformity_red :: D
-  mh_level            :: E
+  mh_level            :: C
 end
 
 """
@@ -24,13 +22,6 @@ FESpaces.get_fe_space(a::FESpaceHierarchyLevel{A,B}) where {A,B} = a.fe_space_re
 get_fe_space_before_redist(sh::FESpaceHierarchy,lev::Int) = get_fe_space_before_redist(sh[lev])
 get_fe_space_before_redist(a::FESpaceHierarchyLevel) = a.fe_space
 
-get_cell_conformity(sh::FESpaceHierarchy,lev::Int) = get_cell_conformity(sh[lev])
-get_cell_conformity(a::FESpaceHierarchyLevel{A,Nothing}) where A = a.cell_conformity
-get_cell_conformity(a::FESpaceHierarchyLevel{A,B}) where {A,B} = a.cell_conformity_red
-
-get_cell_conformity_before_redist(sh::FESpaceHierarchy,lev::Int) = get_cell_conformity_before_redist(sh[lev])
-get_cell_conformity_before_redist(a::FESpaceHierarchyLevel) = a.cell_conformity
-
 get_model(sh::FESpaceHierarchy,level::Integer) = get_model(sh[level])
 get_model(a::FESpaceHierarchyLevel) = get_model(a.mh_level)
 
@@ -45,46 +36,22 @@ has_refinement(a::FESpaceHierarchyLevel) = has_refinement(a.mh_level)
 
 # Test/Trial FESpaces for ModelHierarchyLevels
 
-function _cell_conformity(
-  model::DiscreteModel,
-  reffe::Tuple{<:Gridap.FESpaces.ReferenceFEName,Any,Any}; 
-  conformity=nothing, kwargs...
-) :: CellConformity
-  basis, reffe_args, reffe_kwargs = reffe
-  cell_reffe = ReferenceFE(model,basis,reffe_args...;reffe_kwargs...)
-  conformity = Conformity(Gridap.Arrays.testitem(cell_reffe),conformity)
-  return CellConformity(cell_reffe,conformity)
-end
-
-function _cell_conformity(
-  model::GridapDistributed.DistributedDiscreteModel,args...;kwargs...
-) :: AbstractVector{<:CellConformity}
-  cell_conformities = map(local_views(model)) do model
-    _cell_conformity(model,args...;kwargs...)
-  end
-  return cell_conformities
-end
-
 function FESpaces.FESpace(mh::ModelHierarchyLevel,args...;kwargs...)
   if has_redistribution(mh)
     cparts, _ = get_old_and_new_parts(mh.red_glue,Val(false))
     Vh     = i_am_in(cparts) ? FESpace(get_model_before_redist(mh),args...;kwargs...) : nothing
     Vh_red = FESpace(get_model(mh),args...;kwargs...)
-    cell_conformity = i_am_in(cparts) ? _cell_conformity(get_model_before_redist(mh),args...;kwargs...) : nothing
-    cell_conformity_red = _cell_conformity(get_model(mh),args...;kwargs...)
   else
     Vh = FESpace(get_model(mh),args...;kwargs...)
     Vh_red = nothing
-    cell_conformity = _cell_conformity(get_model(mh),args...;kwargs...)
-    cell_conformity_red = nothing
   end
-  return FESpaceHierarchyLevel(mh.level,Vh,Vh_red,cell_conformity,cell_conformity_red,mh)
+  return FESpaceHierarchyLevel(mh.level,Vh,Vh_red,mh)
 end
 
 function FESpaces.TrialFESpace(a::FESpaceHierarchyLevel,args...;kwargs...)
   Uh     = !isa(a.fe_space,Nothing) ? TrialFESpace(a.fe_space,args...;kwargs...) : nothing
   Uh_red = !isa(a.fe_space_red,Nothing) ? TrialFESpace(a.fe_space_red,args...;kwargs...) : nothing
-  return FESpaceHierarchyLevel(a.level,Uh,Uh_red,a.cell_conformity,a.cell_conformity_red,a.mh_level)
+  return FESpaceHierarchyLevel(a.level,Uh,Uh_red,a.mh_level)
 end
 
 # Test/Trial FESpaces for ModelHierarchies/FESpaceHierarchy
@@ -122,9 +89,7 @@ function Gridap.MultiField.MultiFieldFESpace(spaces::Vector{<:FESpaceHierarchyLe
   level  = spaces[1].level
   Uh     = all(map(s -> !isa(s.fe_space,Nothing),spaces)) ? MultiFieldFESpace(map(s -> s.fe_space, spaces); kwargs...) : nothing
   Uh_red = all(map(s -> !isa(s.fe_space_red,Nothing),spaces)) ? MultiFieldFESpace(map(s -> s.fe_space_red, spaces); kwargs...) : nothing
-  cell_conformity = map(s -> s.cell_conformity, spaces)
-  cell_conformity_red = map(s -> s.cell_conformity_red, spaces)
-  return FESpaceHierarchyLevel(level,Uh,Uh_red,cell_conformity,cell_conformity_red,first(spaces).mh_level)
+  return FESpaceHierarchyLevel(level,Uh,Uh_red,first(spaces).mh_level)
 end
 
 function Gridap.MultiField.MultiFieldFESpace(spaces::Vector{<:HierarchicalArray};kwargs...)
@@ -132,6 +97,27 @@ function Gridap.MultiField.MultiFieldFESpace(spaces::Vector{<:HierarchicalArray}
   map(spaces...) do spaces_i...
     MultiFieldFESpace([spaces_i...];kwargs...)
   end
+end
+
+# Constant FESpaces
+
+function FESpaces.ConstantFESpace(mh::ModelHierarchy)
+  map(mh) do mhl
+    ConstantFESpace(mhl)
+  end
+end
+
+function FESpaces.ConstantFESpace(mh::MultilevelTools.ModelHierarchyLevel)
+  reffe = ReferenceFE(lagrangian,Float64,0)
+  if has_redistribution(mh)
+    cparts, _ = get_old_and_new_parts(mh.red_glue,Val(false))
+    Vh     = i_am_in(cparts) ? ConstantFESpace(get_model_before_redist(mh)) : nothing
+    Vh_red = ConstantFESpace(get_model(mh))
+  else
+    Vh = ConstantFESpace(get_model(mh))
+    Vh_red = nothing
+  end
+  return FESpaceHierarchyLevel(mh.level,Vh,Vh_red,mh)
 end
 
 # Computing system matrices

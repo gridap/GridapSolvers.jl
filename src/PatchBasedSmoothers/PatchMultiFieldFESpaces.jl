@@ -28,7 +28,6 @@ function PatchFESpace(
   cell_conformity::Vector;
   patches_mask = default_patches_mask(patch_decomposition)
 )
-
   field_spaces = map((s,c) -> PatchFESpace(s,patch_decomposition,c;patches_mask),space,cell_conformity)
   part_spaces = map(MultiFieldFESpace,GridapDistributed.to_parray_of_arrays(map(local_views,field_spaces)))
   
@@ -76,21 +75,24 @@ function inject!(x,Ph::MultiFieldFESpace,y)
   end
 end
 
-function prolongate!(x::PVector,
-                     Ph::GridapDistributed.DistributedMultiFieldFESpace,
-                     y::PVector;
-                     is_consistent::Bool=false)
+function prolongate!(
+  x::PVector,
+  Ph::GridapDistributed.DistributedMultiFieldFESpace,
+  y::PVector;
+  is_consistent::Bool=false
+)
   if !is_consistent
     consistent!(y) |> fetch
   end
   map(prolongate!,partition(x),local_views(Ph),partition(y))
 end
 
-function inject!(x::PVector,
-                 Ph::GridapDistributed.DistributedMultiFieldFESpace,
-                 y::PVector;
-                 make_consistent::Bool=true)
-
+function inject!(
+  x::PVector,
+  Ph::GridapDistributed.DistributedMultiFieldFESpace,
+  y::PVector;
+  make_consistent::Bool=true
+)
   map(partition(x),local_views(Ph),partition(y)) do x,Ph,y
     inject!(x,Ph,y)
   end

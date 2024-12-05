@@ -139,6 +139,44 @@ function CartesianModelHierarchy(
   return HierarchicalArray(meshes,level_parts)
 end
 
+function ModelHierarchy(models::Vector{<:DiscreteModel})
+  nlevs = length(models)
+  @check all(map(i -> isa(models[i],AdaptedDiscreteModel),1:nlevs-1)) "Hierarchy models are not adapted models."
+  for lev in 1:nlevs-1
+    @check Adaptivity.is_child(models[lev],models[lev+1]) "Incorrect hierarchy of models."
+  end
+
+  level_parts = fill(DebugArray([1]),nlevs)
+  meshes = Vector{ModelHierarchyLevel}(undef,nlevs)
+  for lev in 1:nlevs-1
+    glue  = Gridap.Adaptivity.get_adaptivity_glue(models[lev])
+    model = models[lev]
+    meshes[lev] = ModelHierarchyLevel(lev,model,glue,nothing,nothing)
+  end
+  meshes[nlevs] = ModelHierarchyLevel(nlevs,models[nlevs],nothing,nothing,nothing)
+  return HierarchicalArray(meshes,level_parts)
+end
+
+function ModelHierarchy(models::Vector{<:GridapDistributed.DistributedDiscreteModel})
+  nlevs = length(models)
+  @check all(map(i -> isa(models[i],GridapDistributed.DistributedAdaptedDiscreteModel),1:nlevs-1)) "Hierarchy models are not adapted models."
+  for lev in 1:nlevs-1
+    @check Adaptivity.is_child(models[lev],models[lev+1]) "Incorrect hierarchy of models."
+  end
+  ranks = get_parts(models[1])
+  @check all(m -> length(get_parts(m)) === length(ranks), models) "Models have different communicators."
+
+  level_parts = fill(ranks,nlevs)
+  meshes = Vector{ModelHierarchyLevel}(undef,nlevs)
+  for lev in 1:nlevs-1
+    glue  = Gridap.Adaptivity.get_adaptivity_glue(models[lev])
+    model = models[lev]
+    meshes[lev] = ModelHierarchyLevel(lev,model,glue,nothing,nothing)
+  end
+  meshes[nlevs] = ModelHierarchyLevel(nlevs,models[nlevs],nothing,nothing,nothing)
+  return HierarchicalArray(meshes,level_parts)
+end
+
 """
     P4estCartesianModelHierarchy(
       ranks,np_per_level,domain,nc::NTuple{D,<:Integer};
@@ -166,6 +204,26 @@ function P4estCartesianModelHierarchy(
   coarse_model = OctreeDistributedDiscreteModel(cparts,cmodel,num_refs_coarse)
   mh = ModelHierarchy(ranks,coarse_model,np_per_level)
   return mh
+end
+
+function GridapDistributed.DistributedAdaptedDiscreteModel(
+  model  :: GridapP4est.OctreeDistributedDiscreteModel,
+  parent :: GridapDistributed.DistributedDiscreteModel,
+  glue   :: AbstractArray{<:Gridap.Adaptivity.AdaptivityGlue};
+)
+  GridapDistributed.DistributedAdaptedDiscreteModel(
+    model.dmodel,parent,glue
+  )
+end
+
+function GridapDistributed.DistributedAdaptedDiscreteModel(
+  model  :: GridapP4est.OctreeDistributedDiscreteModel,
+  parent :: GridapP4est.OctreeDistributedDiscreteModel,
+  glue   :: AbstractArray{<:Gridap.Adaptivity.AdaptivityGlue};
+)
+  GridapDistributed.DistributedAdaptedDiscreteModel(
+    model.dmodel,parent.dmodel,glue
+  )
 end
 
 """
