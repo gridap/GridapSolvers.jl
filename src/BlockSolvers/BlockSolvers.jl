@@ -3,7 +3,6 @@ module BlockSolvers
   using SparseArrays
   using SparseMatricesCSR
   using BlockArrays
-  using IterativeSolvers
 
   using Gridap
   using Gridap.Helpers, Gridap.Algebra, Gridap.CellData, Gridap.Arrays, Gridap.FESpaces, Gridap.MultiField
