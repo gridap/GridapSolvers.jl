@@ -21,7 +21,7 @@ Solvers follow a modular design, where most blocks can be combined to produce PD
 
 ## Documentation and examples
 
-A (hopefully) comprehensive documentation is available at [https://gridap.github.io/GridapSolvers.jl/stable/](https://gridap.github.io/GridapSolvers.jl/stable/).
+A (hopefully) comprehensive documentation is available [here](https://gridap.github.io/GridapSolvers.jl/stable/).
 
 A list of examples is available in the documentation. These include some very well known examples such as the Stokes, Incompressible Navier-Stokes and Darcy problems. The featured scripts are available in `test/Applications`.
 

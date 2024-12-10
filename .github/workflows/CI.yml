@@ -108,7 +108,7 @@ jobs:
       - run: julia --project=. --color=yes --check-bounds=yes test/runtests.jl
       - uses: codecov/codecov-action@v5
         with:
-          file: lcov.info
+          token: ${{ secrets.CODECOV_TOKEN }}
   docs:
     name: Documentation
     runs-on: ubuntu-latest
