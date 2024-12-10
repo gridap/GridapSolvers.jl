@@ -13,16 +13,24 @@ module BlockSolvers
   using GridapSolvers.MultilevelTools
   using GridapSolvers.SolverInterfaces
 
-  include("BlockFEOperators.jl")
+  using GridapDistributed: to_parray_of_arrays, DistributedMultiFieldFESpace
+
+  const MultiFieldFESpaceTypes = Union{<:MultiFieldFESpace,<:GridapDistributed.DistributedMultiFieldFESpace}
+  const BlockFESpaceTypes{NB,SB,P} = Union{<:MultiFieldFESpace{<:BlockMultiFieldStyle{NB,SB,P}},<:GridapDistributed.DistributedMultiFieldFESpace{<:BlockMultiFieldStyle{NB,SB,P}}}
 
   include("BlockSolverInterfaces.jl")
   include("BlockDiagonalSolvers.jl")
   include("BlockTriangularSolvers.jl")
 
-  export BlockFEOperator
+  include("BlockFEOperators.jl")
+  include("StaggeredFEOperators.jl")
 
   export MatrixBlock, LinearSystemBlock, NonlinearSystemBlock, BiformBlock, TriformBlock
 
   export BlockDiagonalSolver
   export BlockTriangularSolver
+
+  export BlockFEOperator
+  export StaggeredFEOperator, StaggeredAffineFEOperator, StaggeredFESolver
+
 end

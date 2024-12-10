@@ -1,47 +1,62 @@
 
 struct BlockFEOperator{NB,SB,P} <: FEOperator
-  global_op    :: FEOperator
-  block_ops    :: Matrix{<:Union{<:FEOperator,Missing,Nothing}}
-  is_nonlinear :: Matrix{Bool}
+  global_op :: FEOperator
+  block_ids :: Vector{CartesianIndex{2}}
+  block_ops :: Vector{FEOperator}
+  nonlinear :: Vector{Bool}
 end
 
-const BlockFESpaceTypes{NB,SB,P} = Union{<:MultiFieldFESpace{<:BlockMultiFieldStyle{NB,SB,P}},<:GridapDistributed.DistributedMultiFieldFESpace{<:BlockMultiFieldStyle{NB,SB,P}}}
+function BlockFEOperator(
+  res::Vector{<:Union{<:Function,Missing,Nothing}},
+  jac::Matrix{<:Union{<:Function,Missing,Nothing}},
+  args...; nonlinear = fill(true,size(res))
+)
+  keep(x) = !ismissing(x) && !isnothing(x)
+  ids = findall(keep, res)
+  @assert ids == findall(keep, jac)
+  _res = [res[I] for I in ids]
+  _jac = [jac[I] for I in ids]
+  return BlockFEOperator(_res,_jac,ids,args...; nonlinear = nonlinear[ids])
+end
 
 function BlockFEOperator(
-  res::Matrix{<:Union{<:Function,Missing,Nothing}},
-  jac::Matrix{<:Union{<:Function,Missing,Nothing}},
+  contributions :: Vector{<:Tuple{Any,Function,Function}}, args...; kwargs...
+)
+  ids = [CartesianIndex(c[1]) for c in contributions]
+  res = [c[2] for c in contributions]
+  jac = [c[3] for c in contributions]
+  return BlockFEOperator(res,jac,ids,args...;kwargs...)
+end
+
+function BlockFEOperator(
+  res::Vector{<:Function},
+  jac::Vector{<:Function},
+  ids::Vector{CartesianIndex{2}},
   trial::BlockFESpaceTypes,
-  test::BlockFESpaceTypes;
+  test ::BlockFESpaceTypes;
   kwargs...
 )
   assem = SparseMatrixAssembler(test,trial)
-  return BlockFEOperator(res,jac,trial,test,assem)
+  return BlockFEOperator(res,jac,ids,trial,test,assem;kwargs...)
 end
 
+# TODO: I think nonlinear should not be a kwarg, since its the whole point of this operator
 function BlockFEOperator(
-  res::Matrix{<:Union{<:Function,Missing,Nothing}},
-  jac::Matrix{<:Union{<:Function,Missing,Nothing}},
+  res::Vector{<:Function},
+  jac::Vector{<:Function},
+  ids::Vector{CartesianIndex{2}},
   trial::BlockFESpaceTypes{NB,SB,P},
   test::BlockFESpaceTypes{NB,SB,P},
   assem::MultiField.BlockSparseMatrixAssembler{NB,NV,SB,P};
-  is_nonlinear::Matrix{Bool}=fill(true,(NB,NB))
+  nonlinear::Vector{Bool}=fill(true,length(res))
 ) where {NB,NV,SB,P}
-  @check size(res,1) == size(jac,1) == NB
-  @check size(res,2) == size(jac,2) == NB
-
-  global_res = residual_from_blocks(NB,SB,P,res)
-  global_jac = jacobian_from_blocks(NB,SB,P,jac)
+  ranges = MultiField.get_block_ranges(NB,SB,P)
+  global_res = residual_from_blocks(ids,ranges,res)
+  global_jac = jacobian_from_blocks(ids,ranges,jac)
   global_op  = FEOperator(global_res,global_jac,trial,test,assem)
 
-  trial_blocks = blocks(trial)
-  test_blocks  = blocks(test)
-  assem_blocks = blocks(assem)
-  block_ops = map(CartesianIndices(res)) do I
-    if !ismissing(res[I]) && !isnothing(res[I])
-      FEOperator(res[I],jac[I],test_blocks[I[1]],trial_blocks[I[2]],assem_blocks[I])
-    end
-  end
-  return BlockFEOperator{NB,SB,P}(global_op,block_ops,is_nonlinear)
+  block_ops = map(FEOperator,res,jac,blocks(trial),blocks(test),blocks(assem))
+  return BlockFEOperator{NB,SB,P}(global_op,block_ids,block_ops,nonlinear)
 end
 
 # BlockArrays API
@@ -58,57 +73,17 @@ Algebra.allocate_jacobian(op::BlockFEOperator,u) = allocate_jacobian(op.global_o
 Algebra.jacobian(op::BlockFEOperator,u) = jacobian(op.global_op,u)
 Algebra.residual!(b::AbstractVector,op::BlockFEOperator,u) = residual!(b,op.global_op,u)
 
-function Algebra.jacobian!(A::AbstractBlockMatrix,op::BlockFEOperator{NB},u) where NB
-  map(blocks(A),blocks(op),op.is_nonlinear) do A,op,nl
-    if nl
-      residual!(A,op,u)
+function Algebra.jacobian!(A::AbstractBlockMatrix,op::BlockFEOperator,u)
+  A_blocks = blocks(A)
+  for (i,I) in enumerate(op.block_ids)
+    if op.nonlinear[i]
+      jacobian!(A_blocks[I],op.block_ops[i],u)
     end
   end
   return A
 end
 
 # Private methods
-
-function residual_from_blocks(NB,SB,P,block_residuals)
-  function res(u,v)
-    block_ranges = MultiField.get_block_ranges(NB,SB,P)
-    block_u = map(r -> (length(r) == 1) ? u[r[1]] : Tuple(u[r]), block_ranges)
-    block_v = map(r -> (length(r) == 1) ? v[r[1]] : Tuple(v[r]), block_ranges)
-    block_contrs = map(CartesianIndices(block_residuals)) do I
-      if !ismissing(block_residuals[I]) && !isnothing(block_residuals[I])
-        block_residuals[I](block_u[I[2]],block_v[I[1]])
-      end
-    end
-    return add_block_contribs(block_contrs)
-  end
-  return res
-end
-
-function jacobian_from_blocks(NB,SB,P,block_jacobians)
-  function jac(u,du,dv)
-    block_ranges = MultiField.get_block_ranges(NB,SB,P)
-    block_u  = map(r -> (length(r) == 1) ?  u[r[1]] : Tuple(u[r]) , block_ranges)
-    block_du = map(r -> (length(r) == 1) ? du[r[1]] : Tuple(du[r]), block_ranges)
-    block_dv = map(r -> (length(r) == 1) ? dv[r[1]] : Tuple(dv[r]), block_ranges)
-    block_contrs = map(CartesianIndices(block_jacobians)) do I
-      if !ismissing(block_jacobians[I]) && !isnothing(block_jacobians[I])
-        block_jacobians[I](block_u[I[2]],block_du[I[2]],block_dv[I[1]])
-      end
-    end
-    return add_block_contribs(block_contrs)
-  end
-  return jac
-end
-
-function add_block_contribs(contrs)
-  c = contrs[1]
-  for ci in contrs[2:end]
-    if !ismissing(ci) && !isnothing(ci)
-      c = c + ci
-    end
-  end
-  return c
-end
 
 function BlockArrays.blocks(a::MultiField.BlockSparseMatrixAssembler)
   return a.block_assemblers
@@ -124,14 +99,13 @@ end
 
 function BlockArrays.blocks(f::GridapDistributed.DistributedMultiFieldFESpace{<:BlockMultiFieldStyle{NB,SB,P}}) where {NB,SB,P}
   block_gids   = blocks(get_free_dof_ids(f))
-
   block_ranges = MultiField.get_block_ranges(NB,SB,P)
   block_spaces = map(block_ranges,block_gids) do range, gids
     if (length(range) == 1) 
       space = f[range[1]]
     else
       global_sf_spaces = f[range]
-      local_sf_spaces  = GridapDistributed.to_parray_of_arrays(map(local_views,global_sf_spaces))
+      local_sf_spaces  = to_parray_of_arrays(map(local_views,global_sf_spaces))
       local_mf_spaces  = map(MultiFieldFESpace,local_sf_spaces)
       vector_type = GridapDistributed._find_vector_type(local_mf_spaces,gids)
       space = MultiFieldFESpace(global_sf_spaces,local_mf_spaces,gids,vector_type)
@@ -139,4 +113,42 @@ function BlockArrays.blocks(f::GridapDistributed.DistributedMultiFieldFESpace{<:
     space
   end
   return block_spaces
+end
+
+function liform_from_blocks(ids, ranges, liforms)
+  function biform(v)
+    c = DomainContribution()
+    for (I,lf) in zip(ids, liforms)
+      vk = v[ranges[I]]
+      c += lf(uk,vk)
+    end
+    return c
+  end
+  return biform
+end
+
+function biform_from_blocks(ids, ranges, biforms)
+  function biform(u,v)
+    c = DomainContribution()
+    for (I,bf) in zip(ids, biforms)
+      uk = u[ranges[I[1]]]
+      vk = v[ranges[I[2]]]
+      c += bf(uk,vk)
+    end
+    return c
+  end
+  return biform
+end
+
+function triform_from_blocks(ids, ranges, triforms)
+  function triform(u,du,dv)
+    c = DomainContribution()
+    for (I,tf) in zip(ids, triforms)
+      duk = du[ranges[I[1]]]
+      dvk = dv[ranges[I[2]]]
+      c += tf(u,duk,dvk)
+    end
+    return c
+  end
+  return triform
 end
