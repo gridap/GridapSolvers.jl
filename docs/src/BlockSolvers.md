@@ -60,12 +60,12 @@ BlockTriangularSolver(blocks::AbstractMatrix{<:SolverBlock},solvers ::AbstractVe
 BlockTriangularSolver(solvers::AbstractVector{<:LinearSolver})
 ```
 
-## Staggered FE Operators
+## Staggered FEOperators
 
 ```@docs
 StaggeredFESolver
 StaggeredFEOperator
-AffineStaggeredFESolver
-NonlinearStaggeredFESolver
-solve!(xh, solver::StaggeredFESolver{NB}, op::StaggeredFEOperator{NB}, ::Nothing)
+StaggeredAffineFEOperator
+StaggeredNonlinearFEOperator
+solve!(xh, solver::StaggeredFESolver{NB}, op::StaggeredFEOperator{NB}, ::Nothing) where {NB}
 ```

@@ -142,6 +142,19 @@ struct StaggeredAffineFEOperator{NB,SB} <: StaggeredFEOperator{NB,SB}
   end
 end
 
+"""
+    function StaggeredAffineFEOperator(
+      biforms::Vector{<:Function},
+      liforms::Vector{<:Function},
+      trials::Vector{<:FESpace},
+      tests::Vector{<:FESpace},
+      [assems::Vector{<:Assembler}]
+    )
+
+Constructor for a `StaggeredAffineFEOperator` operator, taking in each 
+equation as a pair of bilinear/linear forms and the corresponding trial/test spaces.
+The trial/test spaces can be single or multi-field spaces.
+"""
 function StaggeredAffineFEOperator(
   biforms::Vector{<:Function},
   liforms::Vector{<:Function},
@@ -233,6 +246,19 @@ struct StaggeredNonlinearFEOperator{NB,SB} <: StaggeredFEOperator{NB,SB}
 end
 
 # TODO: Can be compute jacobians from residuals? 
+
+"""
+    function StaggeredNonlinearFEOperator(
+      res::Vector{<:Function},
+      jac::Vector{<:Function},
+      trials::Vector{<:FESpace},
+      tests::Vector{<:FESpace}
+    )
+
+Constructor for a `StaggeredNonlinearFEOperator` operator, taking in each 
+equation as a pair of residual/jacobian forms and the corresponding trial/test spaces.
+The trial/test spaces can be single or multi-field spaces.
+"""
 function StaggeredNonlinearFEOperator(
   res::Vector{<:Function},
   jac::Vector{<:Function},
