@@ -14,6 +14,8 @@ using GridapDistributed
 using GridapSolvers.MultilevelTools
 using GridapSolvers.SolverInterfaces
 
+using Gridap.MultiField: BlockSparseMatrixAssembler
+
 using GridapDistributed: to_parray_of_arrays
 using GridapDistributed: DistributedMultiFieldFESpace, DistributedMultiFieldFEFunction
 
@@ -33,6 +35,6 @@ export BlockDiagonalSolver
 export BlockTriangularSolver
 
 export BlockFEOperator
-export StaggeredFEOperator, StaggeredAffineFEOperator, StaggeredFESolver
+export StaggeredFEOperator, StaggeredAffineFEOperator, StaggeredNonlinearFEOperator, StaggeredFESolver
 
 end

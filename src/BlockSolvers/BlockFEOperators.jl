@@ -92,7 +92,7 @@ end
 function BlockArrays.blocks(f::MultiFieldFESpace{<:BlockMultiFieldStyle{NB,SB,P}}) where {NB,SB,P}
   block_ranges = MultiField.get_block_ranges(NB,SB,P)
   block_spaces = map(block_ranges) do range
-    (length(range) == 1) ? f[range[1]] : MultiFieldFESpace(f[range])
+    (length(range) == 1) ? f[range[1]] : MultiFieldFESpace(f.spaces[range])
   end
   return block_spaces
 end
@@ -104,11 +104,11 @@ function BlockArrays.blocks(f::GridapDistributed.DistributedMultiFieldFESpace{<:
     if (length(range) == 1) 
       space = f[range[1]]
     else
-      global_sf_spaces = f[range]
+      global_sf_spaces = f.field_fe_space[range]
       local_sf_spaces  = to_parray_of_arrays(map(local_views,global_sf_spaces))
       local_mf_spaces  = map(MultiFieldFESpace,local_sf_spaces)
       vector_type = GridapDistributed._find_vector_type(local_mf_spaces,gids)
-      space = MultiFieldFESpace(global_sf_spaces,local_mf_spaces,gids,vector_type)
+      space = DistributedMultiFieldFESpace(global_sf_spaces,local_mf_spaces,gids,vector_type)
     end
     space
   end
