@@ -210,8 +210,7 @@ function get_operator!(op_k::AffineFEOperator, op::StaggeredAffineFEOperator{NB}
   A, b = get_matrix(op_k), get_vector(op_k)
   a(uk,vk) = op.biforms[k](xhs,uk,vk)
   l(vk) = op.liforms[k](xhs,vk)
-  uhd = zero(op.trials[k])
-  assemble_matrix_and_vector!(a,l,A,b,op.assems[k],op.trials[k],op.tests[k],uhd)
+  assemble_matrix_and_vector!(a,l,A,b,op.assems[k],op.trials[k],op.tests[k],zero(op.trials[k]))
   return op_k
 end
 
