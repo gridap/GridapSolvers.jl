@@ -1,4 +1,22 @@
 
+"""
+    abstract type StaggeredFEOperator{NB,SB} <: FESpaces.FEOperator end
+
+Staggered operator, used to solve staggered problems. 
+
+We define a staggered problem as a multi-variable non-linear problem where the equation 
+for the k-th variable `u_k` only depends on the previous variables `u_1,...,u_{k-1}` (and itself).
+
+Such a problem can then be solved by solving each variable sequentially, 
+using the previous variables as input. The most common examples of staggered problems 
+are one-directional coupling problems, where the variables are coupled in a chain-like manner.
+
+Two types of staggered operators are currently supported: 
+
+- [`StaggeredAffineFEOperator`](@ref): when the k-th equation is linear in `u_k`.
+- [`StaggeredNonlinearFEOperator`](@ref): when the k-th equation is non-linear in `u_k`.
+
+"""
 abstract type StaggeredFEOperator{NB,SB} <: FESpaces.FEOperator end
 
 function MultiField.get_block_ranges(::StaggeredFEOperator{NB,SB}) where {NB,SB}
@@ -33,6 +51,13 @@ end
 
 # StaggeredFESolver
 
+"""
+    struct StaggeredFESolver{NB} <: FESpaces.FESolver
+      solvers :: Vector{<:Union{LinearSolver,NonlinearSolver}}
+    end
+
+Solver for staggered problems. See [`StaggeredFEOperator`](@ref) for more details.
+"""
 struct StaggeredFESolver{NB} <: FESpaces.FESolver
   solvers :: Vector{<:NonlinearSolver}
   function StaggeredFESolver(solvers::Vector{<:NonlinearSolver})
@@ -41,6 +66,11 @@ struct StaggeredFESolver{NB} <: FESpaces.FESolver
   end
 end
 
+"""
+    solve(solver::StaggeredFESolver{NB}, op::StaggeredFEOperator{NB})
+    solve!(xh, solver::StaggeredFESolver{NB}, op::StaggeredFEOperator{NB}, cache::Nothing) where NB
+    solve!(xh, solver::StaggeredFESolver{NB}, op::StaggeredFEOperator{NB}, cache) where NB
+"""
 function Algebra.solve!(xh, solver::StaggeredFESolver{NB}, op::StaggeredFEOperator{NB}, ::Nothing) where NB
   solvers = solver.solvers
   xhs, caches, operators = (), (), ()
@@ -69,6 +99,25 @@ end
 
 # StaggeredAffineFEOperator
 
+"""
+    struct StaggeredAffineFEOperator{NB,SB} <: StaggeredFEOperator{NB,SB}
+      ...
+    end
+
+Affine staggered operator, used to solve staggered problems 
+where the k-th equation is linear in `u_k`.
+
+Such a problem is formulated by a set of bilinear/linear form pairs:
+
+    a_k((u_1,...,u_{k-1}),u_k,v_k) = ∫(...)
+    l_k((u_1,...,u_{k-1}),v_k) = ∫(...)
+
+than cam be assembled into a set of linear systems: 
+
+    A_k u_k = b_k
+
+where `A_k` and `b_k` only depend on the previous variables `u_1,...,u_{k-1}`.
+"""
 struct StaggeredAffineFEOperator{NB,SB} <: StaggeredFEOperator{NB,SB}
   biforms :: Vector{<:Function}
   liforms :: Vector{<:Function}
@@ -145,6 +194,20 @@ end
 ############################################################################################
 # StaggeredFEOperator
 
+"""
+    struct StaggeredNonlinearFEOperator{NB,SB} <: StaggeredFEOperator{NB,SB}
+      ...
+    end
+
+Nonlinear staggered operator, used to solve staggered problems 
+where the k-th equation is nonlinear in `u_k`.
+
+Such a problem is formulated by a set of residual/jacobian pairs:
+
+    jac_k((u_1,...,u_{k-1}),u_k,du_k,dv_k) = ∫(...)
+    res_k((u_1,...,u_{k-1}),u_k,v_k) = ∫(...)
+
+"""
 struct StaggeredNonlinearFEOperator{NB,SB} <: StaggeredFEOperator{NB,SB}
   jacobians :: Vector{<:Function}
   residuals :: Vector{<:Function}
