@@ -1,36 +1,38 @@
 module BlockSolvers
-  using LinearAlgebra
-  using SparseArrays
-  using SparseMatricesCSR
-  using BlockArrays
-  using IterativeSolvers
 
-  using Gridap
-  using Gridap.Helpers, Gridap.Algebra, Gridap.CellData, Gridap.Arrays, Gridap.FESpaces, Gridap.MultiField
-  using PartitionedArrays
-  using GridapDistributed
+using LinearAlgebra
+using SparseArrays
+using SparseMatricesCSR
+using BlockArrays
+using IterativeSolvers
 
-  using GridapSolvers.MultilevelTools
-  using GridapSolvers.SolverInterfaces
+using Gridap
+using Gridap.Helpers, Gridap.Algebra, Gridap.CellData, Gridap.Arrays, Gridap.FESpaces, Gridap.MultiField
+using PartitionedArrays
+using GridapDistributed
 
-  using GridapDistributed: to_parray_of_arrays, DistributedMultiFieldFESpace
+using GridapSolvers.MultilevelTools
+using GridapSolvers.SolverInterfaces
 
-  const MultiFieldFESpaceTypes = Union{<:MultiFieldFESpace,<:GridapDistributed.DistributedMultiFieldFESpace}
-  const BlockFESpaceTypes{NB,SB,P} = Union{<:MultiFieldFESpace{<:BlockMultiFieldStyle{NB,SB,P}},<:GridapDistributed.DistributedMultiFieldFESpace{<:BlockMultiFieldStyle{NB,SB,P}}}
+using GridapDistributed: to_parray_of_arrays
+using GridapDistributed: DistributedMultiFieldFESpace, DistributedMultiFieldFEFunction
 
-  include("BlockSolverInterfaces.jl")
-  include("BlockDiagonalSolvers.jl")
-  include("BlockTriangularSolvers.jl")
+const MultiFieldFESpaceTypes = Union{<:MultiFieldFESpace,<:GridapDistributed.DistributedMultiFieldFESpace}
+const BlockFESpaceTypes{NB,SB,P} = Union{<:MultiFieldFESpace{<:BlockMultiFieldStyle{NB,SB,P}},<:GridapDistributed.DistributedMultiFieldFESpace{<:BlockMultiFieldStyle{NB,SB,P}}}
 
-  include("BlockFEOperators.jl")
-  include("StaggeredFEOperators.jl")
+include("BlockSolverInterfaces.jl")
+include("BlockDiagonalSolvers.jl")
+include("BlockTriangularSolvers.jl")
 
-  export MatrixBlock, LinearSystemBlock, NonlinearSystemBlock, BiformBlock, TriformBlock
+include("BlockFEOperators.jl")
+include("StaggeredFEOperators.jl")
 
-  export BlockDiagonalSolver
-  export BlockTriangularSolver
+export MatrixBlock, LinearSystemBlock, NonlinearSystemBlock, BiformBlock, TriformBlock
 
-  export BlockFEOperator
-  export StaggeredFEOperator, StaggeredAffineFEOperator, StaggeredFESolver
+export BlockDiagonalSolver
+export BlockTriangularSolver
+
+export BlockFEOperator
+export StaggeredFEOperator, StaggeredAffineFEOperator, StaggeredFESolver
 
 end

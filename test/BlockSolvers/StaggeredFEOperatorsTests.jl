@@ -5,9 +5,12 @@ using Gridap, GridapDistributed, PartitionedArrays
 using Gridap.MultiField
 using BlockArrays
 using GridapSolvers
-using GridapSolvers.BlockSolvers
+using GridapSolvers.BlockSolvers, GridapSolvers.LinearSolvers
 
-model = CartesianDiscreteModel((0,1,0,1),(4,4))
+np = (2,2)
+ranks = DebugArray(LinearIndices((prod(np),)))
+
+model = CartesianDiscreteModel(ranks,np,(0,1,0,1),(4,4))
 
 order = 1
 reffe = ReferenceFE(lagrangian,Float64,order)
@@ -40,14 +43,13 @@ UB2, VB2 = MultiFieldFESpace([U2,U3]), MultiFieldFESpace([V,V])
 UB3, VB3 = U4, V
 op = StaggeredAffineFEOperator([a1,a2,a3],[l1,l2,l3],[UB1,UB2,UB3],[VB1,VB2,VB3])
 
-solver = StaggeredFESolver([LUSolver(),LUSolver(),LUSolver()])
+solver = StaggeredFESolver(fill(CGSolver(JacobiLinearSolver();rtol=1.e-10),3))
 xh = solve(solver,op)
 
 xh_exact = interpolate(sol,X)
-
 for k in 1:4
   eh_k = xh[k] - xh_exact[k]
-  e_k = sum(∫(eh_k * eh_k)dΩ)
+  e_k = sqrt(sum(∫(eh_k * eh_k)dΩ))
   println("Error in field $k: $e_k")
   @test e_k < 1e-10
 end

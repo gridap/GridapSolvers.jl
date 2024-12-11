@@ -7,11 +7,26 @@ end
 
 function get_solution(op::StaggeredFEOperator{NB,SB}, xh::MultiFieldFEFunction, k) where {NB,SB}
   r = MultiField.get_block_ranges(op)[k]
-  if length(r) == 1
+  if isone(length(r)) # SingleField
     xh_k = xh[r[1]]
-  else
-    fv_k = blocks(xh.free_values)[k]
+  else # MultiField
+    fv_k = blocks(get_free_dof_values(xh))[k]
     xh_k = MultiFieldFEFunction(fv_k, op.trials[k], xh.single_fe_functions[r])
+  end
+  return xh_k
+end
+
+function get_solution(op::StaggeredFEOperator{NB,SB}, xh::DistributedMultiFieldFEFunction, k) where {NB,SB}
+  r = MultiField.get_block_ranges(op)[k]
+  if isone(length(r)) # SingleField
+    xh_k = xh[r[1]]
+  else # MultiField
+    sf_k = xh.field_fe_fun[r]
+    fv_k = blocks(get_free_dof_values(xh))[k]
+    mf_k = map(local_views(op.trials[k]),partition(fv_k),map(local_views,sf_k)...) do Vk, fv_k, sf_k...
+      MultiFieldFEFunction(fv_k, Vk, [sf_k...])
+    end
+    xh_k = DistributedMultiFieldFEFunction(sf_k, mf_k, fv_k)
   end
   return xh_k
 end
@@ -33,6 +48,7 @@ function Algebra.solve!(xh, solver::StaggeredFESolver{NB}, op::StaggeredFEOperat
     xh_k = get_solution(op,xh,k)
     op_k = get_operator(op,xhs,k)
     xh_k, cache_k = solve!(xh_k,solvers[k],op_k,nothing)
+    copy!(get_free_dof_values(get_solution(op,xh,k)),get_free_dof_values(xh_k))
     xhs, caches, operators = (xhs...,xh_k), (caches...,cache_k), (operators...,op_k)
   end
   return xh, (caches,operators)
@@ -104,7 +120,7 @@ function combine_fespaces(spaces::Vector{<:FESpace})
 end
 
 split_fespace(space::FESpace) = [space]
-split_fespace(space::MultiFieldFESpaceTypes) = space.spaces
+split_fespace(space::MultiFieldFESpaceTypes) = [space...]
 
 function get_operator(op::StaggeredFEOperator{NB}, xhs, k) where NB
   @assert NB >= k
