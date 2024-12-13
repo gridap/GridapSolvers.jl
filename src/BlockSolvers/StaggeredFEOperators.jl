@@ -158,7 +158,7 @@ struct StaggeredAffineFEOperator{NB,SB} <: StaggeredFEOperator{NB,SB}
     liforms :: Vector{<:Function},
     trials  :: Vector{<:FESpace},
     tests   :: Vector{<:FESpace},
-    assems  :: Vector{<:Assembler} = map(SparseMatrixAssembler,tests,trials)
+    assems  :: Vector{<:Assembler} = map(SparseMatrixAssembler,trials,tests)
   )
     @assert length(biforms) == length(liforms) == length(trials) == length(tests) == length(assems)
     trial = combine_fespaces(trials)
@@ -257,7 +257,7 @@ struct StaggeredNonlinearFEOperator{NB,SB} <: StaggeredFEOperator{NB,SB}
     jac    :: Vector{<:Function},
     trials :: Vector{<:FESpace},
     tests  :: Vector{<:FESpace},
-    assems :: Vector{<:Assembler} = map(SparseMatrixAssembler,tests,trials)
+    assems :: Vector{<:Assembler} = map(SparseMatrixAssembler,trials,tests)
   )
     @assert length(res) == length(jac) == length(trials) == length(tests) == length(assems)
     trial = combine_fespaces(trials)
