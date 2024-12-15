@@ -4,6 +4,10 @@ using Gridap
 using Gridap.Helpers
 using Gridap.Algebra
 
+using PartitionedArrays
+using GridapDistributed
+using GridapDistributed: BlockPRange
+
 using AbstractTrees
 using Printf
 
