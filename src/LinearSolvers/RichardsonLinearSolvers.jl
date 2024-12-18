@@ -1,9 +1,9 @@
 """
-    struct RichadsonLinearSolver <: LinearSolver 
+    struct RichardsonLinearSolver <: LinearSolver 
       ...
     end
 
-    RichadsonLinearSolver(ω,IterMax;Pl=nothing,rtol=1e-10,atol=1e-6,verbose=true,name = "RichardsonLinearSolver")
+    RichardsonLinearSolver(ω,IterMax;Pl=nothing,rtol=1e-10,atol=1e-6,verbose=true,name = "RichardsonLinearSolver")
 
   Richardson Iteration, with an optional left preconditioners `Pl`.
 
@@ -11,54 +11,54 @@
   This gives flexiblity in relaxation.  
 """
 
-struct RichadsonLinearSolver<:Gridap.Algebra.LinearSolver
+struct RichardsonLinearSolver<:Gridap.Algebra.LinearSolver
     ω::Union{Vector{Float64},Float64}
     Pl::Union{Gridap.Algebra.LinearSolver,Nothing}
     IterMax::Int64
     log::ConvergenceLog{Float64}
 end
 
-function RichadsonLinearSolver(ω,IterMax;Pl=nothing,rtol=1e-10,atol=1e-6,verbose=true,name = "RichardsonLinearSolver")
+function RichardsonLinearSolver(ω,IterMax;Pl=nothing,rtol=1e-10,atol=1e-6,verbose=true,name = "RichardsonLinearSolver")
     tols = SolverTolerances{Float64}(maxiter=IterMax,atol=atol,rtol=rtol)
     log  = ConvergenceLog(name,tols,verbose=verbose)
-    return RichadsonLinearSolver(ω,Pl,IterMax,log)
+    return RichardsonLinearSolver(ω,Pl,IterMax,log)
 end
 
-struct RichadsonLinearSymbolicSetup<:Gridap.Algebra.SymbolicSetup
+struct RichardsonLinearSymbolicSetup<:Gridap.Algebra.SymbolicSetup
     solver
 end
 
-function Gridap.Algebra.symbolic_setup(solver::RichadsonLinearSolver,A::AbstractMatrix)
-    return RichadsonLinearSymbolicSetup(solver)
+function Gridap.Algebra.symbolic_setup(solver::RichardsonLinearSolver,A::AbstractMatrix)
+    return RichardsonLinearSymbolicSetup(solver)
 end
 
-function get_solver_caches(solver::RichadsonLinearSolver, A::AbstractMatrix)
+function get_solver_caches(solver::RichardsonLinearSolver, A::AbstractMatrix)
     ω = solver.ω
     return ω
 end
 
-mutable struct RichadsonLinearNumericalSetup<:Gridap.Algebra.NumericalSetup
+mutable struct RichardsonLinearNumericalSetup<:Gridap.Algebra.NumericalSetup
     solver
     A
     Pl_ns
     caches
 end
 
-function Gridap.Algebra.numerical_setup(ss::RichadsonLinearSymbolicSetup, A::AbstractMatrix)
+function Gridap.Algebra.numerical_setup(ss::RichardsonLinearSymbolicSetup, A::AbstractMatrix)
     solver = ss.solver
     Pl_ns = !isnothing(solver.Pl) ? numerical_setup(symbolic_setup(solver.Pl,A),A) : nothing 
     caches = get_solver_caches(solver,A)
-    return RichadsonLinearNumericalSetup(solver,A,Pl_ns,caches)
+    return RichardsonLinearNumericalSetup(solver,A,Pl_ns,caches)
 end
 
-function Gridap.Algebra.numerical_setup(ss::RichadsonLinearSymbolicSetup, A::AbstractMatrix, x::AbstractVector)
+function Gridap.Algebra.numerical_setup(ss::RichardsonLinearSymbolicSetup, A::AbstractMatrix, x::AbstractVector)
     solver = ss.solver
     Pl_ns = !isnothing(solver.Pl) ? numerical_setup(symbolic_setup(solver.Pl,A,x),A,x) : nothing 
     caches = get_solver_caches(solver,A)
-    return RichadsonLinearNumericalSetup(solver,A,Pl_ns,caches)
+    return RichardsonLinearNumericalSetup(solver,A,Pl_ns,caches)
 end
 
-function Gridap.Algebra.numerical_setup!(ns::RichadsonLinearNumericalSetup, A::AbstractMatrix)
+function Gridap.Algebra.numerical_setup!(ns::RichardsonLinearNumericalSetup, A::AbstractMatrix)
     if !isa(ns.Pl_ns,Nothing)
         numerical_setup!(ns.Pl_ns,A)
     end
@@ -66,7 +66,7 @@ function Gridap.Algebra.numerical_setup!(ns::RichadsonLinearNumericalSetup, A::A
     return ns 
 end
 
-function Gridap.Algebra.numerical_setup!(ns::RichadsonLinearNumericalSetup, A::AbstractMatrix, x::AbstractVector)
+function Gridap.Algebra.numerical_setup!(ns::RichardsonLinearNumericalSetup, A::AbstractMatrix, x::AbstractVector)
     if !isa(ns.Pl_ns,Nothing)
         numerical_setup!(ns.Pl_ns,A,x)
     end
@@ -74,7 +74,7 @@ function Gridap.Algebra.numerical_setup!(ns::RichadsonLinearNumericalSetup, A::A
     return ns 
 end
 
-function Gridap.Algebra.solve!(x::AbstractVector, ns:: RichadsonLinearNumericalSetup, b::AbstractVector)
+function Gridap.Algebra.solve!(x::AbstractVector, ns:: RichardsonLinearNumericalSetup, b::AbstractVector)
     solver,A,Pl,caches = ns.solver,ns.A,ns.Pl_ns,ns.caches
     ω = caches
     log = solver.log

@@ -26,7 +26,7 @@ export GMGLinearSolver
 export BlockDiagonalSmoother
 export SchurComplementSolver
 export SchwarzLinearSolver
-export RichadsonLinearSolver
+export RichardsonLinearSolver
 
 export CallbackSolver
 
