@@ -16,6 +16,18 @@ CurrentModule = GridapSolvers.LinearSolvers
   krylov_residual!
 ```
 
+## Richardson iterative solver
+
+Given a linear system ``Ax = b`` and a left **preconditioner** ``Pl``, this iterative solver performs the following iteration until the solution converges.
+
+```math
+  x_{k+1} = x_k + \omega Pl^{-1} (b - A x_k)
+```
+
+```@docs
+  RichardsonLinearSolver
+```
+
 ## Smoothers
 
 Given a linear system ``Ax = b``, a **smoother** is an operator `S` that takes an iterative solution ``x_k`` and its residual ``r_k = b - A x_k``, and modifies them **in place**
