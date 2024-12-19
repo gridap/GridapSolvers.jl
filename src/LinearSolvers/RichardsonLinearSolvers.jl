@@ -3,7 +3,7 @@
       ...
     end
 
-    RichardsonLinearSolver(ω,IterMax;Pl=nothing,rtol=1e-10,atol=1e-6,verbose=true,name = "RichardsonLinearSolver")
+    RichardsonLinearSolver(ω,maxiter;Pl=nothing,rtol=1e-10,atol=1e-6,verbose=true,name = "RichardsonLinearSolver")
 
   Richardson Iteration, with an optional left preconditioners `Pl`.
 
@@ -14,14 +14,13 @@
 struct RichardsonLinearSolver<:Gridap.Algebra.LinearSolver
     ω::Union{Vector{Float64},Float64}
     Pl::Union{Gridap.Algebra.LinearSolver,Nothing}
-    IterMax::Int64
     log::ConvergenceLog{Float64}
 end
 
-function RichardsonLinearSolver(ω,IterMax;Pl=nothing,rtol=1e-10,atol=1e-6,verbose=true,name = "RichardsonLinearSolver")
-    tols = SolverTolerances{Float64}(maxiter=IterMax,atol=atol,rtol=rtol)
+function RichardsonLinearSolver(ω,maxiter;Pl=nothing,rtol=1e-10,atol=1e-6,verbose=true,name = "RichardsonLinearSolver")
+    tols = SolverTolerances{Float64}(maxiter=maxiter,atol=atol,rtol=rtol)
     log  = ConvergenceLog(name,tols,verbose=verbose)
-    return RichardsonLinearSolver(ω,Pl,IterMax,log)
+    return RichardsonLinearSolver(ω,Pl,log)
 end
 
 struct RichardsonLinearSymbolicSetup<:Gridap.Algebra.SymbolicSetup
@@ -34,7 +33,13 @@ end
 
 function get_solver_caches(solver::RichardsonLinearSolver, A::AbstractMatrix)
     ω = solver.ω
-    return ω
+    z = allocate_in_domain(A)
+    r = allocate_in_domain(A)
+    α = allocate_in_domain(A)
+    fill!(z,0.0)
+    fill!(r,0.0)
+    fill!(α,1.0)
+    return ω, z, r, α
 end
 
 mutable struct RichardsonLinearNumericalSetup<:Gridap.Algebra.NumericalSetup
@@ -76,36 +81,31 @@ end
 
 function Gridap.Algebra.solve!(x::AbstractVector, ns:: RichardsonLinearNumericalSetup, b::AbstractVector)
     solver,A,Pl,caches = ns.solver,ns.A,ns.Pl_ns,ns.caches
-    ω = caches
+    ω, z, r, α = caches
     log = solver.log
-    # Relaxation parameters if ω is of type Float64
-    if isa(ω,Float64)
-        temp = ω
-        ω = temp.*ones(eltype(x), size(x))
-    end
-    # Initialization 
-    z = 0*similar(x)
-    r = 0*similar(x)
+    # Relaxation parameters 
+    α .*= ω
     # residual
-    copyto!(r,b - mul!(r,A,x))
+    r .= b
+    mul!(r, A, x, -1, 1)
     done = init!(log,norm(r))
     if !isa(ns.Pl_ns,Nothing) # Case when a preconditioner is applied
         while !done
             solve!(z, Pl, r) # Apply preconditioner r = PZ 
-            copyto!(x,x + ω.* z)
-            copyto!(r,b - mul!(r,A,x))
+            x .+= α.* z
+            r .= b
+            mul!(r, A, x, -1, 1)
             done = update!(log,norm(r))
         end
         finalize!(log,norm(r))
-        return x
     else    # Case when no preconditioner is applied
         while !done
-            copyto!(z,r)
-            copyto!(x,x + ω.* z)
-            copyto!(r,b - mul!(r,A,x))
+            x .+= α.* r
+            r .= b
+            mul!(r, A, x, -1, 1)
             done = update!(log,norm(r))
         end
         finalize!(log,norm(r))
-        return x
     end
+    return x
 end
