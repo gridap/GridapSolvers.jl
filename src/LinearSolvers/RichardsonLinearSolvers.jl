@@ -10,7 +10,6 @@
   The relaxation parameter (ω) can either be of type Float64 or Vector{Float64}. 
   This gives flexiblity in relaxation.  
 """
-
 struct RichardsonLinearSolver<:Gridap.Algebra.LinearSolver
     ω::Union{Vector{Float64},Float64}
     Pl::Union{Gridap.Algebra.LinearSolver,Nothing}
