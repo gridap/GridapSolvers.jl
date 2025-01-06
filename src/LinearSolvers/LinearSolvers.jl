@@ -24,6 +24,7 @@ export GMGLinearSolver
 export BlockDiagonalSmoother
 export SchurComplementSolver
 export SchwarzLinearSolver
+export RichardsonLinearSolver
 
 export CallbackSolver
 
@@ -51,6 +52,7 @@ include("LinearSolverFromSmoothers.jl")
 include("JacobiLinearSolvers.jl")
 include("RichardsonSmoothers.jl")
 include("SymGaussSeidelSmoothers.jl")
+include("RichardsonLinearSolvers.jl")
 
 include("GMGLinearSolvers.jl")
 include("SchurComplementSolvers.jl")
