@@ -64,3 +64,5 @@ x = allocate_in_domain(A)
 fill!(x,0.0)
 solve!(x,ns,b)
 norm(A*x-b)
+
+

@@ -64,10 +64,8 @@ function Algebra.numerical_setup(ss::NullspaceSolverSS, A::AbstractMatrix)
   if solver.constrain_matrix
     K = SolverInterfaces.matrix_representation(N)
     mat = [A K; K' zeros(nK,nK)] # TODO: Explore reusing storage for A
-    display(mat)
-    display(A)
-    display(K)
   else
+    SolverInterfaces.make_orthonormal!(N)
     mat = A
   end
   S = ifelse(solver.constrain_matrix, :constrained, :projected)
@@ -117,6 +115,6 @@ function Algebra.solve!(x::AbstractVector, ns::NullspaceSolverNS{:projected}, b:
   w1, α = SolverInterfaces.project!(w1, N, x)
   x .-= w1
   solve!(x, A_ns, b)
-  x .+= w1
+
   return x
 end

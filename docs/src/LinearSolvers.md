@@ -54,6 +54,12 @@ Given a linear system ``Ax = b``, a **preconditioner** is an operator that takes
   GMGLinearSolver
 ```
 
+## Nullspaces
+
+```@docs
+  NullspaceSolver
+```
+
 ## Wrappers
 
 ### PETSc
