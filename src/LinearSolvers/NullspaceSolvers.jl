@@ -46,7 +46,7 @@ struct NullspaceSolverSS{A} <: Algebra.SymbolicSetup
   solver :: A
 end
 
-function Gridap.Algebra.symbolic_setup(solver::NullspaceSolver,A)
+function Gridap.Algebra.symbolic_setup(solver::NullspaceSolver,A::AbstractMatrix)
   return NullspaceSolverSS(solver)
 end
 
