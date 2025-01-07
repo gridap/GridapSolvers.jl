@@ -27,7 +27,7 @@ Two modes of operation are supported:
   This option is more suitable for iterative solvers, which usually do not require the 
   system matrix to be invertible (e.g. GMRES, BiCGStab, etc).
 """
-struct NullspaceSolver{A,B}
+struct NullspaceSolver{A,B} <: Gridap.Algebra.LinearSolver
   solver    :: A
   nullspace :: B
   constrain_matrix :: Bool
