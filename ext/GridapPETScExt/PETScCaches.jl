@@ -51,3 +51,38 @@ end
 function Algebra.numerical_setup!(ns::CachedPETScNS,mat::AbstractMatrix,x::AbstractVector)
   numerical_setup!(ns.ns,mat,x)
 end
+
+############################################################################################
+# Optimisations for GridapSolvers + PETSc
+
+function LinearSolvers.gmg_coarse_solver_caches(
+  solver::PETScLinearSolver,
+  smatrices::AbstractVector{<:AbstractMatrix},
+  work_vectors
+)
+  nlevs = num_levels(smatrices)
+  with_level(smatrices,nlevs) do AH
+    _, _, dxH, rH = work_vectors[nlevs-1]
+    cache = CachedPETScNS(
+      numerical_setup(symbolic_setup(solver, AH), AH), dxH, rH
+    )
+    return cache
+  end
+end
+
+function LinearSolvers.gmg_coarse_solver_caches(
+  solver::PETScLinearSolver,
+  smatrices::AbstractVector{<:AbstractMatrix},
+  svectors::AbstractVector{<:AbstractVector},
+  work_vectors
+)
+  nlevs = num_levels(smatrices)
+  with_level(smatrices,nlevs) do AH
+    _, _, dxH, rH = work_vectors[nlevs-1]
+    xH = svectors[nlevs]
+    cache = CachedPETScNS(
+      numerical_setup(symbolic_setup(solver, AH, xH), AH, xH), dxH,rH
+    )
+    return cache
+  end
+end

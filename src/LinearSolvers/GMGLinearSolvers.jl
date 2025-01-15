@@ -373,9 +373,6 @@ function gmg_coarse_solver_caches(
   with_level(smatrices,nlevs) do AH
     _, _, dxH, rH = work_vectors[nlevs-1]
     cache = numerical_setup(symbolic_setup(solver, AH), AH)
-    if isa(solver,PETScLinearSolver)
-      cache = CachedPETScNS(cache, dxH, rH)
-    end
     return cache
   end
 end
@@ -391,9 +388,6 @@ function gmg_coarse_solver_caches(
     _, _, dxH, rH = work_vectors[nlevs-1]
     xH = svectors[nlevs]
     cache = numerical_setup(symbolic_setup(solver, AH, xH), AH, xH)
-    if isa(solver,PETScLinearSolver)
-      cache = CachedPETScNS(cache, dxH, rH)
-    end
     return cache
   end
 end
