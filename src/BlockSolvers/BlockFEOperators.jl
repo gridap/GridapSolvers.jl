@@ -47,9 +47,9 @@ function BlockFEOperator(
   ids::Vector{CartesianIndex{2}},
   trial::BlockFESpaceTypes{NB,SB,P},
   test::BlockFESpaceTypes{NB,SB,P},
-  assem::MultiField.BlockSparseMatrixAssembler{NB,NV,SB,P};
+  assem::MultiField.BlockSparseMatrixAssembler;
   nonlinear::Vector{Bool}=fill(true,length(res))
-) where {NB,NV,SB,P}
+) where {NB,SB,P}
   ranges = MultiField.get_block_ranges(NB,SB,P)
   global_res = residual_from_blocks(ids,ranges,res)
   global_jac = jacobian_from_blocks(ids,ranges,jac)

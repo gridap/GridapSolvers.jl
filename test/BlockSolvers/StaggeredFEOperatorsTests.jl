@@ -69,7 +69,7 @@ function driver_affine(model,verbose)
   return true
 end
 
-function test_nonlinear(model,verbose)
+function driver_nonlinear(model,verbose)
   order = 1
   reffe = ReferenceFE(lagrangian,Float64,order)
   V = FESpace(model,reffe;dirichlet_tags="boundary")
@@ -126,7 +126,7 @@ end
 
 function driver(model,verbose)
   @testset "StaggeredAffineFEOperators" driver_affine(model,verbose)
-  @testset "StaggeredNonlinearFEOperators" driver_affine(model,verbose)
+  @testset "StaggeredNonlinearFEOperators" driver_nonlinear(model,verbose)
 end
 
 # Distributed

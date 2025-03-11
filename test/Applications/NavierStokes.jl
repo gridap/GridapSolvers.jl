@@ -66,7 +66,7 @@ function main(distribute,np,nc)
 
   V = TestFESpace(model,reffe_u,dirichlet_tags=["walls","top"]);
   U = TrialFESpace(V,[u_walls,u_top]);
-  Q = TestFESpace(model,reffe_p;conformity=:L2,constraint=:zeromean) 
+  Q = TestFESpace(model,reffe_p;conformity=:L2,constraint=:zeromean)
 
   mfs = Gridap.MultiField.BlockMultiFieldStyle()
   X = MultiFieldFESpace([U,Q];style=mfs)
