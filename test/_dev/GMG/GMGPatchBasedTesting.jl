@@ -130,16 +130,17 @@ restrictions, prolongations = setup_transfer_operators(trials,qdegree;mode=:resi
 smatrices, A, b = get_hierarchy_matrices(mh,tests,trials,biform);
 println("System size: ",size(A))
 
-gmg = GMGLinearSolver(mh,
-                      smatrices,
-                      prolongations,
-                      restrictions,
-                      pre_smoothers=smoothers,
-                      post_smoothers=smoothers,
-                      maxiter=4,
-                      rtol=1.0e-8,
-                      verbose=true,
-                      mode=:preconditioner)
+gmg = GMGLinearSolver(
+  smatrices,
+  prolongations,
+  restrictions,
+  pre_smoothers=smoothers,
+  post_smoothers=smoothers,
+  maxiter=4,
+  rtol=1.0e-8,
+  verbose=true,
+  mode=:preconditioner
+)
 
 solver = FGMRESSolver(100,gmg;rtol=1e-6,verbose=true)
 

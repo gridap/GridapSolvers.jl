@@ -55,7 +55,7 @@ function gmg_driver_from_mats(t,parts,mh,spaces,qdegree,smoothers,biform,liform,
 
   smatrices, A, b = compute_hierarchy_matrices(trials,tests,biform,liform,qdegree)
   gmg = GMGLinearSolver(
-    mh,smatrices,
+    smatrices,
     prolongations,restrictions,
     pre_smoothers=smoothers,
     post_smoothers=smoothers,
@@ -109,7 +109,7 @@ function gmg_driver_from_weakform(t,parts,mh,spaces,qdegree,smoothers,biform,lif
   biforms = map(mhl -> get_bilinear_form(mhl,biform,qdegree),mh)
 
   gmg = GMGLinearSolver(
-    mh,trials,tests,biforms,
+    trials,tests,biforms,
     prolongations,restrictions,
     pre_smoothers=smoothers,
     post_smoothers=smoothers,

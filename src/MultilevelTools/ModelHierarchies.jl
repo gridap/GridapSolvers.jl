@@ -23,11 +23,11 @@ end
 
   For convenience, implements some of the API of `DiscreteModel`.
 """
-const ModelHierarchy = HierarchicalArray{<:ModelHierarchyLevel}
+const ModelHierarchy{T,A,B} = HierarchicalArray{T where T <:ModelHierarchyLevel,A,B}
 
-get_model(a::ModelHierarchy,level::Integer) = get_model(a[level])
-get_model(a::ModelHierarchyLevel{A,B,Nothing}) where {A,B} = a.model
-get_model(a::ModelHierarchyLevel{A,B,C}) where {A,B,C} = a.model_red
+Adaptivity.get_model(a::ModelHierarchy,level::Integer) = get_model(a[level])
+Adaptivity.get_model(a::ModelHierarchyLevel{A,B,Nothing}) where {A,B} = a.model
+Adaptivity.get_model(a::ModelHierarchyLevel{A,B,C}) where {A,B,C} = a.model_red
 
 get_model_before_redist(a::ModelHierarchy,level::Integer) = get_model_before_redist(a[level])
 get_model_before_redist(a::ModelHierarchyLevel) = a.model

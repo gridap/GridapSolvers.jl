@@ -5,21 +5,21 @@
 
 Geometric MultiGrid solver, from algebraic parts.
 """
-struct GMGLinearSolverFromMatrices{A,B,C,D,E,F,G} <: Algebra.LinearSolver
-  mh              :: A
-  smatrices       :: B
-  interp          :: C
-  restrict        :: D
-  pre_smoothers   :: E
-  post_smoothers  :: F
-  coarsest_solver :: G
+struct GMGLinearSolverFromMatrices{A,B,C,D,E,F} <: Algebra.LinearSolver
+  smatrices       :: A
+  interp          :: B
+  restrict        :: C
+  pre_smoothers   :: D
+  post_smoothers  :: E
+  coarsest_solver :: F
   mode            :: Symbol
   log             :: ConvergenceLog{Float64}
 end
 
+MultilevelTools.num_levels(s::GMGLinearSolverFromMatrices) = length(s.smatrices)
+
 @doc """
     GMGLinearSolver(
-      mh::ModelHierarchy,
       matrices::AbstractArray{<:AbstractMatrix},
       prolongations,
       restrictions;
@@ -41,21 +41,22 @@ The solver has two modes of operation, defined by the kwarg `mode`:
 
 """
 function GMGLinearSolver(
-  mh::ModelHierarchy,
   smatrices::AbstractArray{<:AbstractMatrix},
-  interp,restrict;
-  pre_smoothers   = Fill(RichardsonSmoother(JacobiLinearSolver(),10),num_levels(mh)-1),
+  interp::AbstractArray,
+  restrict::AbstractArray;
+  pre_smoothers   = Fill(RichardsonSmoother(JacobiLinearSolver(),10),length(smatrices)-1),
   post_smoothers  = pre_smoothers,
   coarsest_solver = Gridap.Algebra.LUSolver(),
   mode::Symbol    = :preconditioner,
   maxiter = 100, atol = 1.0e-14, rtol = 1.0e-08, verbose = false,
 )
+  @check length(smatrices)-1 == length(interp) == length(restrict) == length(pre_smoothers) == length(post_smoothers)
   @check mode ∈ [:preconditioner,:solver]
   tols = SolverTolerances{Float64}(;maxiter=maxiter,atol=atol,rtol=rtol)
   log  = ConvergenceLog("GMG",tols;verbose=verbose)
 
   return GMGLinearSolverFromMatrices(
-    mh,smatrices,interp,restrict,pre_smoothers,post_smoothers,coarsest_solver,mode,log
+    smatrices,interp,restrict,pre_smoothers,post_smoothers,coarsest_solver,mode,log
   )
 end
 
@@ -66,25 +67,25 @@ end
 
 Geometric MultiGrid solver, from FE parts.
 """
-struct GMGLinearSolverFromWeakform{A,B,C,D,E,F,G,H,I} <: Algebra.LinearSolver
-  mh              :: A
-  trials          :: B
-  tests           :: C
-  biforms         :: D
-  interp          :: E
-  restrict        :: F
-  pre_smoothers   :: G
-  post_smoothers  :: H
-  coarsest_solver :: I
+struct GMGLinearSolverFromWeakform{A,B,C,D,E,F,G,H} <: Algebra.LinearSolver
+  trials          :: A
+  tests           :: B
+  biforms         :: C
+  interp          :: D
+  restrict        :: E
+  pre_smoothers   :: F
+  post_smoothers  :: G
+  coarsest_solver :: H
   mode            :: Symbol
   log             :: ConvergenceLog{Float64}
   is_nonlinear    :: Bool
   primal_restrictions
 end
 
+MultilevelTools.num_levels(s::GMGLinearSolverFromWeakform) = length(s.trials)
+
 @doc """
     GMGLinearSolver(
-      mh::ModelHierarchy,
       trials::FESpaceHierarchy,
       tests::FESpaceHierarchy,
       biforms::AbstractArray{<:Function},
@@ -109,12 +110,11 @@ The solver has two modes of operation, defined by the kwarg `mode`:
 
 """
 function GMGLinearSolver(
-  mh::ModelHierarchy,
   trials::FESpaceHierarchy,
   tests::FESpaceHierarchy,
   biforms::AbstractArray{<:Function},
   interp,restrict;
-  pre_smoothers   = Fill(RichardsonSmoother(JacobiLinearSolver(),10),num_levels(mh)-1),
+  pre_smoothers   = Fill(RichardsonSmoother(JacobiLinearSolver(),10),num_levels(trials)-1),
   post_smoothers  = pre_smoothers,
   coarsest_solver = Gridap.Algebra.LUSolver(),
   mode::Symbol    = :preconditioner,
@@ -122,13 +122,18 @@ function GMGLinearSolver(
   maxiter = 100, atol = 1.0e-14, rtol = 1.0e-08, verbose = false,
 )
   @check mode ∈ [:preconditioner,:solver]
-  @check matching_level_parts(mh,trials,tests,biforms)
+  @check matching_level_parts(trials,tests,biforms)
   tols = SolverTolerances{Float64}(;maxiter=maxiter,atol=atol,rtol=rtol)
   log  = ConvergenceLog("GMG",tols;verbose=verbose)
 
-  primal_restrictions = is_nonlinear ? setup_restriction_operators(trials,8;mode=:solution,solver=IS_ConjugateGradientSolver(;reltol=1.e-6)) : nothing
+  if is_nonlinear 
+    primal_restrictions = setup_restriction_operators(trials,8;mode=:solution,solver=IS_ConjugateGradientSolver(;reltol=1.e-6))
+  else
+    primal_restrictions = nothing
+  end
+
   return GMGLinearSolverFromWeakform(
-    mh,trials,tests,biforms,interp,restrict,pre_smoothers,post_smoothers,coarsest_solver,mode,log,is_nonlinear,primal_restrictions
+    trials,tests,biforms,interp,restrict,pre_smoothers,post_smoothers,coarsest_solver,mode,log,is_nonlinear,primal_restrictions
   )
 end
 
@@ -190,9 +195,9 @@ function Algebra.numerical_setup(ss::GMGSymbolicSetup,mat::AbstractMatrix,x::Abs
   coarsest_solver_cache = gmg_coarse_solver_caches(s.coarsest_solver,smatrices,svectors,work_vectors)
 
   # Update transfer operators
-  mh, interp, restrict = s.mh, s.interp, s.restrict
-  nlevs = num_levels(mh)
-  map(linear_indices(mh),smatrices,svectors) do lev, Ah, xh
+  interp, restrict = s.interp, s.restrict
+  nlevs = num_levels(s)
+  map(linear_indices(smatrices),smatrices,svectors) do lev, Ah, xh
     if lev != nlevs
       if isa(interp[lev],PatchProlongationOperator) || isa(interp[lev],MultiFieldTransferOperator)
         MultilevelTools.update_transfer_operator!(interp[lev],xh)
@@ -227,16 +232,16 @@ function Algebra.numerical_setup!(
   @check ns.solver.is_nonlinear
 
   s = ns.solver
-  mh, interp, restrict = s.mh, s.interp, s.restrict
+  interp, restrict = s.interp, s.restrict
   pre_smoothers_ns, post_smoothers_ns = ns.pre_smoothers_caches, ns.post_smoothers_caches
   coarsest_solver_ns = ns.coarsest_solver_cache
-  nlevs = num_levels(mh)
+  nlevs = num_levels(s)
 
   # Update smatrices and svectors
   smatrices, svectors = gmg_compute_matrices!(ns.system_caches, s,mat,x)
   
   # Update prolongations and smoothers
-  map(linear_indices(mh),smatrices,svectors) do lev, Ah, xh
+  map(linear_indices(smatrices),smatrices,svectors) do lev, Ah, xh
     if lev != nlevs
       if isa(interp[lev],PatchProlongationOperator) || isa(interp[lev],MultiFieldTransferOperator)
         MultilevelTools.update_transfer_operator!(interp[lev],xh)
@@ -285,7 +290,7 @@ end
 
 function gmg_compute_matrices(s::GMGLinearSolverFromWeakform,mat::AbstractMatrix)
   @check !s.is_nonlinear
-  map(linear_indices(s.mh),s.biforms) do l, biform
+  map(linear_indices(s.trials),s.biforms) do l, biform
     if l == 1
       return mat
     end
@@ -299,7 +304,7 @@ end
 function gmg_compute_matrices(s::GMGLinearSolverFromWeakform,mat::AbstractMatrix,x::AbstractVector)
   @check s.is_nonlinear
   svectors = gmg_project_solutions(s,x)
-  smatrices = map(linear_indices(s.mh),s.biforms,svectors) do l, biform, xl
+  smatrices = map(linear_indices(s.trials),s.biforms,svectors) do l, biform, xl
     if l == 1
       return mat
     end
@@ -318,7 +323,7 @@ function gmg_compute_matrices!(caches,s::GMGLinearSolverFromWeakform,mat::Abstra
   smatrices, svectors = caches
 
   svectors = gmg_project_solutions!(svectors,s,x)
-  map(linear_indices(s.mh),s.biforms,smatrices,svectors) do l, biform, matl, xl
+  map(linear_indices(s.trials),s.biforms,smatrices,svectors) do l, biform, matl, xl
     if l == 1
       copyto!(matl,mat)
     else
@@ -418,15 +423,12 @@ end
 function apply_GMG_level!(
   lev::Integer,xh::Union{<:AbstractVector,Nothing},rh::Union{<:AbstractVector,Nothing},ns::GMGNumericalSetup
 )
-  mh = ns.solver.mh
-  parts = get_level_parts(mh,lev)
-  if i_am_in(parts)
-    if (lev == num_levels(mh)) 
+  with_level(ns.smatrices,lev) do Ah
+    if (lev == num_levels(ns.solver)) 
       ## Coarsest level
       solve!(xh, ns.coarsest_solver_cache, rh)
     else
       ## General case
-      Ah = ns.smatrices[lev]
       restrict, interp = ns.solver.restrict[lev], ns.solver.interp[lev]
       dxh, Adxh, dxH, rH = ns.work_vectors[lev]
 

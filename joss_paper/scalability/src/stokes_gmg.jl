@@ -43,7 +43,7 @@ function stokes_gmg_driver(parts,mh)
     trials_u, qdegree; mode=:residual, solver=CGSolver(JacobiLinearSolver(),verbose=false)
   )
   solver_u = GMGLinearSolver(
-    mh,trials_u,tests_u,biforms,
+    trials_u,tests_u,biforms,
     prolongations,restrictions,
     pre_smoothers=smoothers,
     post_smoothers=smoothers,

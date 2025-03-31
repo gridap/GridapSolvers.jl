@@ -138,7 +138,7 @@ function main(distribute,np,nc,np_per_level)
     tests_u,prolongations,graddiv,qdegree;solver=IS_ConjugateGradientSolver(;reltol=1.e-6)
   )
   gmg = GMGLinearSolver(
-    mh,trials_u,tests_u,biforms,
+    trials_u,tests_u,biforms,
     prolongations,restrictions,
     pre_smoothers=smoothers,
     post_smoothers=smoothers,

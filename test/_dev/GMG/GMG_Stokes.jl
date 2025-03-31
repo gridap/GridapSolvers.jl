@@ -109,7 +109,7 @@ restrictions = setup_patch_restriction_operators(
 );
 
 gmg = GMGLinearSolver(
-  mh,trials_u,tests_u,biforms,
+  trials_u,tests_u,biforms,
   prolongations,restrictions,
   pre_smoothers=smoothers,
   post_smoothers=smoothers,

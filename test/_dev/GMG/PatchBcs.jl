@@ -85,17 +85,18 @@ restrictions, prolongations = setup_transfer_operators(trials,
                                                         qdegree;
                                                         mode=:residual,
                                                         solver=LUSolver());
-gmg = GMGLinearSolver(mh,
-                      smatrices,
-                      prolongations,
-                      restrictions,
-                      pre_smoothers=smoothers,
-                      post_smoothers=smoothers,
-                      coarsest_solver=coarse_solver,
-                      maxiter=2,
-                      rtol=1.0e-8,
-                      verbose=true,
-                      mode=:preconditioner)
+gmg = GMGLinearSolver(
+  smatrices,
+  prolongations,
+  restrictions,
+  pre_smoothers=smoothers,
+  post_smoothers=smoothers,
+  coarsest_solver=coarse_solver,
+  maxiter=2,
+  rtol=1.0e-8,
+  verbose=true,
+  mode=:preconditioner
+)
 gmg.log.depth += 1
 
 solver = CGSolver(gmg;maxiter=20,atol=1e-14,rtol=1.e-6,verbose=i_am_main(parts))

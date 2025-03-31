@@ -89,7 +89,7 @@ function main(distribute,np,nc,np_per_level)
   )
 
   gmg = GMGLinearSolver(
-    mh,trials_u,tests_u,biforms,
+    trials_u,tests_u,biforms,
     prolongations,restrictions,
     pre_smoothers=smoothers,
     post_smoothers=smoothers,

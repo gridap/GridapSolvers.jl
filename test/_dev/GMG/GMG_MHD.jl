@@ -122,7 +122,7 @@ prolongations = setup_patch_prolongation_operators(tests,biform,biform,qdegree);
 restrictions = setup_patch_restriction_operators(tests,prolongations,biform,qdegree);
 
 gmg = GMGLinearSolver(
-  mh,smatrices,prolongations,restrictions,
+  smatrices,prolongations,restrictions,
   pre_smoothers=smoothers,post_smoothers=smoothers,
   coarsest_solver=LUSolver(),
   maxiter=4,rtol=1.0e-8,

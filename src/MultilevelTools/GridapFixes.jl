@@ -85,13 +85,3 @@ end
 function get_cell_conformity(space::GridapDistributed.DistributedMultiFieldFESpace)
   map(get_cell_conformity,space)
 end
-
-# Assembly
-
-# For some reason this signature is missing? 
-
-function FESpaces.assemble_matrix_and_vector(f::Function,b::Function,a::Assembler,U::FESpace,V::FESpace,uhd)
-  v = get_fe_basis(V)
-  u = get_trial_fe_basis(U)
-  FESpaces.assemble_matrix_and_vector(a,FESpaces.collect_cell_matrix_and_vector(U,V,f(u,v),b(v),uhd))
-end
