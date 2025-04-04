@@ -31,7 +31,7 @@ function HierarchicalArray{T}(::UndefInitializer,ranks::AbstractVector) where T
   HierarchicalArray{T}(array,ranks)
 end
 
-Base.length(a::HierarchicalArray) = length(a.array)
+Base.length(a::HierarchicalArray) = length(a.ranks)
 Base.size(a::HierarchicalArray) = (length(a),)
 
 function Base.getindex(a::HierarchicalArray,i::Integer)
@@ -67,7 +67,9 @@ function Base.show(io::IO,k::MIME"text/plain",data::HierarchicalArray{T}) where 
   println(io,"HierarchicalArray{$T}")
 end
 
-num_levels(a::HierarchicalArray) = length(a.ranks)
+# TODO: Deprecate
+num_levels(a) = length(a)
+
 get_level_parts(a::HierarchicalArray) = a.ranks
 get_level_parts(a::HierarchicalArray,lev) = a.ranks[lev]
 
