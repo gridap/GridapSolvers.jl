@@ -141,5 +141,5 @@ function with_level(f::Function,a::HierarchicalArray,lev::Integer;default=nothin
 end
 
 function with_level(f::Function,a::AbstractArray,lev::Integer;default=nothing)
-  f(a.array[lev])
+  f(a[lev])
 end
