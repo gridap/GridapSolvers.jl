@@ -15,6 +15,7 @@ using GridapPETSc
 using GridapSolvers
 using GridapSolvers.MultilevelTools
 using GridapSolvers.SolverInterfaces
+using GridapSolvers.LinearSolvers
 using GridapSolvers.PatchBasedSmoothers
 
 include("PETScUtils.jl")

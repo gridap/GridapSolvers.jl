@@ -1,8 +1,13 @@
 module GridapP4estExt
 
 using Gridap
-using GridapP4est
+using GridapDistributed
+using PartitionedArrays
+using GridapSolvers
 
+using GridapSolvers.MultilevelTools
+
+using GridapP4est
 export P4estCartesianModelHierarchy
 
 """
