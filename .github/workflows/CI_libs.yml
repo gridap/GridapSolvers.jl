@@ -65,7 +65,7 @@ jobs:
           INSTALL_ROOT=/opt
           PETSC_INSTALL=$INSTALL_ROOT/$PACKAGE/$VERSION
           TAR_FILE=$PACKAGE-$VERSION.tar.gz
-          URL="https://ftp.mcs.anl.gov/pub/petsc/release-snapshots/"
+          URL="https://web.cels.anl.gov/projects/petsc/download/release-snapshots/"
           ROOT_DIR=/tmp
           SOURCES_DIR=$ROOT_DIR/$PACKAGE-$VERSION
           BUILD_DIR=$SOURCES_DIR/build
