@@ -13,6 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added Vanka-like smoothers in serial. Since PR[#68](https://github.com/gridap/GridapSolvers.jl/pull/68).
 - Added `StaggeredFEOperators` and `StaggeredFESolvers`. Since PR[#84](https://github.com/gridap/GridapSolvers.jl/pull/84).
 - Added `RichardsonLinearSolver`. Since PR[#87](https://github.com/gridap/GridapSolvers.jl/pull/87).
+- Added `NullspaceSolver` for serial. Since PR[#88](https://github.com/gridap/GridapSolvers.jl/pull/88).
 
 ## Previous versions
 

@@ -27,6 +27,7 @@ export SchwarzLinearSolver
 export RichardsonLinearSolver
 
 export CallbackSolver
+export NullspaceSolver
 
 # Wrappers for IterativeSolvers.jl
 export IS_ConjugateGradientSolver
@@ -60,5 +61,6 @@ include("MatrixSolvers.jl")
 include("SchwarzLinearSolvers.jl")
 
 include("CallbackSolver.jl")
+include("NullspaceSolvers.jl")
 
 end
