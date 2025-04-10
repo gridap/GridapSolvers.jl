@@ -8,11 +8,6 @@ using IterativeSolvers
 
 using Gridap.Helpers, Gridap.Algebra
 
-export IS_ConjugateGradientSolver
-export IS_GMRESSolver
-export IS_MINRESSolver
-export IS_SSORSolver
-
 abstract type IterativeLinearSolverType end
 struct CGIterativeSolverType     <: IterativeLinearSolverType end
 struct GMRESIterativeSolverType  <: IterativeLinearSolverType end
@@ -55,9 +50,9 @@ SolverType(::IterativeLinearSolver{T}) where T = T()
 
   Wrapper for the [Conjugate Gradient solver](https://iterativesolvers.julialinearalgebra.org/dev/linear_systems/cg/).
 """
-function IS_ConjugateGradientSolver(;kwargs...)
+function GridapSolvers.IS_ConjugateGradientSolver(;kwargs...)
   options = [:statevars,:initially_zero,:Pl,:abstol,:reltol,:maxiter,:verbose,:log]
-  @check all(map(opt -> opt ∈ options,keys(kwargs)))
+  @check all(map(opt -> opt ∈ options, keys(kwargs)))
   return IterativeLinearSolver(CGIterativeSolverType(),nothing,kwargs)
 end
 
@@ -66,9 +61,9 @@ end
 
   Wrapper for the [GMRES solver](https://iterativesolvers.julialinearalgebra.org/dev/linear_systems/gmres/).
 """
-function IS_GMRESSolver(;kwargs...)
+function GridapSolvers.IS_GMRESSolver(;kwargs...)
   options = [:initially_zero,:abstol,:reltol,:restart,:maxiter,:Pl,:Pr,:log,:verbose,:orth_meth]
-  @check all(map(opt -> opt ∈ options,keys(kwargs)))
+  @check all(map(opt -> opt ∈ options, keys(kwargs)))
   return IterativeLinearSolver(GMRESIterativeSolverType(),nothing,kwargs)
 end
 
@@ -77,9 +72,9 @@ end
 
   Wrapper for the [MINRES solver](https://iterativesolvers.julialinearalgebra.org/dev/linear_systems/minres/).
 """
-function IS_MINRESSolver(;kwargs...)
+function GridapSolvers.IS_MINRESSolver(;kwargs...)
   options = [:initially_zero,:skew_hermitian,:abstol,:reltol,:maxiter,:log,:verbose]
-  @check all(map(opt -> opt ∈ options,keys(kwargs)))
+  @check all(map(opt -> opt ∈ options, keys(kwargs)))
   return IterativeLinearSolver(MINRESIterativeSolverType(),nothing,kwargs)
 end
 
@@ -88,9 +83,9 @@ end
 
   Wrapper for the [SSOR solver](https://iterativesolvers.julialinearalgebra.org/dev/linear_systems/stationary/#SSOR).
 """
-function IS_SSORSolver(ω::Real;kwargs...)
+function GridapSolvers.IS_SSORSolver(ω::Real;kwargs...)
   options = [:maxiter]
-  @check all(map(opt -> opt ∈ options,keys(kwargs)))
+  @check all(map(opt -> opt ∈ options, keys(kwargs)))
   args = Dict(:ω => ω)
   return IterativeLinearSolver(SSORIterativeSolverType(),args,kwargs)
 end
