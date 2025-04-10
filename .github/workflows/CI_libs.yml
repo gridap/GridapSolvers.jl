@@ -80,6 +80,7 @@ jobs:
              --with-mpi=1 --with-64-bit-indices
           make
           make install
+          cd $CURR_DIR
       - name: add MPIPreferences and external packages
         shell: julia --color=yes --project=. {0}
         run: |
@@ -95,4 +96,4 @@ jobs:
       - uses: julia-actions/julia-buildpkg@latest
       - run: echo $PWD
       - run: julia --project=. -e 'using Pkg; Pkg.instantiate(); Pkg.build(); Pkg.precompile()'
-      - run: julia --project=. --color=yes ./test/ExtLibraries/runtests.jl
+      - run: julia --project=. --color=yes test/ExtLibraries/runtests.jl
