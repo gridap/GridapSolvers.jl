@@ -128,7 +128,7 @@ function CartesianModelHierarchy(
       model_ref, ref_glue = nothing, nothing, nothing
     end
     # Redistribution (if needed)
-    if i_am_in(fparts) && (cparts !== fparts) 
+    if i_am_in(fparts) && (cparts !== fparts)
       _model_ref = i_am_in(cparts) ? Gridap.Adaptivity.get_model(model_ref) : nothing
       model_red, red_glue = GridapDistributed.redistribute(_model_ref,level_descs[lev];old_ranks=cparts)
     else
