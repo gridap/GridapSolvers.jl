@@ -76,6 +76,7 @@ jobs:
           make
           make install
           cd $CURR_DIR
+      - uses: actions/checkout@v4
       - uses: julia-actions/setup-julia@v2
         with:
           version: ${{ matrix.version }}
