@@ -149,8 +149,4 @@ function main(distribute,np,Dc,np_x_level)
   end
 end
 
-with_mpi() do distribute
-  main(distribute,4,2,[4,2,2])
-end
-
 end # module DistributedGridTransferOperatorsTests
