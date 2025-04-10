@@ -3,7 +3,6 @@ using MPI
 using PartitionedArrays
 using Gridap, Gridap.Algebra
 using GridapDistributed
-using GridapP4est
 using Test
 
 using GridapSolvers
@@ -11,23 +10,10 @@ using GridapSolvers.MultilevelTools
 
 using GridapDistributed: change_ghost
 
-function get_model_hierarchy(parts,Dc,num_parts_x_level)
-  mh = GridapP4est.with(parts) do
-    if Dc == 2
-      domain = (0,1,0,1)
-      nc = (2,2)
-    else
-      @assert Dc == 3
-      domain = (0,1,0,1,0,1)
-      nc = (2,2,2)
-    end
-    num_refs_coarse = 2
-    num_levels   = length(num_parts_x_level)
-    cparts       = generate_subparts(parts,num_parts_x_level[num_levels])
-    cmodel       = CartesianDiscreteModel(domain,nc)
-    coarse_model = OctreeDistributedDiscreteModel(cparts,cmodel,num_refs_coarse)
-    return ModelHierarchy(parts,coarse_model,num_parts_x_level)
-  end
+function get_model_hierarchy(parts,Dc,np_per_level)
+  domain = ifelse(Dc == 2, (0,1,0,1), (0,1,0,1,0,1))
+  nc = ifelse(Dc == 2, (4,4), (4,4,4))
+  mh = CartesianModelHierarchy(parts,np_per_level,domain,nc)
   return mh
 end
 

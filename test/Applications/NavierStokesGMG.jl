@@ -34,7 +34,6 @@ using Gridap.ReferenceFEs, Gridap.Algebra, Gridap.Geometry, Gridap.FESpaces
 using Gridap.CellData, Gridap.MultiField, Gridap.Algebra
 using PartitionedArrays
 using GridapDistributed
-using GridapP4est
 
 using GridapSolvers
 using GridapSolvers.LinearSolvers, GridapSolvers.MultilevelTools

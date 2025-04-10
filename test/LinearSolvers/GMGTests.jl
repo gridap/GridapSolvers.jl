@@ -3,14 +3,12 @@ module GMGTests
 using MPI
 using Test
 using LinearAlgebra
-using IterativeSolvers
 using FillArrays
 
 using Gridap
 using Gridap.ReferenceFEs, Gridap.Algebra
 using PartitionedArrays
 using GridapDistributed
-using GridapP4est
 
 using GridapSolvers
 using GridapSolvers.LinearSolvers
