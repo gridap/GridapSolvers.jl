@@ -12,11 +12,11 @@ export P4estCartesianModelHierarchy
 
 """
     P4estCartesianModelHierarchy(
-      ranks,np_per_level,domain,nc::NTuple{D,<:Integer};
+      ranks,np_per_level,domain,nc;
       num_refs_coarse::Integer = 0,
       add_labels!::Function = (labels -> nothing),
       map::Function = identity,
-      isperiodic::NTuple{D,Bool} = Tuple(fill(false,D))
+      isperiodic = Tuple(fill(false,D))
     ) where D
   
   Returns a `ModelHierarchy` with a Cartesian model as coarsest level, using GridapP4est.jl. 
@@ -24,12 +24,12 @@ export P4estCartesianModelHierarchy
   The seed model is given by `cmodel = CartesianDiscreteModel(domain,nc)`.
 """
 function P4estCartesianModelHierarchy(
-  ranks,np_per_level,domain,nc::NTuple{D,<:Integer};
-  num_refs_coarse::Integer = 0,
-  add_labels!::Function = (labels -> nothing),
-  map::Function = identity,
-  isperiodic::NTuple{D,Bool} = Tuple(fill(false,D))
-) where D
+  ranks,np_per_level,domain,nc;
+  num_refs_coarse = 0,
+  add_labels! = (labels -> nothing),
+  map = identity,
+  isperiodic = Tuple(fill(false,length(nc)))
+)
   cparts = generate_subparts(ranks,np_per_level[end])
   cmodel = CartesianDiscreteModel(domain,nc;map,isperiodic)
   add_labels!(get_face_labeling(cmodel))

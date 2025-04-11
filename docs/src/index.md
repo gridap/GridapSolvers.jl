@@ -19,17 +19,21 @@ Pages = [
   "LinearSolvers.md",
   "NonlinearSolvers.md",
   "BlockSolvers.md",
-  "PatchBasedSmoothers.md"
-  ]
+  "PatchBasedSmoothers.md",
+  "Extensions" => [
+            "GridapP4est.jl" => "Extensions/GridapP4est.md",
+            "GridapPETSc.jl" => "Extensions/GridapPETSc.md",
+            "IterativeSolvers.jl" => "Extensions/IterativeSolvers.md",
+  ],
+  "Examples" => [
+      "Stokes" => "Examples/Stokes.md",
+      "Navier-Stokes" => "Examples/NavierStokes.md",
+      "Stokes (GMG)" => "Examples/StokesGMG.md",
+      "Navier-Stokes (GMG)" => "Examples/NavierStokesGMG.md",
+      "Darcy (GMG)" => "Examples/DarcyGMG.md",
+  ],
+]
 ```
-
-## Documentation and examples
-
-A (hopefully) comprehensive documentation is available [here](https://gridap.github.io/GridapSolvers.jl/stable/).
-
-A list of examples is available in the documentation. These include some very well known examples such as the Stokes, Incompressible Navier-Stokes and Darcy problems. The featured scripts are available in `test/Applications`.
-
-An example on how to use the library within an HPC cluster is available in `joss_paper/scalability`. The included example and drivers are used to generate the scalability results in our [JOSS paper](https://doi.org/10.21105/joss.07162).
 
 ## Installation
 
@@ -49,3 +53,22 @@ The previous installations steps will setup GridapSolvers to work using Julia's 
 - [MPI.jl](https://juliaparallel.org/MPI.jl/stable/configuration/)
 - [GridapPETSc.jl](https://github.com/gridap/GridapPETSc.jl)
 - [GridapP4est.jl](https://github.com/gridap/GridapP4est.jl), and [P4est_wrapper.jl](https://github.com/gridap/p4est_wrapper.jl)
+
+## Citation
+
+In order to give credit to the `GridapSolvers` contributors, we simply ask you to cite the `Gridap` main project as indicated [here](https://github.com/gridap/Gridap.jl#how-to-cite-gridap) and the sub-packages you use as indicated in the corresponding repositories. Please, use the reference below in any publication in which you have made use of `GridapSolvers`:
+
+```latex
+@article{Manyer2024, 
+  doi = {10.21105/joss.07162}, 
+  url = {https://doi.org/10.21105/joss.07162}, 
+  year = {2024}, 
+  publisher = {The Open Journal}, 
+  volume = {9}, 
+  number = {102}, 
+  pages = {7162}, 
+  author = {Jordi Manyer and Alberto F. Martín and Santiago Badia}, 
+  title = {GridapSolvers.jl: Scalable multiphysics finite element solvers in Julia}, 
+  journal = {Journal of Open Source Software} 
+} 
+```

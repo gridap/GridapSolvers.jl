@@ -24,6 +24,11 @@ makedocs(;
         "NonlinearSolvers" => "NonlinearSolvers.md",
         "BlockSolvers" => "BlockSolvers.md",
         "PatchBasedSmoothers" => "PatchBasedSmoothers.md",
+        "Extensions" => [
+            "GridapP4est.jl" => "Extensions/GridapP4est.md",
+            "GridapPETSc.jl" => "Extensions/GridapPETSc.md",
+            "IterativeSolvers.jl" => "Extensions/IterativeSolvers.md",
+        ],
         "Examples" => [
             "Stokes" => "Examples/Stokes.md",
             "Navier-Stokes" => "Examples/NavierStokes.md",
