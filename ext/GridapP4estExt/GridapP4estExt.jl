@@ -8,7 +8,6 @@ using GridapSolvers
 using GridapSolvers.MultilevelTools
 
 using GridapP4est
-export P4estCartesianModelHierarchy
 
 """
     P4estCartesianModelHierarchy(
@@ -23,7 +22,7 @@ export P4estCartesianModelHierarchy
   The i-th level will be distributed among `np_per_level[i]` processors. 
   The seed model is given by `cmodel = CartesianDiscreteModel(domain,nc)`.
 """
-function P4estCartesianModelHierarchy(
+function GridapSolvers.P4estCartesianModelHierarchy(
   ranks,np_per_level,domain,nc;
   num_refs_coarse = 0,
   add_labels! = (labels -> nothing),

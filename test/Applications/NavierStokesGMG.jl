@@ -134,7 +134,7 @@ function main(distribute,np,nc,np_per_level)
     tests_u,jac_u,graddiv,qdegree;is_nonlinear=true
   )
   restrictions = setup_patch_restriction_operators(
-    tests_u,prolongations,graddiv,qdegree;solver=IS_ConjugateGradientSolver(;reltol=1.e-6)
+    tests_u,prolongations,graddiv,qdegree;solver=CGSolver(JacobiLinearSolver())
   )
   gmg = GMGLinearSolver(
     mh,trials_u,tests_u,biforms,

@@ -1,37 +1,29 @@
-"""
-    struct PETScElasticitySolver <: LinearSolver
-      ...
-    end
 
-  GMRES + AMG solver, specifically designed for linear elasticity problems.
-
-  Follows PETSc's documentation for [PCAMG](https://petsc.org/release/manualpages/PC/PCGAMG.html) 
-  and [MatNullSpaceCreateRigidBody](https://petsc.org/release/manualpages/Mat/MatNullSpaceCreateRigidBody.html).
-"""
-struct PETScElasticitySolver{A} <: Algebra.LinearSolver
+struct _PETScElasticitySolver{A} <: Algebra.LinearSolver
   space :: A
   tols  :: SolverTolerances{Float64}
-
-  @doc """
-      function PETScElasticitySolver(space::FESpace; maxiter=500, atol=1.e-12, rtol=1.e-8)
-
-    Returns an instance of [`PETScElasticitySolver`](@ref) from its underlying properties.
-  """
-  function PETScElasticitySolver(space::FESpace;
-                            maxiter=500,atol=1.e-12,rtol=1.e-8)
-    tols = SolverTolerances{Float64}(;maxiter=maxiter,atol=atol,rtol=rtol)
-    A = typeof(space)
-    new{A}(space,tols)
-  end
 end
 
-SolverInterfaces.get_solver_tolerances(s::PETScElasticitySolver) = s.tols
+"""
+    PETScElasticitySolver(space::FESpace; maxiter=500, atol=1.e-12, rtol=1.e-8)
+
+GMRES + AMG solver, specifically designed for linear elasticity problems.
+
+Follows PETSc's documentation for [PCAMG](https://petsc.org/release/manualpages/PC/PCGAMG.html) 
+and [MatNullSpaceCreateRigidBody](https://petsc.org/release/manualpages/Mat/MatNullSpaceCreateRigidBody.html).
+"""
+function GridapSolvers.PETScElasticitySolver(space::FESpace; maxiter=500, atol=1.e-12, rtol=1.e-8)
+  tols = SolverTolerances{Float64}(;maxiter=maxiter,atol=atol,rtol=rtol)
+  _PETScElasticitySolver(space,tols)
+end
+
+SolverInterfaces.get_solver_tolerances(s::_PETScElasticitySolver) = s.tols
 
 struct PETScElasticitySymbolicSetup{A} <: SymbolicSetup
   solver::A
 end
 
-function Gridap.Algebra.symbolic_setup(solver::PETScElasticitySolver,A::AbstractMatrix)
+function Gridap.Algebra.symbolic_setup(solver::_PETScElasticitySolver,A::AbstractMatrix)
   PETScElasticitySymbolicSetup(solver)
 end
 
