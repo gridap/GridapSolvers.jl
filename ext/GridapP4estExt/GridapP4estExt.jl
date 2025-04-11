@@ -15,8 +15,8 @@ using GridapP4est
       num_refs_coarse::Integer = 0,
       add_labels!::Function = (labels -> nothing),
       map::Function = identity,
-      isperiodic = Tuple(fill(false,D))
-    ) where D
+      isperiodic = Tuple(fill(false,length(nc)))
+    )
   
   Returns a `ModelHierarchy` with a Cartesian model as coarsest level, using GridapP4est.jl. 
   The i-th level will be distributed among `np_per_level[i]` processors. 
