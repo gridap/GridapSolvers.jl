@@ -1,12 +1,12 @@
 
 # DoF coordinates
 
-"""
-    get_dof_coordinates(space::FESpace)
-
-  Given a lagrangian FESpace, returns the physical coordinates of the DoFs, as required 
-  by some PETSc solvers. See [PETSc documentation](https://petsc.org/release/manualpages/PC/PCSetCoordinates.html).
-"""
+# """
+#     get_dof_coordinates(space::FESpace)
+# 
+#   Given a lagrangian FESpace, returns the physical coordinates of the DoFs, as required 
+#   by some PETSc solvers. See [PETSc documentation](https://petsc.org/release/manualpages/PC/PCSetCoordinates.html).
+# """
 function get_dof_coordinates(space::GridapDistributed.DistributedSingleFieldFESpace)
   coords  = map(local_views(space),partition(space.gids)) do space, dof_ids
     local_to_own_dofs = local_to_own(dof_ids)

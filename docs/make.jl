@@ -44,6 +44,7 @@ makedocs(;
         ],
     ],
     warnonly=[:doctest,:example_block,:eval_block],
+    clean=true,
 )
 
 deploydocs(;
