@@ -1,8 +1,8 @@
+# GridapSolvers
+
 ```@meta
 CurrentModule = GridapSolvers
 ```
-
-# GridapSolvers
 
 Documentation for [GridapSolvers](https://github.com/gridap/GridapSolvers.jl).
 
@@ -44,11 +44,9 @@ pkg> add GridapSolvers
 pkg> build
 ```
 
-Building is required to link the external artifacts (e.g., PETSc, p4est) to the Julia environment. Restarting Julia is required after building in order to make the changes take effect.
+If using the extensions for `GridapP4est.jl` or `GridapPETSc.jl`, building is required to link the external artifacts (e.g., PETSc, p4est) to the Julia environment. Restarting Julia is required after building in order to make the changes take effect.
 
-### Using custom binaries
-
-The previous installations steps will setup GridapSolvers to work using Julia's pre-compiled artifacts for MPI, PETSc and p4est. However, you can also link local copies of these libraries. This might be very desirable in clusters, where hardware-specific libraries might be faster/more stable than the ones provided by Julia. To do so, follow the next steps:
+By default, Julia will configure `GridapSolvers` to work using Julia's pre-compiled artifacts for MPI, PETSc and p4est. However, you can also link local copies of these libraries. This might be very desirable in clusters, where hardware-specific libraries might be faster/more stable than the ones provided by Julia. To do so, follow the next steps:
 
 - [MPI.jl](https://juliaparallel.org/MPI.jl/stable/configuration/)
 - [GridapPETSc.jl](https://github.com/gridap/GridapPETSc.jl)
