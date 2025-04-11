@@ -126,7 +126,7 @@ function GMGLinearSolver(
   tols = SolverTolerances{Float64}(;maxiter=maxiter,atol=atol,rtol=rtol)
   log  = ConvergenceLog("GMG",tols;verbose=verbose)
 
-  primal_restrictions = is_nonlinear ? setup_restriction_operators(trials,8;mode=:solution,solver=IS_ConjugateGradientSolver(;reltol=1.e-6)) : nothing
+  primal_restrictions = is_nonlinear ? setup_restriction_operators(trials,8;mode=:solution,solver=CGSolver(JacobiLinearSolver())) : nothing
   return GMGLinearSolverFromWeakform(
     mh,trials,tests,biforms,interp,restrict,pre_smoothers,post_smoothers,coarsest_solver,mode,log,is_nonlinear,primal_restrictions
   )

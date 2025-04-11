@@ -48,7 +48,7 @@ function gmg_driver_from_mats(t,parts,mh,spaces,qdegree,smoothers,biform,liform,
   tests, trials = spaces
 
   restrictions, prolongations = setup_transfer_operators(
-    trials, qdegree; mode=:residual, solver=IS_ConjugateGradientSolver(;reltol=1.e-6)
+    trials, qdegree; mode=:residual, solver=CGSolver(JacobiLinearSolver())
   )
 
   smatrices, A, b = compute_hierarchy_matrices(trials,tests,biform,liform,qdegree)
@@ -89,7 +89,7 @@ function gmg_driver_from_weakform(t,parts,mh,spaces,qdegree,smoothers,biform,lif
   tests, trials = spaces
 
   restrictions, prolongations = setup_transfer_operators(
-    trials, qdegree; mode=:residual, solver=IS_ConjugateGradientSolver(;reltol=1.e-6)
+    trials, qdegree; mode=:residual, solver=CGSolver(JacobiLinearSolver())
   )
 
   A, b = with_level(mh,1) do _
