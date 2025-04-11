@@ -1,38 +1,30 @@
-"""
-    struct ElasticitySolver <: LinearSolver
-      ...
-    end
 
-  GMRES + AMG solver, specifically designed for linear elasticity problems.
-
-  Follows PETSc's documentation for [PCAMG](https://petsc.org/release/manualpages/PC/PCGAMG.html) 
-  and [MatNullSpaceCreateRigidBody](https://petsc.org/release/manualpages/Mat/MatNullSpaceCreateRigidBody.html).
-"""
-struct ElasticitySolver{A} <: Algebra.LinearSolver
+struct _PETScElasticitySolver{A} <: Algebra.LinearSolver
   space :: A
   tols  :: SolverTolerances{Float64}
-
-  @doc """
-      function ElasticitySolver(space::FESpace; maxiter=500, atol=1.e-12, rtol=1.e-8)
-
-    Returns an instance of [`ElasticitySolver`](@ref) from its underlying properties.
-  """
-  function ElasticitySolver(space::FESpace;
-                            maxiter=500,atol=1.e-12,rtol=1.e-8)
-    tols = SolverTolerances{Float64}(;maxiter=maxiter,atol=atol,rtol=rtol)
-    A = typeof(space)
-    new{A}(space,tols)
-  end
 end
 
-SolverInterfaces.get_solver_tolerances(s::ElasticitySolver) = s.tols
+"""
+    PETScElasticitySolver(space::FESpace; maxiter=500, atol=1.e-12, rtol=1.e-8)
 
-struct ElasticitySymbolicSetup{A} <: SymbolicSetup
+GMRES + AMG solver, specifically designed for linear elasticity problems.
+
+Follows PETSc's documentation for [PCAMG](https://petsc.org/release/manualpages/PC/PCGAMG.html) 
+and [MatNullSpaceCreateRigidBody](https://petsc.org/release/manualpages/Mat/MatNullSpaceCreateRigidBody.html).
+"""
+function GridapSolvers.PETScElasticitySolver(space::FESpace; maxiter=500, atol=1.e-12, rtol=1.e-8)
+  tols = SolverTolerances{Float64}(;maxiter=maxiter,atol=atol,rtol=rtol)
+  _PETScElasticitySolver(space,tols)
+end
+
+SolverInterfaces.get_solver_tolerances(s::_PETScElasticitySolver) = s.tols
+
+struct PETScElasticitySymbolicSetup{A} <: SymbolicSetup
   solver::A
 end
 
-function Gridap.Algebra.symbolic_setup(solver::ElasticitySolver,A::AbstractMatrix)
-  ElasticitySymbolicSetup(solver)
+function Gridap.Algebra.symbolic_setup(solver::_PETScElasticitySolver,A::AbstractMatrix)
+  PETScElasticitySymbolicSetup(solver)
 end
 
 function elasticity_ksp_setup(ksp,tols)
@@ -51,28 +43,28 @@ function elasticity_ksp_setup(ksp,tols)
   @check_error_code GridapPETSc.PETSC.KSPView(ksp[],C_NULL)
 end
 
-mutable struct ElasticityNumericalSetup <: NumericalSetup
+mutable struct PETScElasticityNumericalSetup <: NumericalSetup
   A::PETScMatrix
   X::PETScVector
   B::PETScVector
   ksp::Ref{GridapPETSc.PETSC.KSP}
   null::Ref{GridapPETSc.PETSC.MatNullSpace}
   initialized::Bool
-  function ElasticityNumericalSetup(A::PETScMatrix,X::PETScVector,B::PETScVector)
+  function PETScElasticityNumericalSetup(A::PETScMatrix,X::PETScVector,B::PETScVector)
     ksp  = Ref{GridapPETSc.PETSC.KSP}()
     null = Ref{GridapPETSc.PETSC.MatNullSpace}()
     new(A,X,B,ksp,null,false)
   end
 end
 
-function GridapPETSc.Init(a::ElasticityNumericalSetup)
+function GridapPETSc.Init(a::PETScElasticityNumericalSetup)
   @assert Threads.threadid() == 1
   GridapPETSc._NREFS[] += 2
   a.initialized = true
   finalizer(GridapPETSc.Finalize,a)
 end
 
-function GridapPETSc.Finalize(ns::ElasticityNumericalSetup)
+function GridapPETSc.Finalize(ns::PETScElasticityNumericalSetup)
   if ns.initialized && GridapPETSc.Initialized()
     if ns.A.comm == MPI.COMM_SELF
       @check_error_code GridapPETSc.PETSC.KSPDestroy(ns.ksp)
@@ -88,7 +80,7 @@ function GridapPETSc.Finalize(ns::ElasticityNumericalSetup)
   nothing
 end
 
-function Gridap.Algebra.numerical_setup(ss::ElasticitySymbolicSetup,_A::PSparseMatrix)
+function Gridap.Algebra.numerical_setup(ss::PETScElasticitySymbolicSetup,_A::PSparseMatrix)
   _num_dims(space::FESpace) = num_cell_dims(get_triangulation(space))
   _num_dims(space::GridapDistributed.DistributedSingleFieldFESpace) = getany(map(_num_dims,local_views(space)))
   s = ss.solver
@@ -97,7 +89,7 @@ function Gridap.Algebra.numerical_setup(ss::ElasticitySymbolicSetup,_A::PSparseM
   A  = convert(PETScMatrix,_A)
   X  = convert(PETScVector,allocate_in_domain(_A))
   B  = convert(PETScVector,allocate_in_domain(_A))
-  ns = ElasticityNumericalSetup(A,X,B)
+  ns = PETScElasticityNumericalSetup(A,X,B)
 
   # Compute  coordinates for owned dofs
   dof_coords = convert(PETScVector,get_dof_coordinates(s.space))
@@ -115,7 +107,7 @@ function Gridap.Algebra.numerical_setup(ss::ElasticitySymbolicSetup,_A::PSparseM
   GridapPETSc.Init(ns)
 end
 
-function Gridap.Algebra.numerical_setup!(ns::ElasticityNumericalSetup,A::AbstractMatrix)
+function Gridap.Algebra.numerical_setup!(ns::PETScElasticityNumericalSetup,A::AbstractMatrix)
   ns.A = convert(PETScMatrix,A)
   @check_error_code GridapPETSc.PETSC.MatSetNearNullSpace(ns.A.mat[],ns.null[])
   @check_error_code GridapPETSc.PETSC.KSPSetOperators(ns.ksp[],ns.A.mat[],ns.A.mat[])
@@ -123,7 +115,7 @@ function Gridap.Algebra.numerical_setup!(ns::ElasticityNumericalSetup,A::Abstrac
   ns
 end
 
-function Algebra.solve!(x::AbstractVector{PetscScalar},ns::ElasticityNumericalSetup,b::AbstractVector{PetscScalar})
+function Algebra.solve!(x::AbstractVector{PetscScalar},ns::PETScElasticityNumericalSetup,b::AbstractVector{PetscScalar})
   X, B = ns.X, ns.B
   copy!(B,b)
   @check_error_code GridapPETSc.PETSC.KSPSolve(ns.ksp[],B.vec[],X.vec[])

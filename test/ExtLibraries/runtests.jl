@@ -19,5 +19,4 @@ function run_tests(testdir,procs=4)
   end
 end
 
-# MPI tests
 run_tests(@__DIR__)

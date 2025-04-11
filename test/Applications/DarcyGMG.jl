@@ -85,7 +85,7 @@ function main(distribute,np,nc,np_per_level)
     tests_u,qdegree;mode=:residual
   )
   restrictions = setup_restriction_operators(
-    tests_u,qdegree;mode=:residual,solver=IS_ConjugateGradientSolver(;reltol=1.e-6)
+    tests_u,qdegree;mode=:residual,solver=CGSolver(JacobiLinearSolver())
   )
 
   gmg = GMGLinearSolver(

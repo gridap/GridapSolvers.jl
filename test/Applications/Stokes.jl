@@ -90,7 +90,7 @@ function main(distribute,np,nc)
   A, b = get_matrix(op), get_vector(op);
 
   solver_u = LUSolver()
-  solver_p = CGSolver(JacobiLinearSolver();maxiter=20,atol=1e-14,rtol=1.e-6,verbose=i_am_main(parts))
+  solver_p = CGSolver(JacobiLinearSolver();maxiter=20,atol=1e-14,rtol=1.e-6)
   solver_p.log.depth = 2
 
   bblocks = [LinearSystemBlock() LinearSystemBlock();

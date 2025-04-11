@@ -1,9 +1,8 @@
+# GridapSolvers.BlockSolvers
 
 ```@meta
 CurrentModule = GridapSolvers.BlockSolvers
 ```
-
-# GridapSolvers.BlockSolvers
 
 Many scalable preconditioners for multiphysics problems are based on (possibly partial) block factorizations. This module provides a simple interface to define and use block solvers for block-assembled systems.
 

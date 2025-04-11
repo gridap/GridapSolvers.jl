@@ -3,30 +3,16 @@ using MPI
 using PartitionedArrays
 using Gridap, Gridap.Algebra
 using GridapDistributed
-using GridapP4est
 using Test
-using IterativeSolvers
 
 using GridapSolvers
 using GridapSolvers.MultilevelTools
+using GridapSolvers.LinearSolvers
 
-function get_model_hierarchy(parts,Dc,num_parts_x_level)
-  mh = GridapP4est.with(parts) do
-    if Dc == 2
-      domain = (0,1,0,1)
-      nc = (2,2)
-    else
-      @assert Dc == 3
-      domain = (0,1,0,1,0,1)
-      nc = (2,2,2)
-    end
-    num_refs_coarse = 2
-    num_levels   = length(num_parts_x_level)
-    cparts       = generate_subparts(parts,num_parts_x_level[num_levels])
-    cmodel       = CartesianDiscreteModel(domain,nc)
-    coarse_model = OctreeDistributedDiscreteModel(cparts,cmodel,num_refs_coarse)
-    return ModelHierarchy(parts,coarse_model,num_parts_x_level)
-  end
+function get_model_hierarchy(parts,Dc,np_per_level)
+  domain = ifelse(Dc == 2, (0,1,0,1), (0,1,0,1,0,1))
+  nc = ifelse(Dc == 2, (4,4), (4,4,4))
+  mh = CartesianModelHierarchy(parts,np_per_level,domain,nc)
   return mh
 end
 
@@ -37,6 +23,7 @@ function main_driver(parts,mh)
   reffe  = ReferenceFE(lagrangian,Float64,order)
   tests  = TestFESpace(mh,reffe;conformity=:H1,dirichlet_tags="boundary")
   trials = TrialFESpace(tests,sol)
+  solver = CGSolver(JacobiLinearSolver();verbose=i_am_main(parts),rtol=1.0e-8)
 
   nlevs = num_levels(mh)
   quad_order = 2*order+1
@@ -68,7 +55,8 @@ function main_driver(parts,mh)
       bh  = get_vector(oph)
 
       xh = pfill(0.0,partition(axes(Ah,2)))
-      IterativeSolvers.cg!(xh,Ah,bh;verbose=i_am_main(parts),reltol=1.0e-08)
+      ns = numerical_setup(symbolic_setup(solver,Ah),Ah)
+      solve!(xh,ns,bh)
       uH_projected = FEFunction(Uh,xh)
 
       _eh = uh-uH_projected
@@ -84,7 +72,8 @@ function main_driver(parts,mh)
       bH  = get_vector(opH)
 
       xH = pfill(0.0,partition(axes(AH,2)))
-      IterativeSolvers.cg!(xH,AH,bH;verbose=i_am_main(parts),reltol=1.0e-08)
+      ns = numerical_setup(symbolic_setup(solver,AH),AH)
+      solve!(xH,ns,bH)
       uh_projected = FEFunction(UH,xH)
 
       _eH = uH-uh_projected

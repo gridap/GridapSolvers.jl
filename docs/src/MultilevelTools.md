@@ -1,9 +1,8 @@
+# GridapSolvers.MultilevelTools
 
 ```@meta
 CurrentModule = GridapSolvers.MultilevelTools
 ```
-
-# GridapSolvers.MultilevelTools
 
 ## Nested subpartitions
 
@@ -24,7 +23,6 @@ This objects are the multilevel counterparts of Gridap's `DiscreteModel` and `FE
 ModelHierarchy
 ModelHierarchyLevel
 CartesianModelHierarchy
-P4estCartesianModelHierarchy
 FESpaceHierarchy
 ```
 

@@ -1,9 +1,8 @@
+# GridapSolvers.LinearSolvers
 
 ```@meta
 CurrentModule = GridapSolvers.LinearSolvers
 ```
-
-# GridapSolvers.LinearSolvers
 
 ## Krylov solvers
 
@@ -54,34 +53,9 @@ Given a linear system ``Ax = b``, a **preconditioner** is an operator that takes
   GMGLinearSolver
 ```
 
-## Nullspaces
+## Other
 
 ```@docs
   NullspaceSolver
-```
-
-## Wrappers
-
-### PETSc
-
-Building on top of [GridapPETSc.jl](https://github.com/gridap/GridapPETSc.jl), GridapSolvers provides specific solvers for some particularly complex PDEs:
-
-```@docs
-  ElasticitySolver
-  ElasticitySolver(::FESpace)
-  CachedPETScNS
-  CachedPETScNS(::GridapPETSc.PETScLinearSolverNS,::AbstractVector,::AbstractVector)
-  get_dof_coordinates
-```
-
-### IterativeSolvers.jl
-
-GridapSolvers provides wrappers for some iterative solvers from the package [IterativeSolvers.jl](https://iterativesolvers.julialinearalgebra.org/dev/):
-
-```@docs
-  IterativeLinearSolver
-  IS_ConjugateGradientSolver
-  IS_GMRESSolver
-  IS_MINRESSolver
-  IS_SSORSolver
+  CallbackSolver
 ```
