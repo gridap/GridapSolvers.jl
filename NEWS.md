@@ -15,6 +15,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added `RichardsonLinearSolver`. Since PR[#87](https://github.com/gridap/GridapSolvers.jl/pull/87).
 - Added `NullspaceSolver` for serial. Since PR[#88](https://github.com/gridap/GridapSolvers.jl/pull/88).
 
+### Changed
+
+- **BREAKING:** Moved GridapP4est, GridapPETSc and IterativeSolvers into extensions (i.e weak dependencies). Since PR[#76](https://github.com/gridap/GridapSolvers.jl/pull/76).
+
 ## Previous versions
 
 A changelog is not maintained for older versions than 0.4.0.

@@ -127,11 +127,10 @@ function GMGLinearSolver(
   log  = ConvergenceLog("GMG",tols;verbose=verbose)
 
   if is_nonlinear 
-    primal_restrictions = setup_restriction_operators(trials,8;mode=:solution,solver=IS_ConjugateGradientSolver(;reltol=1.e-6))
+    primal_restrictions = setup_restriction_operators(trials,8;mode=:solution,solver=CGSolver(JacobiLinearSolver()))
   else
     primal_restrictions = nothing
   end
-
   return GMGLinearSolverFromWeakform(
     trials,tests,biforms,interp,restrict,pre_smoothers,post_smoothers,coarsest_solver,mode,log,is_nonlinear,primal_restrictions
   )
@@ -378,9 +377,6 @@ function gmg_coarse_solver_caches(
   with_level(smatrices,nlevs) do AH
     _, _, dxH, rH = work_vectors[nlevs-1]
     cache = numerical_setup(symbolic_setup(solver, AH), AH)
-    if isa(solver,PETScLinearSolver)
-      cache = CachedPETScNS(cache, dxH, rH)
-    end
     return cache
   end
 end
@@ -396,9 +392,6 @@ function gmg_coarse_solver_caches(
     _, _, dxH, rH = work_vectors[nlevs-1]
     xH = svectors[nlevs]
     cache = numerical_setup(symbolic_setup(solver, AH, xH), AH, xH)
-    if isa(solver,PETScLinearSolver)
-      cache = CachedPETScNS(cache, dxH, rH)
-    end
     return cache
   end
 end

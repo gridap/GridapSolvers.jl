@@ -1,8 +1,8 @@
+# GridapSolvers
+
 ```@meta
 CurrentModule = GridapSolvers
 ```
-
-# GridapSolvers
 
 Documentation for [GridapSolvers](https://github.com/gridap/GridapSolvers.jl).
 
@@ -19,17 +19,31 @@ Pages = [
   "LinearSolvers.md",
   "NonlinearSolvers.md",
   "BlockSolvers.md",
-  "PatchBasedSmoothers.md"
-  ]
+  "PatchBasedSmoothers.md",
+]
 ```
 
-## Documentation and examples
+### Extensions
 
-A (hopefully) comprehensive documentation is available [here](https://gridap.github.io/GridapSolvers.jl/stable/).
+```@contents
+Pages = [
+  "Extensions/GridapP4est.md",
+  "Extensions/GridapPETSc.md",
+  "Extensions/IterativeSolvers.md",
+]
+```
 
-A list of examples is available in the documentation. These include some very well known examples such as the Stokes, Incompressible Navier-Stokes and Darcy problems. The featured scripts are available in `test/Applications`.
+### Examples
 
-An example on how to use the library within an HPC cluster is available in `joss_paper/scalability`. The included example and drivers are used to generate the scalability results in our [JOSS paper](https://doi.org/10.21105/joss.07162).
+```@contents
+Pages = [
+  "Examples/Stokes.md",
+  "Examples/NavierStokes.md",
+  "Examples/StokesGMG.md",
+  "Examples/NavierStokesGMG.md",
+  "Examples/DarcyGMG.md",
+]
+```
 
 ## Installation
 
@@ -40,12 +54,29 @@ pkg> add GridapSolvers
 pkg> build
 ```
 
-Building is required to link the external artifacts (e.g., PETSc, p4est) to the Julia environment. Restarting Julia is required after building in order to make the changes take effect.
+If using the extensions for `GridapP4est.jl` or `GridapPETSc.jl`, building is required to link the external artifacts (e.g., PETSc, p4est) to the Julia environment. Restarting Julia is required after building in order to make the changes take effect.
 
-### Using custom binaries
-
-The previous installations steps will setup GridapSolvers to work using Julia's pre-compiled artifacts for MPI, PETSc and p4est. However, you can also link local copies of these libraries. This might be very desirable in clusters, where hardware-specific libraries might be faster/more stable than the ones provided by Julia. To do so, follow the next steps:
+By default, Julia will configure `GridapSolvers` to work using Julia's pre-compiled artifacts for MPI, PETSc and p4est. However, you can also link local copies of these libraries. This might be very desirable in clusters, where hardware-specific libraries might be faster/more stable than the ones provided by Julia. To do so, follow the next steps:
 
 - [MPI.jl](https://juliaparallel.org/MPI.jl/stable/configuration/)
 - [GridapPETSc.jl](https://github.com/gridap/GridapPETSc.jl)
 - [GridapP4est.jl](https://github.com/gridap/GridapP4est.jl), and [P4est_wrapper.jl](https://github.com/gridap/p4est_wrapper.jl)
+
+## Citation
+
+In order to give credit to the `GridapSolvers` contributors, we simply ask you to cite the `Gridap` main project as indicated [here](https://github.com/gridap/Gridap.jl#how-to-cite-gridap) and the sub-packages you use as indicated in the corresponding repositories. Please, use the reference below in any publication in which you have made use of `GridapSolvers`:
+
+```latex
+@article{Manyer2024, 
+  doi = {10.21105/joss.07162}, 
+  url = {https://doi.org/10.21105/joss.07162}, 
+  year = {2024}, 
+  publisher = {The Open Journal}, 
+  volume = {9}, 
+  number = {102}, 
+  pages = {7162}, 
+  author = {Jordi Manyer and Alberto F. Martín and Santiago Badia}, 
+  title = {GridapSolvers.jl: Scalable multiphysics finite element solvers in Julia}, 
+  journal = {Journal of Open Source Software} 
+} 
+```

@@ -11,16 +11,13 @@ function generate_level_parts(root_parts::AbstractArray,num_procs_x_level::Vecto
   level_parts = Vector{T}(undef,num_levels)
   level_parts[1] = generate_subparts(root_parts,num_procs_x_level[1])
   for l = 2:num_levels
-    level_parts[l] = generate_level_parts(root_parts,level_parts[l-1],num_procs_x_level[l])
+    if num_procs_x_level[l] == num_procs_x_level[l-1]
+      level_parts[l] = level_parts[l-1]
+    else
+      level_parts[l] = generate_subparts(root_parts, num_procs_x_level[l])
+    end
   end
   return level_parts
-end
-
-function generate_level_parts(root_parts::AbstractArray,last_level_parts::AbstractArray,level_parts_size::Integer)
-  if level_parts_size == num_parts(last_level_parts)
-    return last_level_parts
-  end
-  return generate_subparts(root_parts,level_parts_size)
 end
 
 my_print(x::PVector,s) = my_print(partition(x),s)

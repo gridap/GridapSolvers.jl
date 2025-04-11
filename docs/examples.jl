@@ -14,6 +14,7 @@ for file in readdir(src_dir)
   out_file = string(out_dir,file)
 
   Literate.markdown(
-    in_file, out_dir
+    in_file, out_dir;
+    codefence = "````julia " => "````"
   )
 end

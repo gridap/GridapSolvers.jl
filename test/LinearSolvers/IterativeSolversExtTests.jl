@@ -1,4 +1,4 @@
-module IterativeSolversWrappersTests
+module IterativeSolversExtTests
 
 using Test
 using Gridap, Gridap.Algebra

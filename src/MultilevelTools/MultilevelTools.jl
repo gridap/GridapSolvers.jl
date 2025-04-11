@@ -12,7 +12,7 @@ using Gridap.ReferenceFEs, Gridap.Geometry, Gridap.FESpaces, Gridap.Adaptivity, 
 using Gridap.Adaptivity
 using Gridap.Adaptivity: get_model
 
-using PartitionedArrays, GridapDistributed, GridapP4est
+using PartitionedArrays, GridapDistributed
 
 using Gridap.FESpaces: BasisStyle, TestBasis, TrialBasis, SingleFieldFEBasis
 using Gridap.MultiField: MultiFieldFEBasisComponent
