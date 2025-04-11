@@ -3,5 +3,5 @@ using PartitionedArrays
 include("../Applications/Elasticity.jl")
 
 with_mpi() do distribute
-  main(distribute,4)
+  main(distribute,(2,2))
 end
