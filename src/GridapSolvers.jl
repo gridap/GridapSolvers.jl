@@ -39,11 +39,6 @@ export SymGaussSeidelSmoother
 export GMGLinearSolver
 export BlockDiagonalSmoother
 
-export ConjugateGradientSolver
-export IS_GMRESSolver
-export IS_MINRESSolver
-export IS_SSORSolver
-
 export CGSolver
 export MINRESSolver
 export GMRESSolver
@@ -54,5 +49,7 @@ export PatchDecomposition
 export PatchFESpace
 export PatchBasedLinearSolver
 export Closure
+
+include("extensions.jl")
 
 end

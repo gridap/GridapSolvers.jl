@@ -1,17 +1,8 @@
 using GridapSolvers
 using Test
 
-@testset "Sequential tests" begin
-  include("MultilevelTools/seq/runtests.jl")
-  include("LinearSolvers/seq/runtests.jl")
-  include("NonlinearSolvers/seq/runtests.jl")
-  include("BlockSolvers/seq/runtests.jl")
-  include("Applications/seq/runtests.jl")
-end
-
-@testset "MPI tests" begin
-  include("MultilevelTools/mpi/runtests.jl")
-  include("LinearSolvers/mpi/runtests.jl")
-  include("BlockSolvers/mpi/runtests.jl")
-  include("Applications/mpi/runtests.jl")
-end
+@testset "MultilevelTools" begin include("MultilevelTools/seq/runtests.jl") end
+@testset "LinearSolvers" begin include("LinearSolvers/seq/runtests.jl") end
+@testset "NonlinearSolvers" begin include("NonlinearSolvers/seq/runtests.jl") end
+@testset "BlockSolvers" begin include("BlockSolvers/seq/runtests.jl") end
+@testset "Applications" begin include("Applications/seq/runtests.jl") end

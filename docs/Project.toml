@@ -1,4 +1,7 @@
 [deps]
 Documenter = "e30172f5-a6a5-5a46-863b-614d45cd2de4"
+GridapP4est = "c2c8e14b-f5fd-423d-9666-1dd9ad120af9"
+GridapPETSc = "bcdc36c2-0c3e-11ea-095a-c9dadae499f1"
 GridapSolvers = "6d3209ee-5e3c-4db7-a716-942eb12ed534"
+IterativeSolvers = "42fd0dbc-a981-5370-80f2-aaf504508153"
 Literate = "98b081ad-f1c9-55d3-8b20-4c87d4299306"
