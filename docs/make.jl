@@ -6,7 +6,7 @@ include("examples.jl")
 
 extensions = map(
     ext -> Base.get_extension(GridapSolvers,ext),
-    (:GridapP4estExt,:GridapPETScExt,:IterativeSolversExt)
+    (:GridapP4estExt,:GridapPETScExt,:IterativeSolversExt,:PardisoExt)
 )
 
 DocMeta.setdocmeta!(GridapSolvers, :DocTestSetup, :(using GridapSolvers); recursive=true)
@@ -34,6 +34,7 @@ makedocs(;
             "GridapP4est.jl" => "Extensions/GridapP4est.md",
             "GridapPETSc.jl" => "Extensions/GridapPETSc.md",
             "IterativeSolvers.jl" => "Extensions/IterativeSolvers.md",
+            "Pardiso.jl" => "Extensions/Pardiso.md",
         ],
         "Examples" => [
             "Stokes" => "Examples/Stokes.md",

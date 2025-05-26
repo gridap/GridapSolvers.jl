@@ -30,6 +30,7 @@ Pages = [
   "Extensions/GridapP4est.md",
   "Extensions/GridapPETSc.md",
   "Extensions/IterativeSolvers.md",
+  "Extensions/Pardiso.md",
 ]
 ```
 
