@@ -1,4 +1,4 @@
-module IterativeSolversExtTests
+module PardisoExtTests
 
 using Test
 using Pardiso
@@ -33,7 +33,5 @@ function main()
   
   @test norm(x - y) < 1e-10
 end
-
-main()
 
 end
