@@ -14,12 +14,14 @@ using GridapSolvers.MultilevelTools
 using GridapSolvers.SolverInterfaces
 
 using Gridap.MultiField: BlockSparseMatrixAssembler
+using Gridap.MultiField: split_fespace, combine_fespaces
 
 using GridapDistributed: to_parray_of_arrays
+using GridapDistributed: DistributedFESpace, DistributedSingleFieldFESpace
 using GridapDistributed: DistributedMultiFieldFESpace, DistributedMultiFieldFEFunction
 
-const MultiFieldFESpaceTypes = Union{<:MultiFieldFESpace,<:GridapDistributed.DistributedMultiFieldFESpace}
-const BlockFESpaceTypes{NB,SB,P} = Union{<:MultiFieldFESpace{<:BlockMultiFieldStyle{NB,SB,P}},<:GridapDistributed.DistributedMultiFieldFESpace{<:BlockMultiFieldStyle{NB,SB,P}}}
+const MultiFieldFESpaceTypes = Union{<:MultiFieldFESpace,<:DistributedMultiFieldFESpace}
+const BlockFESpaceTypes{NB,SB,P} = Union{<:MultiFieldFESpace{<:BlockMultiFieldStyle{NB,SB,P}},<:DistributedMultiFieldFESpace{<:BlockMultiFieldStyle{NB,SB,P}}}
 
 include("BlockSolverInterfaces.jl")
 include("BlockDiagonalSolvers.jl")

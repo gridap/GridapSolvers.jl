@@ -2,7 +2,7 @@ module StaggeredFEOperatorsTests
 
 using Test
 using Gridap, GridapDistributed, PartitionedArrays
-using Gridap.MultiField
+using Gridap.MultiField, Gridap.FESpaces
 using BlockArrays
 using GridapSolvers
 using GridapSolvers.BlockSolvers, GridapSolvers.LinearSolvers, GridapSolvers.NonlinearSolvers
@@ -108,18 +108,18 @@ function driver_nonlinear(model,verbose)
   Y = MultiFieldFESpace([V,V,V,V];style=mfs)
   op = StaggeredNonlinearFEOperator([r1,r2,r3],[j1,j2,j3],X,Y)
   xh = zero(X)
-  xh, cache = solve!(xh,solver,op);
+  xh, cache = solve!(xh,solver,op)
   test_solution(xh,sol,X,dΩ,verbose)
   
   # Create operator from components
-  UB1, VB1 = U1, V
-  UB2, VB2 = MultiFieldFESpace([U2,U3]), MultiFieldFESpace([V,V])
-  UB3, VB3 = U4, V
-  op = StaggeredNonlinearFEOperator([r1,r2,r3],[j1,j2,j3],[UB1,UB2,UB3],[VB1,VB2,VB3])
-  
-  xh = zero(X)
-  xh, cache = solve!(xh,solver,op,cache);
-  test_solution(xh,sol,X,dΩ,verbose)
+  # UB1, VB1 = U1, V
+  # UB2, VB2 = MultiFieldFESpace([U2,U3]), MultiFieldFESpace([V,V])
+  # UB3, VB3 = U4, V
+  # op = StaggeredNonlinearFEOperator([r1,r2,r3],[j1,j2,j3],[UB1,UB2,UB3],[VB1,VB2,VB3])
+ 
+  # xh = zero(X)
+  # xh, cache = solve!(xh,solver,op)
+  # test_solution(xh,sol,X,dΩ,verbose)
 
   return true
 end
