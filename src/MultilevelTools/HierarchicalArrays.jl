@@ -2,13 +2,13 @@
 """
     HierarchicalArray{T,A,B} <: AbstractVector{T}
 
-  Array of hierarchical (nested) distributed objects.
-  Each level might live in a different subcommunicator. If a processor does not belong to 
-  subcommunicator `ranks[i]`, then `array[i]` is `nothing`.
-  
-  However, it assumes: 
-    - The subcommunicators are nested, so that `ranks[i]` contains `ranks[i+1]`.
-    - The first subcommunicator does not have empty parts.
+Array of hierarchical (nested) distributed objects.
+Each level might live in a different subcommunicator. If a processor does not belong to 
+subcommunicator `ranks[i]`, then `array[i]` is `nothing`.
+
+However, it assumes: 
+  - The subcommunicators are nested, so that `ranks[i]` contains `ranks[i+1]`.
+  - The first subcommunicator does not have empty parts.
 """
 struct HierarchicalArray{T,A,B} <: AbstractVector{T}
   array :: A
@@ -131,8 +131,8 @@ end
 """
     with_level(f::Function,a::HierarchicalArray,lev::Integer;default=nothing)
   
-  Applies a function to the `lev`-th level of a `HierarchicalArray`. If the processor does not
-  belong to the subcommunicator of the `lev`-th level, then `default` is returned.
+Applies a function to the `lev`-th level of a `HierarchicalArray`. If the processor does not
+belong to the subcommunicator of the `lev`-th level, then `default` is returned.
 """
 function with_level(f::Function,a::HierarchicalArray,lev::Integer;default=nothing)
   if i_am_in(a.ranks[lev])
