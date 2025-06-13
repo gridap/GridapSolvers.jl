@@ -14,8 +14,10 @@ using Pardiso: MessageLevel, MESSAGE_LEVEL_ON
 
 using Pardiso: ANALYSIS, NUM_FACT, SOLVE_ITERATIVE_REFINE, RELEASE_ALL
 
+# Cannot have name `PardisoSolver` to not conflict with Pardiso.jl, and cannot have name
+# `PardisoLinearSolver` to not conflict with the function exported from GridapSolvers.jl.
 # Needs to be mutable for the finalizer
-mutable struct PardisoLinearSolver{A} <: Algebra.LinearSolver
+mutable struct GridapPardisoSolver{A} <: Algebra.LinearSolver
   ps :: A
   verbose :: Bool
 end
@@ -48,7 +50,7 @@ function GridapSolvers.PardisoLinearSolver(;
   set_matrixtype!(ps, mtype)
   set_nprocs!(ps, nthreads)
   verbose && set_msglvl!(ps,MESSAGE_LEVEL_ON)
-  solver = PardisoLinearSolver(ps,verbose)
+  solver = GridapPardisoSolver(ps,verbose)
   return finalizer(ps_finalize,solver)
 end
 
@@ -62,7 +64,7 @@ struct PardisoSymbolicSetup{A} <: Algebra.SymbolicSetup
   solver :: A
 end
 
-function Algebra.symbolic_setup(solver::PardisoLinearSolver, mat::AbstractMatrix)
+function Algebra.symbolic_setup(solver::GridapPardisoSolver, mat::AbstractMatrix)
   ps = solver.ps
   
   pardisoinit(ps)

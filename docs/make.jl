@@ -9,6 +9,7 @@ extensions = map(
     ext -> Base.get_extension(GridapSolvers,ext),
     (:GridapP4estExt,:GridapPETScExt,:IterativeSolversExt,:PardisoExt)
 )
+println(" >>> Extensions found: ", extensions)
 
 DocMeta.setdocmeta!(GridapSolvers, :DocTestSetup, :(using GridapSolvers); recursive=true)
 
