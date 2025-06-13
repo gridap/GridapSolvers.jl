@@ -1,6 +1,7 @@
-using GridapSolvers
-using GridapPETSc, GridapP4est, IterativeSolvers
 using Documenter
+
+using GridapSolvers
+using GridapPETSc, GridapP4est, IterativeSolvers, Pardiso
 
 include("examples.jl")
 
@@ -17,10 +18,10 @@ makedocs(;
     repo = "https://github.com/gridap/GridapSolvers.jl/blob/{commit}{path}#{line}",
     sitename = "GridapSolvers.jl",
     format = Documenter.HTML(;
-        prettyurls=get(ENV, "CI", "false") == "true",
-        canonical="https://gridap.github.io/GridapSolvers.jl",
-        edit_link="main",
-        assets=String[],
+        prettyurls = get(ENV, "CI", "false") == "true",
+        canonical = "https://gridap.github.io/GridapSolvers.jl",
+        edit_link = "main",
+        assets = String[],
     ),
     pages = [
         "Home" => "index.md",
@@ -44,8 +45,8 @@ makedocs(;
             "Darcy (GMG)" => "Examples/DarcyGMG.md",
         ],
     ],
-    warnonly=[:doctest,:example_block,:eval_block],
-    clean=true,
+    warnonly = [:doctest,:example_block,:eval_block],
+    clean = true,
 )
 
 deploydocs(;
