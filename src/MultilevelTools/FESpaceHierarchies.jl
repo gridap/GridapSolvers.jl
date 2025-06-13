@@ -8,12 +8,12 @@ end
 """
     const FESpaceHierarchy = HierarchicalArray{<:FESpaceHierarchyLevel}
   
-  A `FESpaceHierarchy` is a hierarchical array of `FESpaceHierarchyLevel` objects. It stores the 
-  adapted/redistributed fe spaces and the corresponding subcommunicators.
+A `FESpaceHierarchy` is a hierarchical array of `FESpaceHierarchyLevel` objects. It stores the 
+adapted/redistributed fe spaces and the corresponding subcommunicators.
 
-  For convenience, implements some of the API of `FESpace`.
+For convenience, implements some of the API of `FESpace`.
 """
-const FESpaceHierarchy = HierarchicalArray{<:FESpaceHierarchyLevel}
+const FESpaceHierarchy{T,A,B} = HierarchicalArray{<:T where T<:FESpaceHierarchyLevel,A,B}
 
 FESpaces.get_fe_space(sh::FESpaceHierarchy,lev::Int) = get_fe_space(sh[lev])
 FESpaces.get_fe_space(a::FESpaceHierarchyLevel{A,Nothing}) where {A} = a.fe_space
@@ -22,8 +22,8 @@ FESpaces.get_fe_space(a::FESpaceHierarchyLevel{A,B}) where {A,B} = a.fe_space_re
 get_fe_space_before_redist(sh::FESpaceHierarchy,lev::Int) = get_fe_space_before_redist(sh[lev])
 get_fe_space_before_redist(a::FESpaceHierarchyLevel) = a.fe_space
 
-get_model(sh::FESpaceHierarchy,level::Integer) = get_model(sh[level])
-get_model(a::FESpaceHierarchyLevel) = get_model(a.mh_level)
+Adaptivity.get_model(sh::FESpaceHierarchy,level::Integer) = get_model(sh[level])
+Adaptivity.get_model(a::FESpaceHierarchyLevel) = get_model(a.mh_level)
 
 get_model_before_redist(a::FESpaceHierarchy,level::Integer) = get_model_before_redist(a[level])
 get_model_before_redist(a::FESpaceHierarchyLevel) = get_model_before_redist(a.mh_level)
@@ -63,9 +63,7 @@ function FESpaces.FESpace(mh::ModelHierarchy,args...;kwargs...)
 end
 
 function FESpaces.FESpace(
-  mh::ModelHierarchy,
-  arg_vector::AbstractVector{<:Union{ReferenceFE,Tuple{<:ReferenceFEs.ReferenceFEName,Any,Any}}};
-  kwargs...
+  mh::ModelHierarchy,arg_vector::AbstractVector;kwargs...
 )
   map(linear_indices(mh),mh) do l, mhl
     args = arg_vector[l]

@@ -26,3 +26,9 @@ export CachedPETScNS
 
 function PETScElasticitySolver end
 function CachedPETScNS end
+
+# PardisoExt
+
+export PardisoLinearSolver
+
+function PardisoLinearSolver end

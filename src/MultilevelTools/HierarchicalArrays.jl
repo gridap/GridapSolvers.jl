@@ -2,13 +2,13 @@
 """
     HierarchicalArray{T,A,B} <: AbstractVector{T}
 
-  Array of hierarchical (nested) distributed objects.
-  Each level might live in a different subcommunicator. If a processor does not belong to 
-  subcommunicator `ranks[i]`, then `array[i]` is `nothing`.
-  
-  However, it assumes: 
-    - The subcommunicators are nested, so that `ranks[i]` contains `ranks[i+1]`.
-    - The first subcommunicator does not have empty parts.
+Array of hierarchical (nested) distributed objects.
+Each level might live in a different subcommunicator. If a processor does not belong to 
+subcommunicator `ranks[i]`, then `array[i]` is `nothing`.
+
+However, it assumes: 
+  - The subcommunicators are nested, so that `ranks[i]` contains `ranks[i+1]`.
+  - The first subcommunicator does not have empty parts.
 """
 struct HierarchicalArray{T,A,B} <: AbstractVector{T}
   array :: A
@@ -31,7 +31,7 @@ function HierarchicalArray{T}(::UndefInitializer,ranks::AbstractVector) where T
   HierarchicalArray{T}(array,ranks)
 end
 
-Base.length(a::HierarchicalArray) = length(a.array)
+Base.length(a::HierarchicalArray) = length(a.ranks)
 Base.size(a::HierarchicalArray) = (length(a),)
 
 function Base.getindex(a::HierarchicalArray,i::Integer)
@@ -67,7 +67,9 @@ function Base.show(io::IO,k::MIME"text/plain",data::HierarchicalArray{T}) where 
   println(io,"HierarchicalArray{$T}")
 end
 
-num_levels(a::HierarchicalArray) = length(a.ranks)
+# TODO: Deprecate
+num_levels(a) = length(a)
+
 get_level_parts(a::HierarchicalArray) = a.ranks
 get_level_parts(a::HierarchicalArray,lev) = a.ranks[lev]
 
@@ -129,8 +131,8 @@ end
 """
     with_level(f::Function,a::HierarchicalArray,lev::Integer;default=nothing)
   
-  Applies a function to the `lev`-th level of a `HierarchicalArray`. If the processor does not
-  belong to the subcommunicator of the `lev`-th level, then `default` is returned.
+Applies a function to the `lev`-th level of a `HierarchicalArray`. If the processor does not
+belong to the subcommunicator of the `lev`-th level, then `default` is returned.
 """
 function with_level(f::Function,a::HierarchicalArray,lev::Integer;default=nothing)
   if i_am_in(a.ranks[lev])
@@ -141,5 +143,5 @@ function with_level(f::Function,a::HierarchicalArray,lev::Integer;default=nothin
 end
 
 function with_level(f::Function,a::AbstractArray,lev::Integer;default=nothing)
-  f(a.array[lev])
+  f(a[lev])
 end

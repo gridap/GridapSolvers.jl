@@ -34,7 +34,7 @@ restrictions = setup_restriction_operators(
 )
 
 gmg = GMGLinearSolver(
-  mh,sh,sh,biforms,
+  sh,sh,biforms,
   prolongations,restrictions,
   pre_smoothers=smoothers,
   post_smoothers=smoothers,

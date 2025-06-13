@@ -1,11 +1,19 @@
 
 """
-  Single level for a ModelHierarchy.
+    struct ModelHierarchyLevel{A,B,C,D}
+      level     :: Int
+      model     :: A
+      ref_glue  :: B
+      model_red :: C
+      red_glue  :: D
+    end
 
-  Note that `model_red` and `red_glue` might be of type `Nothing`
-  whenever there is no redistribution in a given level.
+Single level for a ModelHierarchy.
 
-  `ref_glue` is of type `Nothing` on the coarsest level.
+Note that `model_red` and `red_glue` might be of type `Nothing`
+whenever there is no redistribution in a given level.
+
+`ref_glue` is of type `Nothing` on the coarsest level.
 """
 struct ModelHierarchyLevel{A,B,C,D}
   level     :: Int
@@ -18,16 +26,16 @@ end
 """
     const ModelHierarchy = HierarchicalArray{<:ModelHierarchyLevel}
   
-  A `ModelHierarchy` is a hierarchical array of `ModelHierarchyLevel` objects. It stores the 
-  adapted/redistributed models and the corresponding subcommunicators.
+A `ModelHierarchy` is a hierarchical array of `ModelHierarchyLevel` objects. It stores the 
+adapted/redistributed models and the corresponding subcommunicators.
 
-  For convenience, implements some of the API of `DiscreteModel`.
+For convenience, implements **some** of the API of `DiscreteModel`.
 """
-const ModelHierarchy = HierarchicalArray{<:ModelHierarchyLevel}
+const ModelHierarchy{T,A,B} = HierarchicalArray{<:T where T <:ModelHierarchyLevel,A,B}
 
-get_model(a::ModelHierarchy,level::Integer) = get_model(a[level])
-get_model(a::ModelHierarchyLevel{A,B,Nothing}) where {A,B} = a.model
-get_model(a::ModelHierarchyLevel{A,B,C}) where {A,B,C} = a.model_red
+Adaptivity.get_model(a::ModelHierarchy,level::Integer) = get_model(a[level])
+Adaptivity.get_model(a::ModelHierarchyLevel{A,B,Nothing}) where {A,B} = a.model
+Adaptivity.get_model(a::ModelHierarchyLevel{A,B,C}) where {A,B,C} = a.model_red
 
 get_model_before_redist(a::ModelHierarchy,level::Integer) = get_model_before_redist(a[level])
 get_model_before_redist(a::ModelHierarchyLevel) = a.model
@@ -52,22 +60,22 @@ has_refinement(a::ModelHierarchyLevel{A,Nothing}) where A = false
       add_labels!::Function = (labels -> nothing),
     ) where D
   
-  Returns a `ModelHierarchy` with a Cartesian model as coarsest level. The i-th level 
-  will be distributed among `np_per_level[i]` processors. Two consecutive levels are 
-  refined by a factor of `nrefs[i]`.
+Returns a `ModelHierarchy` with a Cartesian model as coarsest level. The i-th level 
+will be distributed among `np_per_level[i]` processors. Two consecutive levels are 
+refined by a factor of `nrefs[i]`.
 
-  ## Parameters: 
+## Parameters: 
 
-  - `ranks`: Initial communicator. Will be used to generate subcommunicators.
-  - `domain`: Tuple containing the domain limits.
-  - `nc`: Tuple containing the number of cells in each direction for the coarsest model.
-  - `np_per_level`: Vector containing the number of processors we want to distribute
-    each level into. Requires a tuple `np = (np_1,...,np_d)` for each level, then each 
-    level will be distributed among `prod(np)` processors with `np_i` processors in the
-    i-th direction.
-  - `nrefs`: Vector containing the refinement factor for each level. Has `nlevs-1` entries, 
-      and each entry can either be an integer (homogeneous refinement) or a tuple 
-      with `D` integers (inhomogeneous refinement).
+- `ranks`: Initial communicator. Will be used to generate subcommunicators.
+- `domain`: Tuple containing the domain limits.
+- `nc`: Tuple containing the number of cells in each direction for the coarsest model.
+- `np_per_level`: Vector containing the number of processors we want to distribute
+  each level into. Requires a tuple `np = (np_1,...,np_d)` for each level, then each 
+  level will be distributed among `prod(np)` processors with `np_i` processors in the
+  i-th direction.
+- `nrefs`: Vector containing the refinement factor for each level. Has `nlevs-1` entries, 
+    and each entry can either be an integer (homogeneous refinement) or a tuple 
+    with `D` integers (inhomogeneous refinement).
 """
 function CartesianModelHierarchy(
   ranks::AbstractVector{<:Integer},

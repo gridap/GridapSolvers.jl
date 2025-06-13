@@ -98,7 +98,7 @@ restrictions = setup_restriction_operators(
   trials,qdegree;mode=:residual,solver=LUSolver()
 )
 gmg = GMGLinearSolver(
-  mh,trials,tests,biforms,
+  trials,tests,biforms,
   prolongations,restrictions,
   pre_smoothers=smoothers,
   post_smoothers=smoothers,

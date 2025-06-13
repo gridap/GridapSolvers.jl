@@ -23,19 +23,9 @@ function MultiField.get_block_ranges(::StaggeredFEOperator{NB,SB}) where {NB,SB}
   MultiField.get_block_ranges(NB,SB,Tuple(1:sum(SB)))
 end
 
-# TODO: This is type piracy -> move to Gridap
-MultiField.num_fields(space::FESpace) = 1
-
-# TODO: We could reuse gids in distributed
-function combine_fespaces(spaces::Vector{<:FESpace})
-  NB = length(spaces)
-  SB = Tuple(map(num_fields,spaces))
-  sf_spaces = vcat(map(split_fespace,spaces)...)
-  MultiFieldFESpace(sf_spaces; style = BlockMultiFieldStyle(NB,SB))
-end
-
-split_fespace(space::FESpace) = [space]
-split_fespace(space::MultiFieldFESpaceTypes) = [space...]
+# TODO: This is type piracy -> move to GridapDistributed
+MultiField.num_fields(space::DistributedFESpace) = 1
+MultiField.split_fespace(space::DistributedMultiFieldFESpace) = [space...]
 
 function get_solution(op::StaggeredFEOperator{NB,SB}, xh::MultiFieldFEFunction, k) where {NB,SB}
   r = MultiField.get_block_ranges(op)[k]
@@ -94,7 +84,7 @@ function Algebra.solve!(xh, solver::StaggeredFESolver{NB}, op::StaggeredFEOperat
     xh_k, cache_k = solve!(xh_k,solvers[k],op_k,nothing)
     xhs, caches, operators = (xhs...,xh_k), (caches...,cache_k), (operators...,op_k)
   end
-  return xh, (caches,operators)
+  return xh, (caches, operators)
 end
 
 function Algebra.solve!(xh, solver::StaggeredFESolver{NB}, op::StaggeredFEOperator{NB}, cache) where NB
@@ -107,7 +97,7 @@ function Algebra.solve!(xh, solver::StaggeredFESolver{NB}, op::StaggeredFEOperat
     xh_k, cache_k = solve!(xh_k,solvers[k],op_k,last_caches[k])
     xhs, caches, operators = (xhs...,xh_k), (caches...,cache_k), (operators...,op_k)
   end
-  return xh, (caches,operators)
+  return xh, (caches, operators)
 end
 
 # StaggeredAffineFEOperator
@@ -173,7 +163,7 @@ struct StaggeredAffineFEOperator{NB,SB} <: StaggeredFEOperator{NB,SB}
       liforms :: Vector{<:Function},
       trial   :: BlockFESpaceTypes{NB,SB,P},
       test    :: BlockFESpaceTypes{NB,SB,P},
-      [assem  :: BlockSparseMatrixAssembler{NB,NV,SB,P}]
+      [assem  :: BlockSparseMatrixAssembler]
     ) where {NB,NV,SB,P}
 
   Constructor for a `StaggeredAffineFEOperator` operator, taking in each 
@@ -184,8 +174,8 @@ struct StaggeredAffineFEOperator{NB,SB} <: StaggeredFEOperator{NB,SB}
     liforms :: Vector{<:Function},
     trial   :: BlockFESpaceTypes{NB,SB,P},
     test    :: BlockFESpaceTypes{NB,SB,P},
-    assem   :: BlockSparseMatrixAssembler{NB,NV,SB,P} = SparseMatrixAssembler(trial,test)
-  ) where {NB,NV,SB,P}
+    assem   :: BlockSparseMatrixAssembler = SparseMatrixAssembler(trial,test)
+  ) where {NB,SB,P}
     @assert length(biforms) == length(liforms) == NB
     @assert P == Tuple(1:sum(SB)) "Permutations not supported"
     trials = blocks(trial)
@@ -272,8 +262,8 @@ struct StaggeredNonlinearFEOperator{NB,SB} <: StaggeredFEOperator{NB,SB}
       jac     :: Vector{<:Function},
       trial   :: BlockFESpaceTypes{NB,SB,P},
       test    :: BlockFESpaceTypes{NB,SB,P},
-      [assem  :: BlockSparseMatrixAssembler{NB,NV,SB,P}]
-    ) where {NB,NV,SB,P}
+      [assem  :: BlockSparseMatrixAssembler]
+    ) where {NB,SB,P}
 
   Constructor for a `StaggeredNonlinearFEOperator` operator, taking in each 
   equation as a pair of bilinear/linear forms and the global trial/test spaces.
@@ -283,8 +273,8 @@ struct StaggeredNonlinearFEOperator{NB,SB} <: StaggeredFEOperator{NB,SB}
     jac   :: Vector{<:Function},
     trial :: BlockFESpaceTypes{NB,SB,P},
     test  :: BlockFESpaceTypes{NB,SB,P},
-    assem :: BlockSparseMatrixAssembler{NB,NV,SB,P} = SparseMatrixAssembler(trial,test)
-  ) where {NB,NV,SB,P}
+    assem :: BlockSparseMatrixAssembler = SparseMatrixAssembler(trial,test)
+  ) where {NB,SB,P}
     @assert length(res) == length(jac) == NB
     @assert P == Tuple(1:sum(SB)) "Permutations not supported"
     trials = blocks(trial)

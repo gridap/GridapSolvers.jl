@@ -9,6 +9,9 @@ using Gridap
 using Gridap.Helpers, Gridap.Algebra, Gridap.Arrays, Gridap.Fields, Gridap.CellData
 using Gridap.ReferenceFEs, Gridap.Geometry, Gridap.FESpaces, Gridap.Adaptivity, Gridap.MultiField
 
+using Gridap.Adaptivity
+using Gridap.Adaptivity: get_model
+
 using PartitionedArrays, GridapDistributed
 
 using Gridap.FESpaces: BasisStyle, TestBasis, TrialBasis, SingleFieldFEBasis

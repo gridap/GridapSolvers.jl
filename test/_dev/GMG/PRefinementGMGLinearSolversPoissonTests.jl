@@ -44,16 +44,17 @@ function main(parts, coarse_grid_partition, num_parts_x_level, num_refs_coarse, 
                                                            mode=:residual,
                                                            restriction_method=:interpolation)
 
-    gmg = GMGLinearSolver(mh,
-                          smatrices,
-                          prolongations,
-                          restrictions,
-                          pre_smoothers=smoothers,
-                          post_smoothers=smoothers,
-                          maxiter=1,
-                          rtol=1.0e-10,
-                          verbose=false,
-                          mode=:preconditioner)
+    gmg = GMGLinearSolver(
+      smatrices,
+      prolongations,
+      restrictions,
+      pre_smoothers=smoothers,
+      post_smoothers=smoothers,
+      maxiter=1,
+      rtol=1.0e-10,
+      verbose=false,
+      mode=:preconditioner
+    )
     ss = symbolic_setup(gmg,A)
     ns = numerical_setup(ss,A)
 

@@ -1,13 +1,15 @@
-using GridapSolvers
-using GridapPETSc, GridapP4est, IterativeSolvers
 using Documenter
+
+using GridapSolvers
+using GridapPETSc, GridapP4est, IterativeSolvers, Pardiso
 
 include("examples.jl")
 
 extensions = map(
     ext -> Base.get_extension(GridapSolvers,ext),
-    (:GridapP4estExt,:GridapPETScExt,:IterativeSolversExt)
+    (:GridapP4estExt,:GridapPETScExt,:IterativeSolversExt,:PardisoExt)
 )
+println(" >>> Extensions found: ", extensions)
 
 DocMeta.setdocmeta!(GridapSolvers, :DocTestSetup, :(using GridapSolvers); recursive=true)
 
@@ -17,10 +19,10 @@ makedocs(;
     repo = "https://github.com/gridap/GridapSolvers.jl/blob/{commit}{path}#{line}",
     sitename = "GridapSolvers.jl",
     format = Documenter.HTML(;
-        prettyurls=get(ENV, "CI", "false") == "true",
-        canonical="https://gridap.github.io/GridapSolvers.jl",
-        edit_link="main",
-        assets=String[],
+        prettyurls = get(ENV, "CI", "false") == "true",
+        canonical = "https://gridap.github.io/GridapSolvers.jl",
+        edit_link = "main",
+        assets = String[],
     ),
     pages = [
         "Home" => "index.md",
@@ -34,6 +36,7 @@ makedocs(;
             "GridapP4est.jl" => "Extensions/GridapP4est.md",
             "GridapPETSc.jl" => "Extensions/GridapPETSc.md",
             "IterativeSolvers.jl" => "Extensions/IterativeSolvers.md",
+            "Pardiso.jl" => "Extensions/Pardiso.md",
         ],
         "Examples" => [
             "Stokes" => "Examples/Stokes.md",
@@ -43,8 +46,8 @@ makedocs(;
             "Darcy (GMG)" => "Examples/DarcyGMG.md",
         ],
     ],
-    warnonly=[:doctest,:example_block,:eval_block],
-    clean=true,
+    warnonly = [:doctest,:example_block,:eval_block],
+    clean = true,
 )
 
 deploydocs(;
