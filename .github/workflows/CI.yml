@@ -4,7 +4,15 @@ on:
     branches:
       - main
     tags: ['*']
+    paths-ignore:
+      - 'NEWS.md'
+      - 'README.md'
+      - 'LICENSE.md'
   pull_request:
+    paths-ignore:
+      - 'NEWS.md'
+      - 'README.md'
+      - 'LICENSE.md'
 concurrency:
   # Skip intermediate builds: always.
   # Cancel intermediate builds: only if it is a pull request build.
@@ -12,7 +20,7 @@ concurrency:
   cancel-in-progress: ${{ startsWith(github.ref, 'refs/pull/') }}
 jobs:
   test-sequential:
-    name: Sequential - Julia ${{ matrix.version }} - ${{ matrix.os }} - ${{ matrix.arch }} - ${{ github.event_name }}
+    name: ${{ matrix.testcase }} - Julia ${{ matrix.version }} - ${{ matrix.os }} - ${{ matrix.arch }} - ${{ github.event_name }}
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
@@ -23,6 +31,17 @@ jobs:
           - ubuntu-latest
         arch:
           - x64
+        testcase:
+          - seq-multilevel
+          - seq-linear
+          - seq-nonlinear
+          - seq-block
+          - seq-applications
+          - mpi-multilevel
+          - mpi-linear
+          - mpi-nonlinear
+          - mpi-block
+          - mpi-applications
     steps:
       - uses: actions/checkout@v4
       - uses: julia-actions/setup-julia@v2
@@ -32,40 +51,14 @@ jobs:
       - uses: julia-actions/cache@v2
       - uses: julia-actions/julia-buildpkg@v1
       - uses: julia-actions/julia-runtest@v1
+        env:
+          TESTCASE: ${{ matrix.testcase }}
       - uses: julia-actions/julia-processcoverage@v1
       - uses: codecov/codecov-action@v5
         with:
           verbose: true
           token: ${{ secrets.CODECOV_TOKEN }}
-          flags: test-sequential
-  test-mpi:
-    name: MPI - Julia ${{ matrix.version }} - ${{ matrix.os }} - ${{ matrix.arch }} - ${{ github.event_name }}
-    runs-on: ${{ matrix.os }}
-    strategy:
-      fail-fast: false
-      matrix:
-        version:
-          - '1.10'
-        os:
-          - ubuntu-latest
-        arch:
-          - x64
-    steps:
-      - uses: actions/checkout@v4
-      - uses: julia-actions/setup-julia@v2
-        with:
-          version: ${{ matrix.version }}
-          arch: ${{ matrix.arch }}
-      - uses: julia-actions/cache@v2
-      - uses: julia-actions/julia-buildpkg@v1
-      - run: julia --project=. --color=yes -e 'using Pkg; Pkg.add("IterativeSolvers")'
-      - run: julia --project=. --color=yes test/runtests_mpi.jl
-      - uses: julia-actions/julia-processcoverage@v1
-      - uses: codecov/codecov-action@v5
-        with:
-          verbose: true
-          token: ${{ secrets.CODECOV_TOKEN }}
-          flags: test-mpi
+          flags: ${{ matrix.testcase }}
   docs:
     name: Documentation
     runs-on: ubuntu-latest
