@@ -1,5 +1,8 @@
 using Test
 
-@testset "Stokes equation" begin
-  include("Stokes.jl")
+@testset "Applications" begin
+
+  @testset "Stokes" begin include("Stokes.jl") end
+  @testset "Navier-Stokes" begin include("NavierStokes.jl") end
+
 end

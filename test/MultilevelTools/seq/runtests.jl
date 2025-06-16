@@ -1,3 +1,7 @@
 using Test
 
-include("ModelHierarchiesTests.jl")
+@testset "MultilevelTools" begin
+
+  include("ModelHierarchiesTests.jl")
+
+end

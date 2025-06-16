@@ -99,7 +99,7 @@ end
   Initializes the convergence log `log` with the initial residual `r0`.
 """
 function init!(log::ConvergenceLog{T},r0::T) where T
-  log.num_iters = 0
+  reset!(log)
   log.residuals[1] = r0
   if log.verbose > SOLVER_VERBOSE_LOW
     header =  " Starting $(log.name) solver "

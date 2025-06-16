@@ -4,7 +4,15 @@ on:
     branches:
       - main
     tags: ['*']
+    paths-ignore:
+      - 'NEWS.md'
+      - 'README.md'
+      - 'LICENSE.md'
   pull_request:
+    paths-ignore:
+      - 'NEWS.md'
+      - 'README.md'
+      - 'LICENSE.md'
 concurrency:
   # Skip intermediate builds: always.
   # Cancel intermediate builds: only if it is a pull request build.
@@ -26,6 +34,8 @@ jobs:
           - ubuntu-latest
         arch:
           - x64
+        testcase:
+          - extlibs
     steps:
       - name: Install p4est/petsc dependencies
         run: |
@@ -87,17 +97,18 @@ jobs:
         run: |
           using Pkg
           Pkg.add("MPIPreferences")
-          Pkg.add("GridapP4est")
-          Pkg.add("GridapPETSc")
       - name: use MPI system binary 
         shell: julia --color=yes --project=. {0}
         run: |
           using MPIPreferences
           MPIPreferences.use_system_binary()
       - uses: julia-actions/julia-buildpkg@latest
-      - run: echo $PWD
-      - run: ls .
-      - run: ls test
-      - run: ls test/ExtLibraries
-      - run: julia --project=. -e 'using Pkg; Pkg.instantiate(); Pkg.build(); Pkg.precompile()'
-      - run: julia --project=. --color=yes test/ExtLibraries/runtests.jl
+      - uses: julia-actions/julia-runtest@v1
+        env:
+          TESTCASE: ${{ matrix.testcase }}
+      - uses: julia-actions/julia-processcoverage@v1
+      - uses: codecov/codecov-action@v5
+        with:
+          verbose: true
+          token: ${{ secrets.CODECOV_TOKEN }}
+          flags: test-extlibs
