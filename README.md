@@ -69,8 +69,8 @@ In order to give credit to the `GridapSolvers` contributors, we simply ask you t
 
 GridapSolvers is a collaborative project open to contributions. If you want to contribute, please take into account:
 
-  - Before opening a PR with a significant contribution, contact the project administrators by [opening an issue](https://github.com/gridap/GridapSolvers.jl/issues/new) describing what you are willing to implement. Wait for feedback from other community members.
-  - We adhere to the contribution and code-of-conduct instructions of the Gridap.jl project, available [here](https://github.com/gridap/Gridap.jl/blob/master/CONTRIBUTING.md) and [here](https://github.com/gridap/Gridap.jl/blob/master/CODE_OF_CONDUCT.md), resp.  Please, carefully read and follow the instructions in these files.
-  - Open a PR with your contribution.
+- Before opening a PR with a significant contribution, contact the project administrators by [opening an issue](https://github.com/gridap/GridapSolvers.jl/issues/new) describing what you are willing to implement. Wait for feedback from other community members.
+- We adhere to the contribution and code-of-conduct instructions of the Gridap.jl project, available [here](https://github.com/gridap/Gridap.jl/blob/master/CONTRIBUTING.md) and [here](https://github.com/gridap/Gridap.jl/blob/master/CODE_OF_CONDUCT.md), resp.  Please, carefully read and follow the instructions in these files.
+- Open a PR with your contribution.
 
 Want to help? We have [issues waiting for help](https://github.com/gridap/GridapSolvers.jl/labels/help%20wanted). You can start contributing to the GridapSolvers project by solving some of those issues.
