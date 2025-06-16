@@ -97,8 +97,6 @@ jobs:
         run: |
           using Pkg
           Pkg.add("MPIPreferences")
-          Pkg.add("GridapP4est")
-          Pkg.add("GridapPETSc")
       - name: use MPI system binary 
         shell: julia --color=yes --project=. {0}
         run: |
