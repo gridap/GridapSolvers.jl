@@ -12,6 +12,10 @@ using GridapDistributed
 using GridapSolvers.MultilevelTools
 using GridapSolvers.MultilevelTools: get_cell_conformity
 
+using Gridap.Geometry: PatchTopology
+using Gridap.FESpaces: PatchAssembler
+using GridapDistributed: DistributedFESpace, DistributedPatchTopology, DistributedPatchAssembler
+
 export PatchDecomposition, Closure
 export PatchFESpace
 export PatchBasedLinearSolver, VankaSolver

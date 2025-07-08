@@ -134,7 +134,7 @@ function Gridap.Algebra.numerical_setup(ss::PatchBasedSymbolicSetup,A::AbstractM
   Ap, Ap_ns = assemble_patch_matrices(Ph,ap;local_solver)
   weights = solver.weighted ? compute_weight_operators(Ph,Vh) : nothing
   caches = allocate_patch_workvectors(Ph,Vh)
-  return PatchBasedSmootherNumericalSetup(solver,nothing,Ap_ns,weights,caches)
+  return PatchBasedSmootherNumericalSetup(solver,Ap,Ap_ns,weights,caches)
 end
 
 function Gridap.Algebra.numerical_setup(ss::PatchBasedSymbolicSetup,A::AbstractMatrix,x::AbstractVector)
