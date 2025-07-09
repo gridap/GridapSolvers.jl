@@ -60,64 +60,82 @@ end
 Algebra.symbolic_setup(s::PatchSolverFromMats,mat::AbstractMatrix) = PatchSS(s)
 Algebra.symbolic_setup(s::PatchSolverFromWeakform,mat::AbstractMatrix) = PatchSS(s)
 
-struct PatchNS{A,B,C,D,E} <: Algebra.NumericalSetup
+mutable struct PatchNS{A,B,C,D,E,F} <: Algebra.NumericalSetup
   solver :: A
   patch_rows :: B
   patch_cols :: C
-  patch_factorizations :: D
-  caches :: E
+  patch_mats :: D
+  patch_factorizations :: E
+  caches :: F
 end
 
 function Algebra.numerical_setup(ss::PatchSS{<:PatchSolverFromMats},mat::AbstractMatrix)
   solver = ss.solver
   patch_rows, patch_cols = solver.patch_axes
-  patch_factorizations = lazy_map(lu!, solver.patch_mats)
-  if solver.collect_factorizations
-    patch_factorizations = Arrays.lazy_collect(patch_factorizations)
-  end
-
-  i_cache = array_cache(patch_cols)
-  x_cache = CachedVector(eltype(mat))
-  f_cache = array_cache(patch_factorizations)
-  caches = (i_cache, x_cache, f_cache)
-
-  return PatchNS(solver, patch_rows, patch_cols, patch_factorizations,caches)
+  patch_mats = solver.patch_mats
+  
+  patch_factorizations, caches = patch_solver_caches(
+    patch_cols, patch_mats; collect_factorizations = solver.collect_factorizations
+  )
+  return PatchNS(solver, patch_rows, patch_cols, patch_mats, patch_factorizations,caches)
 end
 
 function Algebra.numerical_setup(ss::PatchSS{<:PatchSolverFromMats},mat::PSparseMatrix)
   solver = ss.solver
-  # patch_cols = reindex_patch_ids(solver.patch_axes[2], solver.axes[2], axes(mat,2))
-  # patch_rows = patch_cols # reindex_patch_ids(solver.patch_axes[1], solver.axes[1], axes(mat,1))
   rows, cols = solver.axes
   patch_rows, patch_cols = solver.patch_axes
+  patch_mats = solver.patch_mats
 
-  patch_factorizations, caches = map(solver.patch_mats,patch_cols) do patch_mats, patch_cols
-    patch_factorizations = lazy_map(lu!, patch_mats)
-    if solver.collect_factorizations
-      patch_factorizations = Arrays.lazy_collect(patch_factorizations)
-    end
-
-    i_cache = array_cache(patch_cols)
-    x_cache = CachedVector(eltype(mat))
-    f_cache = array_cache(patch_factorizations)
-    caches = (i_cache, x_cache, f_cache)
-
-    return patch_factorizations, caches
+  patch_factorizations, caches = map(patch_mats,patch_cols) do patch_mats, patch_cols
+    patch_solver_caches(
+      patch_cols, patch_mats; collect_factorizations = solver.collect_factorizations
+    )
   end |> tuple_of_arrays
 
   x_c = pzeros(eltype(mat),partition(rows))
   b_c = pzeros(eltype(mat),partition(cols))
   caches = (x_c,b_c,caches)
-  return PatchNS(solver, patch_rows, patch_cols, patch_factorizations, caches)
+  return PatchNS(solver, patch_rows, patch_cols, patch_mats, patch_factorizations, caches)
 end
 
 function Algebra.numerical_setup(ss::PatchSS{<:PatchSolverFromWeakform},mat::AbstractMatrix,vec::AbstractVector)
   solver = ss.solver
   @assert solver.is_nonlinear
   assem, trial, test = solver.assem, solver.trial, solver.test
-  
-  patch_rows = assem.strategy.patch_rows
-  patch_cols = assem.strategy.patch_cols
+
+  xh = FEFunction(trial, vec)
+  biform(u,v) = solver.weakform(xh,u,v)
+  patch_mats = assemble_matrix(biform, assem, trial, test)
+  patch_rows, patch_cols, patch_factorizations, caches = patch_solver_caches(
+    assem, patch_mats; collect_factorizations = solver.collect_factorizations
+  )
+
+  return PatchNS(solver, patch_rows, patch_cols, patch_mats, patch_factorizations, caches)
+end
+
+function Algebra.numerical_setup(ss::PatchSS{<:PatchSolverFromWeakform},mat::PSparseMatrix,vec::PVector)
+  solver = ss.solver
+  @assert solver.is_nonlinear
+  assem, trial, test = solver.assem, solver.trial, solver.test
+
+  xh = FEFunction(trial, vec)
+  biform(u,v) = solver.weakform(xh,u,v)
+  patch_mats = assemble_matrix(biform, assem, trial, test)
+
+  patch_rows, patch_cols, patch_factorizations, caches = patch_solver_caches(
+    assem, patch_mats; collect_factorizations = solver.collect_factorizations
+  )
+
+  x_c = pzeros(eltype(mat),partition(get_free_dof_ids(trial)))
+  b_c = pzeros(eltype(mat),partition(get_free_dof_ids(test)))
+  caches = (x_c,b_c,caches)
+  return PatchNS(solver, patch_rows, patch_cols, patch_mats, patch_factorizations, caches)
+end
+
+function Algebra.numerical_setup!(ns::PatchNS,mat::AbstractMatrix,vec::AbstractVector)
+  solver = nc.solver
+  @assert solver.is_nonlinear
+  assem, trial, test = solver.assem, solver.trial, solver.test
 
   xh = FEFunction(trial, vec)
   biform(u,v) = solver.weakform(xh,u,v)
@@ -126,46 +144,69 @@ function Algebra.numerical_setup(ss::PatchSS{<:PatchSolverFromWeakform},mat::Abs
   if solver.collect_factorizations
     patch_factorizations = Arrays.lazy_collect(patch_factorizations)
   end
-
-  i_cache = array_cache(patch_cols)
-  x_cache = CachedVector(eltype(mat))
-  f_cache = array_cache(patch_factorizations)
-  caches = (i_cache, x_cache, f_cache)
-
-  return PatchNS(solver, patch_rows, patch_cols, patch_factorizations, caches)
+  ns.patch_mats = patch_mats
+  ns.patch_factorizations = patch_factorizations
+  
+  return ns
 end
 
-function Algebra.numerical_setup(ss::PatchSS{<:PatchSolverFromWeakform},mat::PSparseMatrix,vec::PVector)
-  solver = ss.solver
+function Algebra.numerical_setup!(ns::PatchNS,mat::PSparseMatrix,vec::PVector)
+  solver = nc.solver
   @assert solver.is_nonlinear
   assem, trial, test = solver.assem, solver.trial, solver.test
-  
-  patch_rows = map(a -> a.strategy.patch_rows, local_views(assem))
-  patch_cols = map(a -> a.strategy.patch_cols, local_views(assem))
-  # patch_cols = reindex_patch_ids(assem_patch_cols, get_free_dof_ids(trial), axes(mat,2))
-  # patch_rows = patch_cols # reindex_patch_ids(assem_patch_rows, get_free_dof_ids(test), axes(mat,1))
 
   xh = FEFunction(trial, vec)
   biform(u,v) = solver.weakform(xh,u,v)
   patch_mats = assemble_matrix(biform, assem, trial, test)
-  patch_factorizations, caches = map(patch_mats,patch_cols) do patch_mats,patch_cols
+  patch_factorizations = map(patch_mats) do patch_mats 
     patch_factorizations = lazy_map(lu!, patch_mats)
     if solver.collect_factorizations
       patch_factorizations = Arrays.lazy_collect(patch_factorizations)
     end
+    return patch_factorizations
+  end
+  ns.patch_mats = patch_mats
+  ns.patch_factorizations = patch_factorizations
+  
+  return ns
+end
 
-    i_cache = array_cache(patch_cols)
-    x_cache = CachedVector(eltype(mat))
-    f_cache = array_cache(patch_factorizations)
-    caches = (i_cache, x_cache, f_cache)
+function patch_solver_caches(patch_cols, patch_mats; collect_factorizations = false)
+  patch_factorizations = lazy_map(lu!, patch_mats)
+  if collect_factorizations
+    patch_factorizations = Arrays.lazy_collect(patch_factorizations)
+  end
 
-    return patch_factorizations, caches
+  T = eltype(eltype(patch_mats))
+  i_cache = array_cache(patch_cols)
+  x_cache = CachedVector(eltype(T))
+  f_cache = array_cache(patch_factorizations)
+  caches = (i_cache, x_cache, f_cache)
+
+  return patch_factorizations, caches
+end
+
+function patch_solver_caches(
+  assem::PatchAssembler, patch_mats; 
+  collect_factorizations = false
+)
+  patch_cols = assem.strategy.patch_cols
+  patch_rows = assem.strategy.patch_rows
+
+  patch_factorizations, caches = patch_solver_caches(
+    patch_cols, patch_mats; collect_factorizations
+  )
+  return patch_cols, patch_rows, patch_factorizations, caches
+end
+
+function patch_solver_caches(
+  assem::GridapDistributed.DistributedPatchAssembler, patch_mats; 
+  collect_factorizations = false
+)
+  patch_rows, patch_cols, patch_factorizations, caches = map(local_views(assem), patch_mats) do assem, patch_mats
+    patch_solve_caches(assem, patch_mats; collect_factorizations)
   end |> tuple_of_arrays
-
-  x_c = pzeros(eltype(mat),partition(get_free_dof_ids(trial)))
-  b_c = pzeros(eltype(mat),partition(get_free_dof_ids(test)))
-  caches = (x_c,b_c,caches)
-  return PatchNS(solver, patch_rows, patch_cols, patch_factorizations, caches)
+  return patch_rows, patch_cols, patch_factorizations, caches
 end
 
 # function reindex_patch_ids(old_patch_ids, old_ids::PRange, new_ids::PRange)
@@ -198,25 +239,40 @@ function Algebra.solve!(x::AbstractVector,ns::PatchNS,b::AbstractVector)
   solve_patch_overlapping!(x,ns,patch_b)
 end
 
-for func in (:solve_patch_overlapping!, :solve_patch_nonoverlapping!)
-  @eval begin
+function solve_patch_overlapping!(x::AbstractVector,ns::PatchNS,patch_b,patch_ids=eachindex(patch_b))
+  solve_patch_overlapping!(x, ns.patch_cols, ns.patch_factorizations, patch_b, patch_ids, ns.caches)
+end
 
-    function $func(x::AbstractVector,ns::PatchNS,patch_b)
-      return $func(x, ns.patch_cols, ns.patch_factorizations, patch_b, eachindex(patch_b), ns.caches)
-    end
+function solve_patch_nonoverlapping!(x::AbstractVector,ns::PatchNS,patch_b,patch_ids=eachindex(patch_b))
+  solve_patch_nonoverlapping!(x, ns.patch_cols, ns.patch_factorizations, patch_b, patch_ids, ns.caches)
+end
 
-    function $func(x::PVector,ns::PatchNS,patch_b)
-      x_c, _, caches = ns.caches
-      map(partition(x_c), ns.patch_cols, ns.patch_factorizations, patch_b, caches) do x_c, patch_cols, patch_f, patch_b, caches
-        $func(x_c, patch_cols, patch_f, patch_b, eachindex(patch_b), caches)
-      end
-      assemble!(x_c) |> wait
-      copy!(x, x_c)
-      consistent!(x) |> wait
-      return x
-    end
+function solve_patch_overlapping!(x::PVector,ns::PatchNS,patch_b,patch_ids=map(eachindex,patch_b))
+  x_c, _, caches = ns.caches
+  map(solve_patch_overlapping!, partition(x_c), ns.patch_cols, ns.patch_factorizations, patch_b, patch_ids, caches)
+  assemble!(x_c) |> wait
+  copy!(x, x_c)
+  consistent!(x) |> wait
+  return x
+end
 
-  end
+function solve_patch_nonoverlapping!(x::PVector,ns::PatchNS,patch_b,patch_ids=map(eachindex,patch_b))
+  x_c, _, caches = ns.caches
+  map(solve_patch_nonoverlapping!, partition(x_c), ns.patch_cols, ns.patch_factorizations, patch_b, patch_ids, caches)
+  assemble!(x_c) |> wait
+  copy!(x, x_c)
+  consistent!(x) |> wait
+  return x
+end
+
+function solve_patch_overlapping!(x::PVector, args...)
+  map(solve_patch_overlapping!, partition(x), args...)
+  assemble!(x) |> wait
+end
+
+function solve_patch_nonoverlapping!(x::PVector, args...)
+  map(solve_patch_nonoverlapping!, partition(x), args...)
+  assemble!(x) |> wait
 end
 
 function solve_patch_overlapping!(
@@ -261,4 +317,18 @@ function solve_patch_nonoverlapping!(
   end
 
   return x
+end
+
+function patch_evaluate_rhs(ns::PatchNS,x::AbstractVector)
+  patch_x = lazy_map(Broadcasting(Reindex(x)),ns.patch_cols)
+  patch_b = lazy_map(*,ns.patch_mats,patch_x)
+  return patch_b
+end
+
+function patch_evaluate_rhs(ns::PatchNS,x::PVector)
+  patch_b = map(partition(x),ns.patch_cols,ns.patch_mats) do x,patch_cols,patch_mats
+    patch_x = lazy_map(Broadcasting(Reindex(x)),patch_cols)
+    return lazy_map(*,patch_mats,patch_x)
+  end
+  return patch_b
 end

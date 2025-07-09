@@ -23,6 +23,9 @@ export PatchBasedLinearSolver, VankaSolver
 export PatchProlongationOperator, PatchRestrictionOperator
 export setup_patch_prolongation_operators, setup_patch_restriction_operators
 
+export PatchProlongationOperatorOld, PatchRestrictionOperatorOld
+export setup_patch_prolongation_operators_old, setup_patch_restriction_operators_old
+
 # Geometry
 include("PatchDecompositions.jl")
 include("DistributedPatchDecompositions.jl")
@@ -38,6 +41,7 @@ include("PatchMultiFieldFESpaces.jl")
 # Solvers
 include("PatchBasedLinearSolvers.jl")
 include("PatchTransferOperators.jl")
+include("PatchTransferOperatorsOld.jl")
 include("VankaSolvers.jl")
 include("PatchSolvers.jl")
 
