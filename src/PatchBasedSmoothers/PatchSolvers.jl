@@ -204,7 +204,7 @@ function patch_solver_caches(
   collect_factorizations = false
 )
   patch_rows, patch_cols, patch_factorizations, caches = map(local_views(assem), patch_mats) do assem, patch_mats
-    patch_solve_caches(assem, patch_mats; collect_factorizations)
+    patch_solver_caches(assem, patch_mats; collect_factorizations)
   end |> tuple_of_arrays
   return patch_rows, patch_cols, patch_factorizations, caches
 end

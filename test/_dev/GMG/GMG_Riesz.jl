@@ -63,7 +63,7 @@ parts = with_debug() do distribute
   distribute(LinearIndices((prod(np),)))
 end
 
-nc = (2,2)
+nc = (4,4)
 Dc = length(nc)
 domain = (Dc == 2) ? (0,1,0,1) : (0,1,0,1,0,1)
 mh = CartesianModelHierarchy(parts,np_per_level,domain,nc)

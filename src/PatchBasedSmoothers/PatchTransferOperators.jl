@@ -175,18 +175,24 @@ function setup_patch_prolongation_operators(
 end
 
 function CoarsePatchTopology(model::Gridap.Adaptivity.AdaptedDiscreteModel)
-  topo = get_grid_topology(model)
+  Dc = num_cell_dims(model)
+  ftopo = get_grid_topology(model)
+  ctopo = get_grid_topology(Gridap.Adaptivity.get_parent(model))
   glue = Gridap.Adaptivity.get_adaptivity_glue(model)
   patch_cells = glue.o2n_faces_map
+  
+  fnode_to_cface_dim = Gridap.Adaptivity.get_d_to_fface_to_cface(glue, ctopo, ftopo)[2][1]
+  is_interior(n) = isequal(fnode_to_cface_dim[n],Dc)
 
   Dc = num_cell_dims(model)
-  cell_to_nodes = Geometry.get_faces(topo,Dc,0)
+  fcell_to_fnodes = Geometry.get_faces(ftopo,Dc,0)
   patch_roots = map(patch_cells) do cells
-    only(intersect((cell_to_nodes[c] for c in cells)...))
+    nodes = filter(is_interior,intersect((fcell_to_fnodes[c] for c in cells)...))
+    return only(nodes)
   end
   metadata = Geometry.StarPatchMetadata(0,patch_roots)
 
-  return PatchTopology(topo,patch_cells,metadata)
+  return PatchTopology(ftopo,patch_cells,metadata)
 end
 
 function CoarsePatchTopology(model::GridapDistributed.DistributedDiscreteModel)
