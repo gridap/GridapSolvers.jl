@@ -1,18 +1,18 @@
 
-mutable struct PatchProlongationOperator{R,A,B,C}
+mutable struct PatchProlongationOperator{R,A,B}
   sh    :: A
   assem :: B
   lhs   :: Union{Nothing,Function}
   rhs   :: Union{Nothing,Function}
   is_nonlinear :: Bool
   collect_factorizations :: Bool
-  caches :: C
+  caches
 
   function PatchProlongationOperator{R}(
     sh,assem,lhs,rhs,is_nonlinear,collect_factorizations,caches
   ) where R
-    A, B, C = typeof(sh), typeof(assem), typeof(caches)
-    new{R,A,B,C}(sh,assem,lhs,rhs,is_nonlinear,collect_factorizations,caches)
+    A, B = typeof(sh), typeof(assem)
+    new{R,A,B}(sh,assem,lhs,rhs,is_nonlinear,collect_factorizations,caches)
   end
 end
 
