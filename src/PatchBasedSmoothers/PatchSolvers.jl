@@ -160,7 +160,7 @@ function Algebra.numerical_setup!(ns::PatchNS,mat::PSparseMatrix,vec::PVector)
   patch_mats = assemble_matrix(biform, assem, trial, test)
   patch_factorizations, caches = map(patch_mats,ns.patch_cols) do patch_mats, patch_cols
     patch_solver_caches(patch_cols, patch_mats; collect_factorizations = solver.collect_factorizations)
-  end
+  end |> tuple_of_arrays
 
   x_c, b_c, _ = ns.caches
   caches = (x_c, b_c, caches)
