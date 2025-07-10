@@ -60,13 +60,13 @@ end
 Algebra.symbolic_setup(s::PatchSolverFromMats,mat::AbstractMatrix) = PatchSS(s)
 Algebra.symbolic_setup(s::PatchSolverFromWeakform,mat::AbstractMatrix) = PatchSS(s)
 
-mutable struct PatchNS{A,B,C,D,E,F} <: Algebra.NumericalSetup
+mutable struct PatchNS{A,B,C} <: Algebra.NumericalSetup
   solver :: A
   patch_rows :: B
   patch_cols :: C
-  patch_mats :: D
-  patch_factorizations :: E
-  caches :: F
+  patch_mats
+  patch_factorizations
+  caches
 end
 
 function Algebra.numerical_setup(ss::PatchSS{<:PatchSolverFromMats},mat::AbstractMatrix)
@@ -140,33 +140,34 @@ function Algebra.numerical_setup!(ns::PatchNS,mat::AbstractMatrix,vec::AbstractV
   xh = FEFunction(trial, vec)
   biform(u,v) = solver.weakform(xh,u,v)
   patch_mats = assemble_matrix(biform, assem, trial, test)
-  patch_factorizations = lazy_map(lu!, patch_mats)
-  if solver.collect_factorizations
-    patch_factorizations = Arrays.lazy_collect(patch_factorizations)
-  end
+  patch_factorizations, caches = patch_solver_caches(
+    patch_mats, ns.patch_cols; collect_factorizations = solver.collect_factorizations
+  )
   ns.patch_mats = patch_mats
   ns.patch_factorizations = patch_factorizations
+  ns.caches = caches
   
   return ns
 end
 
 function Algebra.numerical_setup!(ns::PatchNS,mat::PSparseMatrix,vec::PVector)
-  solver = nc.solver
+  solver = ns.solver
   @assert solver.is_nonlinear
   assem, trial, test = solver.assem, solver.trial, solver.test
 
   xh = FEFunction(trial, vec)
   biform(u,v) = solver.weakform(xh,u,v)
   patch_mats = assemble_matrix(biform, assem, trial, test)
-  patch_factorizations = map(patch_mats) do patch_mats 
-    patch_factorizations = lazy_map(lu!, patch_mats)
-    if solver.collect_factorizations
-      patch_factorizations = Arrays.lazy_collect(patch_factorizations)
-    end
-    return patch_factorizations
+  patch_factorizations, caches = map(patch_mats,ns.patch_cols) do patch_mats, patch_cols
+    patch_solver_caches(patch_cols, patch_mats; collect_factorizations = solver.collect_factorizations)
   end
+
+  x_c, b_c, _ = ns.caches
+  caches = (x_c, b_c, caches)
+
   ns.patch_mats = patch_mats
   ns.patch_factorizations = patch_factorizations
+  ns.caches = caches
   
   return ns
 end
