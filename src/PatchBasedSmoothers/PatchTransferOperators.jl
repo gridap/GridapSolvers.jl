@@ -1,4 +1,6 @@
 
+struct PatchRestrictionOperator end # Just a placeholder for now
+
 mutable struct PatchProlongationOperator{R,A,B}
   sh    :: A
   assem :: B
