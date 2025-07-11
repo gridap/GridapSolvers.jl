@@ -37,6 +37,9 @@ export FESpaceHierarchy
 export get_fe_space, get_fe_space_before_redist
 export compute_hierarchy_matrices
 
+export TriangulationHierarchy
+export get_triangulation_before_redist
+
 export LocalProjectionMap
 
 export DistributedGridTransferOperator
@@ -52,6 +55,7 @@ include("GridapFixes.jl")
 include("RefinementTools.jl")
 
 include("ModelHierarchies.jl")
+include("TriangulationHierarchies.jl")
 include("FESpaceHierarchies.jl")
 include("LocalProjectionMaps.jl")
 include("GridTransferOperators.jl")

@@ -1,8 +1,8 @@
 struct FESpaceHierarchyLevel{A,B,C}
-  level               :: Int
-  fe_space            :: A
-  fe_space_red        :: B
-  mh_level            :: C
+  level        :: Int
+  fe_space     :: A
+  fe_space_red :: B
+  mh_level     :: C
 end
 
 """
@@ -48,6 +48,18 @@ function FESpaces.FESpace(mh::ModelHierarchyLevel,args...;kwargs...)
   return FESpaceHierarchyLevel(mh.level,Vh,Vh_red,mh)
 end
 
+function FESpaces.FESpace(th::TriangulationHierarchyLevel,args...;kwargs...)
+  if has_redistribution(th)
+    cparts, _ = get_old_and_new_parts(th.mh_level.red_glue,Val(false))
+    Vh     = i_am_in(cparts) ? FESpace(get_triangulation_before_redist(th),args...;kwargs...) : nothing
+    Vh_red = FESpace(get_triangulation(th),args...;kwargs...)
+  else
+    Vh = FESpace(get_triangulation(th),args...;kwargs...)
+    Vh_red = nothing
+  end
+  return FESpaceHierarchyLevel(th.level,Vh,Vh_red,th.mh_level)
+end
+
 function FESpaces.TrialFESpace(a::FESpaceHierarchyLevel,args...;kwargs...)
   Uh     = !isa(a.fe_space,Nothing) ? TrialFESpace(a.fe_space,args...;kwargs...) : nothing
   Uh_red = !isa(a.fe_space_red,Nothing) ? TrialFESpace(a.fe_space_red,args...;kwargs...) : nothing
@@ -58,7 +70,7 @@ end
 
 function FESpaces.FESpace(mh::ModelHierarchy,args...;kwargs...)
   map(mh) do mhl
-    TestFESpace(mhl,args...;kwargs...)
+    FESpace(mhl,args...;kwargs...)
   end
 end
 
@@ -67,7 +79,13 @@ function FESpaces.FESpace(
 )
   map(linear_indices(mh),mh) do l, mhl
     args = arg_vector[l]
-    TestFESpace(mhl,args...;kwargs...)
+    FESpace(mhl,args...;kwargs...)
+  end
+end
+
+function FESpaces.FESpace(th::TriangulationHierarchy,args...;kwargs...)
+  map(th) do thl
+    FESpace(thl,args...;kwargs...)
   end
 end
 
