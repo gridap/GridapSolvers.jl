@@ -39,16 +39,22 @@ using GridapSolvers
 using GridapSolvers.LinearSolvers, GridapSolvers.MultilevelTools, GridapSolvers.PatchBasedSmoothers
 using GridapSolvers.BlockSolvers: LinearSystemBlock, BiformBlock, BlockTriangularSolver
 
-function get_patch_smoothers(mh,tests,biform,patch_decompositions,qdegree)
-  patch_spaces = PatchFESpace(tests,patch_decompositions)
-  nlevs = num_levels(mh)
-  smoothers = map(view(tests,1:nlevs-1),patch_decompositions,patch_spaces) do tests, PD, Ph
-    Vh = get_fe_space(tests)
-    Ω  = Triangulation(PD)
+function get_patch_smoothers(sh,biform,qdegree)
+  nlevs = num_levels(sh)
+  smoothers = map(view(sh,1:nlevs-1)) do shl
+    model = get_model(shl)
+    ptopo = Geometry.PatchTopology(ReferenceFE{0},model)
+    space = get_fe_space(shl)
+    Ω  = Geometry.PatchTriangulation(model,ptopo)
     dΩ = Measure(Ω,qdegree)
     ap = (u,v) -> biform(u,v,dΩ)
-    patch_smoother = PatchBasedLinearSolver(ap,Ph,Vh)
-    return RichardsonSmoother(patch_smoother,10,0.2)
+    solver = PatchBasedSmoothers.PatchSolver(
+      ptopo, space, space, ap;
+      assembly = :star,
+      collect_factorizations = true,
+      is_nonlinear = false
+    )
+    return RichardsonSmoother(solver,10,0.2)
   end
   return smoothers
 end
@@ -113,15 +119,14 @@ function main(distribute,np,nc,np_per_level)
   A, b = get_matrix(op), get_vector(op);
 
   biforms = map(mhl -> get_bilinear_form(mhl,biform_u,qdegree),mh)
-  patch_decompositions = PatchDecomposition(mh)
   smoothers = get_patch_smoothers(
-    mh,tests_u,biform_u,patch_decompositions,qdegree
+    tests_u,biform_u,qdegree
   )
   prolongations = setup_patch_prolongation_operators(
-    tests_u,biform_u,graddiv,qdegree
+    tests_u,biform_u,graddiv,qdegree;is_nonlinear=false,collect_factorizations=true
   )
-  restrictions = setup_patch_restriction_operators(
-    tests_u,prolongations,graddiv,qdegree;solver=CGSolver(JacobiLinearSolver())
+  restrictions = setup_restriction_operators(
+    tests_u,qdegree;mode=:residual,solver=CGSolver(JacobiLinearSolver())
   )
   gmg = GMGLinearSolver(
     trials_u,tests_u,biforms,

@@ -40,16 +40,22 @@ using GridapSolvers.LinearSolvers, GridapSolvers.MultilevelTools
 using GridapSolvers.PatchBasedSmoothers, GridapSolvers.NonlinearSolvers
 using GridapSolvers.BlockSolvers: NonlinearSystemBlock, LinearSystemBlock, BiformBlock, BlockTriangularSolver
 
-function get_patch_smoothers(mh,tests,biform,patch_decompositions,qdegree;is_nonlinear=false)
-  patch_spaces = PatchFESpace(tests,patch_decompositions)
-  nlevs = num_levels(mh)
-  smoothers = map(view(tests,1:nlevs-1),patch_decompositions,patch_spaces) do tests, PD, Ph
-    Vh = get_fe_space(tests)
-    Ω  = Triangulation(PD)
+function get_patch_smoothers(sh,jac,qdegree)
+  nlevs = num_levels(sh)
+  smoothers = map(view(sh,1:nlevs-1)) do shl
+    model = get_model(shl)
+    ptopo = Geometry.PatchTopology(ReferenceFE{0},model)
+    space = get_fe_space(shl)
+    Ω  = Geometry.PatchTriangulation(model,ptopo)
     dΩ = Measure(Ω,qdegree)
-    ap = (u,du,dv) -> biform(u,du,dv,dΩ)
-    patch_smoother = PatchBasedLinearSolver(ap,Ph,Vh;is_nonlinear)
-    return RichardsonSmoother(patch_smoother,10,0.2)
+    ap = (u,du,dv) -> jac(u,du,dv,dΩ)
+    solver = PatchBasedSmoothers.PatchSolver(
+      ptopo, space, space, ap;
+      assembly = :star,
+      collect_factorizations = true,
+      is_nonlinear = true
+    )
+    return RichardsonSmoother(solver,10,0.2)
   end
   return smoothers
 end
@@ -126,15 +132,14 @@ function main(distribute,np,nc,np_per_level)
   op = FEOperator(res_h,jac_h,X,Y)
 
   biforms = map(mhl -> get_trilinear_form(mhl,jac_u,qdegree),mh)
-  patch_decompositions = PatchDecomposition(mh)
   smoothers = get_patch_smoothers(
-    mh,trials_u,jac_u,patch_decompositions,qdegree;is_nonlinear=true
+    trials_u,jac_u,qdegree
   )
   prolongations = setup_patch_prolongation_operators(
-    tests_u,jac_u,graddiv,qdegree;is_nonlinear=true
+    tests_u,jac_u,jac_u,qdegree;is_nonlinear=true,collect_factorizations=true
   )
-  restrictions = setup_patch_restriction_operators(
-    tests_u,prolongations,graddiv,qdegree;solver=CGSolver(JacobiLinearSolver())
+  restrictions = setup_restriction_operators(
+    tests_u,qdegree;mode=:residual,solver=CGSolver(JacobiLinearSolver())
   )
   gmg = GMGLinearSolver(
     trials_u,tests_u,biforms,

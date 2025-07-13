@@ -15,17 +15,22 @@ using GridapSolvers.LinearSolvers
 using GridapSolvers.MultilevelTools
 using GridapSolvers.PatchBasedSmoothers
 
-function get_patch_smoothers(mh,tests,biform,qdegree)
-  patch_decompositions = PatchDecomposition(mh)
-  patch_spaces = PatchFESpace(tests,patch_decompositions)
-  nlevs = num_levels(mh)
-  smoothers = map(view(tests,1:nlevs-1),patch_decompositions,patch_spaces) do tests, PD, Ph
-    Vh = get_fe_space(tests)
-    Ω  = Triangulation(PD)
+function get_patch_smoothers(sh,biform,qdegree)
+  nlevs = num_levels(sh)
+  smoothers = map(view(sh,1:nlevs-1)) do shl
+    model = get_model(shl)
+    ptopo = Geometry.PatchTopology(ReferenceFE{0},model)
+    space = get_fe_space(shl)
+    Ω  = Geometry.PatchTriangulation(model,ptopo)
     dΩ = Measure(Ω,qdegree)
     ap = (u,v) -> biform(u,v,dΩ)
-    patch_smoother = PatchBasedLinearSolver(ap,Ph,Vh)
-    return RichardsonSmoother(patch_smoother,10,0.2)
+    solver = PatchBasedSmoothers.PatchSolver(
+      ptopo, space, space, ap;
+      assembly = :star,
+      collect_factorizations = true,
+      is_nonlinear = false
+    )
+    return RichardsonSmoother(solver,10,0.2)
   end
   return smoothers
 end
@@ -227,7 +232,7 @@ function gmg_hdiv_driver(t,parts,mh,order)
   toc!(t,"FESpaces")
 
   tic!(t;barrier=true)
-  smoothers = get_patch_smoothers(mh,tests,biform,qdegree)
+  smoothers = get_patch_smoothers(tests,biform,qdegree)
   toc!(t,"Patch Decomposition")
 
   tic!(t;barrier=true)
@@ -265,7 +270,7 @@ function gmg_multifield_driver(t,parts,mh,order)
 
   tic!(t;barrier=true)
   qdegree = 2*(order+1)
-  smoothers = get_patch_smoothers(mh,tests,biform,qdegree)
+  smoothers = get_patch_smoothers(tests,biform,qdegree)
   toc!(t,"Patch Decomposition")
 
   tic!(t;barrier=true)

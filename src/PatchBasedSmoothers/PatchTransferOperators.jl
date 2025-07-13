@@ -70,7 +70,7 @@ function _get_patch_cache(lev,sh,assem,lhs,rhs,is_nonlinear,collect_factorizatio
     
     return uh, uH, xh, dx_h, liform, patch_rows, patch_cols, patch_f, patch_ids, caches
   else
-    return nothing, nothing, nothing, nothing, nothing, nothing, nothing, nothing, nothing
+    return nothing, nothing, nothing, nothing, nothing, nothing, nothing, nothing, nothing, nothing
   end
 end
 
@@ -132,7 +132,6 @@ function LinearAlgebra.mul!(y::PVector,A::PatchProlongationOperator{Val{true}},x
   model_h, Uh, fv_h, dv_h, UH, fv_H, dv_H = cache_refine
   fv_h_red, dv_h_red, Uh_red, model_h_red, glue, cache_exchange = cache_redist
   _, uH, _, dx_h, liform, _, patch_cols, patch_f, patch_ids, caches = cache_patch
-  dxh  = isa(duh,Nothing) ? nothing : get_free_dof_values(duh)
 
   # 1 - Interpolate in coarse partition
   if !isa(x,Nothing)
@@ -144,7 +143,7 @@ function LinearAlgebra.mul!(y::PVector,A::PatchProlongationOperator{Val{true}},x
       dx_h, patch_cols, patch_f, patch_b, patch_ids, caches
     )
 
-    fv_h .= fv_h .- dxh
+    fv_h .= fv_h .- dx_h
   end
 
   # 2 - Redistribute from coarse partition to fine partition
