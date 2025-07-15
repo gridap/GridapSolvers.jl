@@ -125,6 +125,9 @@ function main(distribute,np,nc,np_per_level)
   prolongations = setup_patch_prolongation_operators(
     tests_u,biform_u,graddiv,qdegree;is_nonlinear=false,collect_factorizations=true
   )
+  # restrictions = setup_patch_restriction_operators(
+  #   tests_u,prolongations,qdegree;solver=CGSolver(JacobiLinearSolver())
+  # )
   restrictions = setup_restriction_operators(
     tests_u,qdegree;mode=:residual,solver=CGSolver(JacobiLinearSolver())
   )

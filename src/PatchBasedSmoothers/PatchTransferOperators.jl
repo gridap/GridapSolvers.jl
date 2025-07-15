@@ -1,6 +1,50 @@
 
-struct PatchRestrictionOperator end # Just a placeholder for now
+"""
+    CoarsePatchTopology(model::AdaptedDiscreteModel)
 
+Given an `AdaptedDiscreteModel`, returns a `PatchTopology` for the fine model 
+such that each patch corresponds to a coarse cell in the parent model.
+"""
+function CoarsePatchTopology(model::Gridap.Adaptivity.AdaptedDiscreteModel)
+  Dc = num_cell_dims(model)
+  ftopo = get_grid_topology(model)
+  ctopo = get_grid_topology(Gridap.Adaptivity.get_parent(model))
+  glue = Gridap.Adaptivity.get_adaptivity_glue(model)
+  patch_cells = glue.o2n_faces_map
+  
+  fnode_to_cface_dim = Gridap.Adaptivity.get_d_to_fface_to_cface(glue, ctopo, ftopo)[2][1]
+  is_interior(n) = isequal(fnode_to_cface_dim[n],Dc)
+
+  Dc = num_cell_dims(model)
+  fcell_to_fnodes = Geometry.get_faces(ftopo,Dc,0)
+  patch_roots = map(patch_cells) do cells
+    nodes = filter(is_interior,intersect((fcell_to_fnodes[c] for c in cells)...))
+    return only(nodes)
+  end
+  metadata = Geometry.StarPatchMetadata(0,patch_roots)
+
+  return PatchTopology(ftopo,patch_cells,metadata)
+end
+
+function CoarsePatchTopology(model::GridapDistributed.DistributedDiscreteModel)
+  ptopos = map(CoarsePatchTopology, local_views(model))
+  GridapDistributed.DistributedPatchTopology(ptopos)
+end
+
+
+"""
+    struct PatchProlongationOperator end
+
+A `PatchProlongationOperator` is a modified prolongation operator such that given a coarse
+solution `xH`, it maps it to a fine mesh solution `xh` given by
+
+```
+xh = Ih(xH) - yh
+```
+
+where `yh` is a subspace-based correction computed by solving local problems on coarse cell 
+patches within the fine mesh.
+"""
 mutable struct PatchProlongationOperator{R,A,B}
   sh    :: A
   assem :: B
@@ -18,6 +62,27 @@ mutable struct PatchProlongationOperator{R,A,B}
   end
 end
 
+@doc """
+    function PatchProlongationOperator(
+      lev   :: Integer,
+      sh    :: FESpaceHierarchy,
+      ptopo :: PatchTopology,
+      lhs   :: Function,
+      rhs   :: Function;
+      is_nonlinear=false,
+      collect_factorizations=false
+    )
+
+Returns an instance of `PatchProlongationOperator` for a given level `lev` and a given 
+FESpaceHierarchy `sh`. The subspace-based correction on a solution `uH` is computed 
+by solving local problems given by 
+
+```
+  lhs(u_i,v_i) = rhs(uH,v_i)  ∀ v_i ∈ V_i
+```
+
+where `V_i` is a restriction of `sh[lev]` onto the patches given by the PatchTopology `ptopo`.
+"""
 function PatchProlongationOperator(
   lev,sh,ptopo::Union{<:Geometry.PatchTopology,<:GridapDistributed.DistributedPatchTopology},
   lhs,rhs;is_nonlinear=false,collect_factorizations=false
@@ -175,28 +240,95 @@ function setup_patch_prolongation_operators(
   end
 end
 
-function CoarsePatchTopology(model::Gridap.Adaptivity.AdaptedDiscreteModel)
-  Dc = num_cell_dims(model)
-  ftopo = get_grid_topology(model)
-  ctopo = get_grid_topology(Gridap.Adaptivity.get_parent(model))
-  glue = Gridap.Adaptivity.get_adaptivity_glue(model)
-  patch_cells = glue.o2n_faces_map
-  
-  fnode_to_cface_dim = Gridap.Adaptivity.get_d_to_fface_to_cface(glue, ctopo, ftopo)[2][1]
-  is_interior(n) = isequal(fnode_to_cface_dim[n],Dc)
+############################################################################################
 
-  Dc = num_cell_dims(model)
-  fcell_to_fnodes = Geometry.get_faces(ftopo,Dc,0)
-  patch_roots = map(patch_cells) do cells
-    nodes = filter(is_interior,intersect((fcell_to_fnodes[c] for c in cells)...))
-    return only(nodes)
+mutable struct PatchRestrictionOperator{R,A,B}
+  Ip :: A
+  caches :: B
+
+  function PatchRestrictionOperator{R}(
+    Ip::PatchProlongationOperator{R},
+    caches
+  ) where R
+    A = typeof(Ip)
+    B = typeof(caches)
+    new{R,A,B}(Ip,caches)
   end
-  metadata = Geometry.StarPatchMetadata(0,patch_roots)
-
-  return PatchTopology(ftopo,patch_cells,metadata)
 end
 
-function CoarsePatchTopology(model::GridapDistributed.DistributedDiscreteModel)
-  ptopos = map(CoarsePatchTopology, local_views(model))
-  GridapDistributed.DistributedPatchTopology(ptopos)
+function PatchRestrictionOperator(lev,sh,Ip,qdegree;solver=LUSolver())
+  cache_refine = MultilevelTools._get_dual_projection_cache(lev,sh,qdegree,solver)
+  cache_redist = MultilevelTools._get_redistribution_cache(lev,sh,:residual,:restriction,:dual_projection,cache_refine)
+  cache_patch = Ip.caches[2]
+  caches = cache_refine, cache_patch, cache_redist
+
+  redist = has_redistribution(sh,lev)
+  R = typeof(Val(redist))
+  return PatchRestrictionOperator{R}(Ip,caches)
+end
+
+function MultilevelTools.update_transfer_operator!(op::PatchRestrictionOperator,x::Union{PVector,Nothing})
+  cache_refine, cache_patch, cache_redist = op.caches
+  op.caches = (cache_refine, op.Ip.caches[2], cache_redist)
+  return nothing
+end
+
+function setup_patch_restriction_operators(sh,patch_prolongations,qdegrees;kwargs...)
+  map(view(linear_indices(sh),1:num_levels(sh)-1)) do lev
+    qdegree = isa(qdegrees,Vector) ? qdegrees[lev] : qdegrees
+    Ip = patch_prolongations[lev]
+    PatchRestrictionOperator(lev,sh,Ip,qdegree;kwargs...)
+  end
+end
+
+function LinearAlgebra.mul!(y::AbstractVector,A::PatchRestrictionOperator{Val{false}},x::AbstractVector)
+  cache_refine, cache_patch, _ = A.caches
+  model_h, Uh, VH, Mh_ns, rh, _, assem, dΩhH = cache_refine
+  uh, uH, _, dx_h, liform, _, patch_cols, patch_f, patch_ids, caches = cache_patch
+  fv_h = get_free_dof_values(uh)
+
+  copy!(fv_h,x)
+  consistent!(fv_h) |> fetch
+  patch_b = assemble_vector(liform, A.Ip.assem, Uh)
+  solve_patch_overlapping!(
+    dx_h, patch_cols, patch_f, patch_b, patch_ids, caches
+  )
+  fv_h .= fv_h .- dx_h
+
+  solve!(rh,Mh_ns,fv_h)
+  copy!(fv_h,rh)
+  isa(y,PVector) && wait(consistent!(fv_h))
+  v = get_fe_basis(VH)
+  assemble_vector!(y,assem,collect_cell_vector(VH,∫(v⋅uh)*dΩhH))
+
+  return y
+end
+
+function LinearAlgebra.mul!(y::Union{PVector,Nothing},A::PatchRestrictionOperator{Val{true}},x::PVector)
+  cache_refine, cache_patch, cache_redist = A.caches
+  model_h, Uh, VH, Mh_ns, rh, _, assem, dΩhH = cache_refine
+  fv_h_red, dv_h_red, Uh_red, model_h_red, glue, cache_exchange = cache_redist
+  uh, uH, _, dx_h, liform, _, patch_cols, patch_f, patch_ids, caches = cache_patch
+  fv_h = isa(uh,Nothing) ? nothing : get_free_dof_values(uh)
+
+  copy!(fv_h_red,x)
+  consistent!(fv_h_red) |> fetch
+  GridapDistributed.redistribute_free_values!(cache_exchange,fv_h,Uh,fv_h_red,dv_h_red,Uh_red,model_h,glue;reverse=true)
+
+  if !isa(y,Nothing)
+    consistent!(fv_h) |> fetch
+    patch_b = assemble_vector(liform, A.Ip.assem, Uh)
+    solve_patch_overlapping!(
+      dx_h, patch_cols, patch_f, patch_b, patch_ids, caches
+    )
+    fv_h .= fv_h .- dx_h
+    
+    solve!(rh,Mh_ns,fv_h)
+    copy!(fv_h,rh)
+    consistent!(fv_h) |> fetch
+    v = get_fe_basis(VH)
+    assemble_vector!(y,assem,collect_cell_vector(VH,∫(v⋅uh)*dΩhH))
+  end
+
+  return y
 end
