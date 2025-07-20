@@ -6,7 +6,7 @@ using LinearAlgebra
 using FillArrays
 
 using Gridap
-using Gridap.ReferenceFEs, Gridap.Algebra
+using Gridap.ReferenceFEs, Gridap.Algebra, Gridap.Geometry
 using PartitionedArrays
 using GridapDistributed
 
