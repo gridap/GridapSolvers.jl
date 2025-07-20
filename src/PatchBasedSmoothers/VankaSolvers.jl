@@ -16,8 +16,8 @@ function VankaSolver(space::FESpace)
   return VankaSolver(space,patch_cells)
 end
 
-function VankaSolver(space::FESpace,patch_decomposition::PatchDecomposition)
-  patch_cells = patch_decomposition.patch_cells
+function VankaSolver(space::FESpace,ptopo::PatchTopology)
+  patch_cells = get_patch_cells(ptopo)
   return VankaSolver(space,patch_cells)
 end
 
@@ -44,10 +44,10 @@ end
 
 function VankaSolver(
   space::GridapDistributed.DistributedMultiFieldFESpace,
-  patch_decomposition::DistributedPatchDecomposition
+  ptopo::DistributedPatchTopology
 )
   @notimplemented "Distributed not implemented yet"
-  local_solvers = map(VankaSolver,local_views(space),local_views(patch_decomposition))
+  local_solvers = map(VankaSolver,local_views(space),local_views(ptopo))
   return SchwarzLinearSolver(local_solvers)
 end
 
