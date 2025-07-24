@@ -25,6 +25,7 @@ using PartitionedArrays: getany
 include("PETScUtils.jl")
 include("PETScCaches.jl")
 include("ElasticitySolvers.jl")
+include("HPDDMLinearSolvers.jl")
 include("HipmairXuSolvers.jl")
 
 end # module

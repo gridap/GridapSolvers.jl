@@ -1,3 +1,4 @@
+module PETScElasticitySolverTests
 
 using Gridap
 using Gridap.Geometry, Gridap.Algebra
@@ -50,3 +51,5 @@ function main(distribute,np)
 
   uh = FEFunction(U,x)
 end
+
+end # module
