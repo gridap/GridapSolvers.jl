@@ -7,6 +7,7 @@ using GridapDistributed
 using PartitionedArrays
 using SparseMatricesCSR, SparseArrays
 using GridapPETSc
+using GridapSolvers
 
 function main(distribute,np)
   u(x) = x[1] + x[2]
