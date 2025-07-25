@@ -1,7 +1,7 @@
 name = "GridapSolvers"
 uuid = "6d3209ee-5e3c-4db7-a716-942eb12ed534"
 authors = ["Santiago Badia <santiago.badia@monash.edu>", "Jordi Manyer <jordi.manyer@monash.edu>", "Alberto F. Martin <alberto.f.martin@anu.edu.au>", "Javier Principe <principe@cimne.upc.edu>"]
-version = "0.6.0"
+version = "0.6.1"
 
 [deps]
 AbstractTrees = "1520ce14-60c1-5f80-bbc7-55ef81b5835c"
@@ -19,8 +19,8 @@ SparseArrays = "2f01184e-e22b-5df5-ae63-d93ebab69eaf"
 SparseMatricesCSR = "a0a7dd2c-ebf4-11e9-1f05-cf50bc540ca1"
 
 [weakdeps]
-GridapP4est = "c2c8e14b-f5fd-423d-9666-1dd9ad120af9"
 GridapPETSc = "bcdc36c2-0c3e-11ea-095a-c9dadae499f1"
+GridapP4est = "c2c8e14b-f5fd-423d-9666-1dd9ad120af9"
 IterativeSolvers = "42fd0dbc-a981-5370-80f2-aaf504508153"
 Pardiso = "46dd5b70-b6fb-5a00-ae2d-e8fea33afaf2"
 

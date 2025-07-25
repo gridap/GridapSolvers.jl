@@ -22,9 +22,11 @@ function P4estCartesianModelHierarchy end
 # GridapPETScExt
 
 export PETScElasticitySolver
+export HPDDMLinearSolver
 export CachedPETScNS
 
 function PETScElasticitySolver end
+function HPDDMLinearSolver end
 function CachedPETScNS end
 
 # PardisoExt

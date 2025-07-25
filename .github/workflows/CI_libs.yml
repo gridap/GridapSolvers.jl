@@ -24,7 +24,7 @@ jobs:
     runs-on: ${{ matrix.os }}
     env:
       P4EST_ROOT_DIR: "/opt/p4est/2.8.5/"
-      JULIA_PETSC_LIBRARY: "/opt/petsc/3.22.4/lib/libpetsc"
+      JULIA_PETSC_LIBRARY: "/opt/petsc/3.23.4/lib/libpetsc"
     strategy:
       fail-fast: false
       matrix:
@@ -67,7 +67,7 @@ jobs:
         run: |
           CURR_DIR=$(pwd)
           PACKAGE=petsc
-          VERSION=3.22.4
+          VERSION=3.23.4
           INSTALL_ROOT=/opt
           PETSC_INSTALL=$INSTALL_ROOT/$PACKAGE/$VERSION
           TAR_FILE=$PACKAGE-$VERSION.tar.gz
@@ -81,7 +81,8 @@ jobs:
           cd $SOURCES_DIR
           ./configure --prefix=$PETSC_INSTALL --with-cc=mpicc --with-cxx=mpicxx --with-fc=mpif90 \
              --download-mumps --download-scalapack --download-parmetis --download-metis \
-             --download-fblaslapack --download-ptscotch --with-debugging --with-x=0 --with-shared=1 \
+             --download-fblaslapack --download-ptscotch --download-hpddm --download-slepc \
+             --with-debugging --with-x=0 --with-shared=1 \
              --with-mpi=1 --with-64-bit-indices
           make
           make install
