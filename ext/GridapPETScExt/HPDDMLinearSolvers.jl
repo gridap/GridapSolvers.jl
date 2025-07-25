@@ -41,7 +41,7 @@ end
 To modify the default setup, you can pass your own functions (with the same signatures) 
 as arguments to the constructor.
 """
-function HPDDMLinearSolver(
+function GridapSolvers.HPDDMLinearSolver(
   indices::MPIArray,mats::MPIArray,
   ksp_setup::Function = hpddm_default_setup_ksp,
   pc_setup::Function = hpddm_default_setup_pc;
@@ -57,8 +57,8 @@ end
 """
     HPDDMLinearSolver(space::FESpace,biform::Function[,args...];kwargs...)
 
-Creates a `HPDDMLinearSolver` for a finite element space and a bilinear form for the local overlapping
-Neumann problems.
+Creates a `HPDDMLinearSolver` from a finite element space and a bilinear form for the local overlapping
+Neumann problems. The extra arguments are the same as for the low-level constructor.
 
 To have overlapping Neumann problems, the `Measure` has to be modified to include ghost cells.
 For instance, for a Poisson problem we would have:
@@ -69,14 +69,19 @@ dΩg = Measure(Ωg,qdegree)
 a(u,v) = ∫(∇(u)⋅∇(v))dΩg
 ```
 """
-function HPDDMLinearSolver(space::FESpace,biform::Function,args...;kwargs...)
+function GridapSolvers.HPDDMLinearSolver(
+  space::FESpace,biform::Function,
+  ksp_setup::Function = hpddm_default_setup_ksp,
+  pc_setup::Function = hpddm_default_setup_pc;
+  kwargs...
+)
   assems = map(local_views(space)) do space
     SparseMatrixAssembler(
       SparseMatrixCSR{0,PetscScalar,PetscInt},Vector{PetscScalar},space,space
     )
   end
   indices, mats = subassemble_matrices(space,biform,assems)
-  HPDDMLinearSolver(indices,mats,args...;kwargs...)
+  HPDDMLinearSolver(indices,mats,ksp_setup,pc_setup;kwargs...)
 end
 
 function subassemble_matrices(space,biform,assems)
@@ -105,11 +110,11 @@ function Algebra.numerical_setup(ss::HPDDMLinearSolverSS,A::AbstractMatrix)
   @check_error_code PETSC.KSPSetOperators(ns.ksp[],ns.B.mat[],ns.B.mat[])
   hpddm_setup(ss.solver,ns.ksp)
   @check_error_code PETSC.KSPSetUp(ns.ksp[])
-  Init(ns)
+  GridapPETSc.Init(ns)
 end
 
 function hpddm_default_setup_ksp(ksp)
-  @check_error_code GridapPETSc.PETSC.KSPSetFromOptions(ksp[])
+  @check_error_code PETSC.KSPSetFromOptions(ksp[])
 end
 
 function hpddm_default_setup_pc(pc)
@@ -119,16 +124,17 @@ end
 function hpddm_setup(solver::_HPDDMLinearSolver,ksp)
   solver.ksp_setup(ksp)
 
-  rtol   = PetscScalar(tols.rtol)
-  atol   = PetscScalar(tols.atol)
-  dtol   = PetscScalar(tols.dtol)
+  tols = solver.tols
+  rtol = PetscScalar(tols.rtol)
+  atol = PetscScalar(tols.atol)
+  dtol = PetscScalar(tols.dtol)
   maxits = PetscInt(tols.maxiter)
-  @check_error_code GridapPETSc.PETSC.KSPSetTolerances(ksp[], rtol, atol, dtol, maxits)
+  @check_error_code PETSC.KSPSetTolerances(ksp[], rtol, atol, dtol, maxits)
 
   pc = Ref{PETSC.PC}()
   mat, is = solver.mat.mat, solver.is.is
   @check_error_code PETSC.KSPGetPC(ksp[],pc)
-  @check_error_code PETSC.PCSetType(pc[],GridapPETSc.PETSC.PCHPDDM)
+  @check_error_code PETSC.PCSetType(pc[],PETSC.PCHPDDM)
   @check_error_code PETSC.PCHPDDMSetAuxiliaryMat(pc[],is[],mat[],C_NULL,C_NULL)
   @check_error_code PETSC.PCHPDDMHasNeumannMat(pc[],PETSC.PETSC_TRUE)
   @check_error_code PETSC.PCHPDDMSetSTShareSubKSP(pc[],PETSC.PETSC_TRUE)
