@@ -165,13 +165,16 @@ function _get_redistribution_cache(lev::Int,sh::FESpaceHierarchy,mode::Symbol,op
 
   Uh_red      = get_fe_space(sh,lev)
   model_h_red = get_model(sh,lev)
-  fv_h_red    = pfill(0.0,partition(Uh_red.gids))
+  fv_h_red    = zero_free_values(Uh_red)
   dv_h_red    = (mode == :solution) ? get_dirichlet_dof_values(Uh_red) : zero_dirichlet_values(Uh_red)
   glue        = sh[lev].mh_level.red_glue
 
-  if (op_type == :prolongation) || (restriction_method ∈ [:interpolation,:dof_mask])
+  if (op_type == :prolongation)
     model_h, Uh, fv_h, dv_h, UH, fv_H, dv_H = cache_refine
     cache_exchange = get_redistribute_free_values_cache(fv_h_red,Uh_red,fv_h,dv_h,Uh,model_h_red,glue;reverse=false)
+  elseif restriction_method ∈ [:interpolation,:dof_mask]
+    model_h, Uh, fv_h, dv_h, UH, fv_H, dv_H = cache_refine
+    cache_exchange = get_redistribute_free_values_cache(fv_h,Uh,fv_h_red,dv_h_red,Uh_red,model_h,glue;reverse=true)
   elseif restriction_method == :projection
     model_h, Uh, fv_h, dv_h, VH, AH, lH, xH, bH, bH0, assem = cache_refine
     cache_exchange = get_redistribute_free_values_cache(fv_h,Uh,fv_h_red,dv_h_red,Uh_red,model_h,glue;reverse=true)
@@ -182,7 +185,6 @@ function _get_redistribution_cache(lev::Int,sh::FESpaceHierarchy,mode::Symbol,op
   end
 
   cache_redist = fv_h_red, dv_h_red, Uh_red, model_h_red, glue, cache_exchange
-
   return cache_redist
 end
 
@@ -262,8 +264,8 @@ function LinearAlgebra.mul!(y::AbstractVector,A::DistributedGridTransferOperator
   uh = FEFunction(Uh,fv_h,dv_h)
   v  = get_fe_basis(VH)
   vec_data = collect_cell_vector(VH,lH(v,uh))
-  copy!(bH,bH0)
-  assemble_vector_add!(bH,assem,vec_data) # Matrix layout
+  assemble_vector!(bH,assem,vec_data) # Matrix layout
+  bH .+= bH0
   solve!(xH,AH_ns,bH)
   copy!(y,xH)
   

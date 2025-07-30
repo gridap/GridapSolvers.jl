@@ -102,7 +102,7 @@ function main(distribute,np,nc,np_per_level)
   X = MultiFieldFESpace([U,Q];style=mfs)
   Y = MultiFieldFESpace([V,Q];style=mfs)
 
-  α = 1.e2
+  α = 1.e3
   f = (Dc==2) ? VectorValue(1.0,1.0) : VectorValue(1.0,1.0,1.0)
   Π_Qh = LocalProjectionMap(divergence,reffe_p,qdegree)
   graddiv(u,v,dΩ) = ∫(α*(∇⋅v)⋅Π_Qh(u))dΩ

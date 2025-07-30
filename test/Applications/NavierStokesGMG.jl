@@ -105,7 +105,7 @@ function main(distribute,np,nc,np_per_level)
 
   Re = 10.0
   ν = 1/Re
-  α = 1.e2
+  α = 1.e3
   f = (Dc==2) ? VectorValue(1.0,1.0) : VectorValue(1.0,1.0,1.0)
   
   Π_Qh = LocalProjectionMap(divergence,reffe_p,qdegree)
@@ -136,7 +136,7 @@ function main(distribute,np,nc,np_per_level)
     trials_u,jac_u,qdegree
   )
   prolongations = setup_patch_prolongation_operators(
-    tests_u,jac_u,jac_u,qdegree;is_nonlinear=true,collect_factorizations=true
+    trials_u,jac_u,jac_u,qdegree;is_nonlinear=true,collect_factorizations=true
   )
   restrictions = setup_restriction_operators(
     tests_u,qdegree;mode=:residual,solver=CGSolver(JacobiLinearSolver())
@@ -147,10 +147,16 @@ function main(distribute,np,nc,np_per_level)
     pre_smoothers=smoothers,
     post_smoothers=smoothers,
     coarsest_solver=LUSolver(),
-    maxiter=2,mode=:preconditioner,verbose=i_am_main(parts),is_nonlinear=true
+    maxiter=2,
+    mode=:preconditioner,
+    cycle_type=:f_cycle,
+    primal_restriction_method = :interpolation,
+    verbose=i_am_main(parts),
+    is_nonlinear=true,
   )
+  gmg.log.depth = 4
 
-  solver_u = gmg
+  solver_u = FGMRESSolver(20,gmg;atol=1e-8,rtol=1.e-8,verbose=i_am_main(parts))
   solver_p = CGSolver(JacobiLinearSolver();maxiter=20,atol=1e-14,rtol=1.e-6,verbose=i_am_main(parts))
   solver_u.log.depth = 3
   solver_p.log.depth = 3

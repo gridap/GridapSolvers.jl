@@ -5,12 +5,15 @@
 Given an `AdaptedDiscreteModel`, returns a `PatchTopology` for the fine model 
 such that each patch corresponds to a coarse cell in the parent model.
 """
-function CoarsePatchTopology(model::Gridap.Adaptivity.AdaptedDiscreteModel)
+function CoarsePatchTopology(
+  model::Gridap.Adaptivity.AdaptedDiscreteModel,
+  coarse_ids = 1:num_cells(Gridap.Adaptivity.get_parent(model))
+)
   Dc = num_cell_dims(model)
   ftopo = get_grid_topology(model)
   ctopo = get_grid_topology(Gridap.Adaptivity.get_parent(model))
   glue = Gridap.Adaptivity.get_adaptivity_glue(model)
-  patch_cells = glue.o2n_faces_map
+  patch_cells = glue.o2n_faces_map[coarse_ids]
   
   fnode_to_cface_dim = Gridap.Adaptivity.get_d_to_fface_to_cface(glue, ctopo, ftopo)[2][1]
   is_interior(n) = isequal(fnode_to_cface_dim[n],Dc)
@@ -27,7 +30,11 @@ function CoarsePatchTopology(model::Gridap.Adaptivity.AdaptedDiscreteModel)
 end
 
 function CoarsePatchTopology(model::GridapDistributed.DistributedDiscreteModel)
-  ptopos = map(CoarsePatchTopology, local_views(model))
+  parent = Gridap.Adaptivity.get_parent(model)
+  cgids = get_cell_gids(parent)
+  ptopos = map(local_views(model),partition(cgids)) do model, cgids
+    CoarsePatchTopology(model,own_to_local(cgids))
+  end
   GridapDistributed.DistributedPatchTopology(ptopos)
 end
 
@@ -118,6 +125,8 @@ function _get_patch_cache(lev,sh,assem,lhs,rhs,is_nonlinear,collect_factorizatio
     uh = FEFunction(Uh,fv_h,dv_h)
     uH = FEFunction(UH,fv_H,dv_H)
     dx_h = zero_free_values(Uh)
+    @check get_free_dof_values(uh) === fv_h # Check correct aliasing
+    @check get_free_dof_values(uH) === fv_H # Check correct aliasing
 
     biform(u,v) = is_nonlinear ? lhs(xh,u,v) : lhs(u,v)
     liform(v) = is_nonlinear ? rhs(xh,uh,v) : rhs(uh,v)
@@ -156,10 +165,12 @@ function MultilevelTools.update_transfer_operator!(op::PatchProlongationOperator
     GridapDistributed.redistribute_free_values(fv_h,Uh,fv_h_red,dv_h_red,Uh_red,model_h,glue;reverse=true)
   else
     copy!(fv_h,x)
+    consistent!(fv_h) |> fetch
   end
 
   if !isa(fv_h,Nothing)
     copy!(get_free_dof_values(xh),fv_h)
+    @check get_free_dof_values(uh) === fv_h # Check correct aliasing
     biform(u,v) = op.lhs(xh,u,v)
     liform(v) = op.rhs(xh,uh,v)
 
@@ -176,11 +187,13 @@ end
 function LinearAlgebra.mul!(y::AbstractVector,A::PatchProlongationOperator{Val{false}},x::AbstractVector)
   cache_refine, cache_patch, cache_redist = A.caches
   model_h, Uh, fv_h, dv_h, UH, fv_H, dv_H = cache_refine
-  _, uH, _, dx_h, liform, _, patch_cols, patch_f, patch_ids, caches = cache_patch
+  uh, uH, _, dx_h, liform, _, patch_cols, patch_f, patch_ids, caches = cache_patch
 
   copy!(fv_H,x) # Matrix layout -> FE layout
+  consistent!(fv_H) |> fetch
   interpolate!(uH,fv_h,Uh)
 
+  @check get_free_dof_values(uh) === fv_h # Check correct aliasing
   patch_b = assemble_vector(liform, A.assem, Uh)
   solve_patch_overlapping!(
     dx_h, patch_cols, patch_f, patch_b, patch_ids, caches
@@ -201,6 +214,7 @@ function LinearAlgebra.mul!(y::PVector,A::PatchProlongationOperator{Val{true}},x
   # 1 - Interpolate in coarse partition
   if !isa(x,Nothing)
     copy!(fv_H,x) # Matrix layout -> FE layout
+    consistent!(fv_H) |> fetch
     interpolate!(uH,fv_h,Uh)
 
     patch_b = assemble_vector(liform, A.assem, Uh)

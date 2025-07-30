@@ -132,11 +132,13 @@ function GMGLinearSolver(
   coarsest_solver = Gridap.Algebra.LUSolver(),
   mode::Symbol       = :preconditioner,
   cycle_type::Symbol = :v_cycle,
-  is_nonlinear    = false, primal_restriction_method = :interpolation,
+  is_nonlinear    = false, 
+  primal_restriction_method = :projection,
   maxiter = 100, atol = 1.0e-14, rtol = 1.0e-08, verbose = false,
 )
   @check mode ∈ [:preconditioner,:solver]
   @check cycle_type ∈ [:v_cycle,:w_cycle,:f_cycle]
+  @check primal_restriction_method ∈ [:projection, :interpolation]
   @check matching_level_parts(trials,tests,biforms)
   tols = SolverTolerances{Float64}(;maxiter=maxiter,atol=atol,rtol=rtol)
   log  = ConvergenceLog("GMG",tols;verbose=verbose)
@@ -300,6 +302,21 @@ function gmg_project_solutions!(
   return svectors
 end
 
+function gmg_project_solutions!(
+  svectors::AbstractVector{<:AbstractVector},
+  solver::GMGLinearSolverFromWeakform,
+  x::PVector
+)
+  restrictions = solver.primal_restrictions
+  copy!(svectors[1],x)
+  map(linear_indices(restrictions),restrictions) do lev, R
+    consistent!(svectors[lev]) |> wait
+    mul!(unsafe_getindex(svectors,lev+1),R,svectors[lev])
+  end
+  with_level(wait∘consistent!,svectors,length(svectors))
+  return svectors
+end
+
 function gmg_compute_matrices(s::GMGLinearSolverFromMatrices,mat::AbstractMatrix)
   smatrices = s.smatrices
   smatrices[1] = mat
@@ -343,7 +360,7 @@ function gmg_compute_matrices!(caches,s::GMGLinearSolverFromWeakform,mat::Abstra
   svectors = gmg_project_solutions!(svectors,s,x)
   map(linear_indices(s.trials),s.biforms,smatrices,svectors) do l, biform, matl, xl
     if l == 1
-      copyto!(matl,mat)
+      #copyto!(matl,mat)
     else
       Ul = MultilevelTools.get_fe_space(trials,l)
       Vl = MultilevelTools.get_fe_space(tests,l)
