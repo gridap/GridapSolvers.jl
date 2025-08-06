@@ -16,14 +16,14 @@ using Gridap.Geometry: PatchTopology, get_patch_cells, get_patch_faces
 using Gridap.FESpaces: PatchAssembler
 using GridapDistributed: DistributedFESpace, DistributedPatchTopology, DistributedPatchAssembler
 
-export PatchSolver, VankaSolver
+export PatchSolver, BlockJacobiSolver
 
 export PatchProlongationOperator, PatchRestrictionOperator
 export setup_patch_prolongation_operators, setup_patch_restriction_operators
 
 # Solvers
 include("PatchTransferOperators.jl")
-include("VankaSolvers.jl")
+include("BlockJacobiSolvers.jl")
 include("PatchSolvers.jl")
 
 end

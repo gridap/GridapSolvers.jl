@@ -1,54 +1,54 @@
 
-struct VankaSolver{A,B,C,D} <: Algebra.LinearSolver
+struct BlockJacobiSolver{A,B,C,D} <: Algebra.LinearSolver
   rows::A
   cols::B
   patch_rows::C
   patch_cols::D
 end
 
-function VankaSolver(
+function BlockJacobiSolver(
   patch_rows::AbstractArray{<:AbstractArray{<:Integer}},
   patch_cols::AbstractArray{<:AbstractArray{<:Integer}}
 )
   rows = Base.OneTo(maximum(maximum, patch_rows))
   cols = Base.OneTo(maximum(maximum, patch_cols))
-  return VankaSolver(rows, cols, patch_rows, patch_cols)
+  return BlockJacobiSolver(rows, cols, patch_rows, patch_cols)
 end
 
-function VankaSolver(assem::PatchAssembler)
+function BlockJacobiSolver(assem::PatchAssembler)
   rows, cols = get_rows(assem), get_cols(assem)
   patch_rows = collect(Vector{Int32},assem.strategy.patch_rows)
   patch_cols = collect(Vector{Int32},assem.strategy.patch_cols)
-  return VankaSolver(rows, cols, patch_rows, patch_cols)
+  return BlockJacobiSolver(rows, cols, patch_rows, patch_cols)
 end
 
-function VankaSolver(assem::GridapDistributed.DistributedPatchAssembler)
+function BlockJacobiSolver(assem::GridapDistributed.DistributedPatchAssembler)
   rows, cols = map(partition, assem.axes)
   patch_rows, patch_cols = map(local_views(assem)) do assem
     assem.strategy.patch_rows, assem.strategy.patch_cols
   end |> tuple_of_arrays
-  return VankaSolver(rows, cols, patch_rows, patch_cols)
+  return BlockJacobiSolver(rows, cols, patch_rows, patch_cols)
 end
 
-function VankaSolver(space::FESpace,ptopo;kwargs...)
+function BlockJacobiSolver(space::FESpace,ptopo;kwargs...)
   assem = PatchAssembler(ptopo,space,space; kwargs...)
-  return VankaSolver(assem)
+  return BlockJacobiSolver(assem)
 end
 
-function VankaSolver(space::FESpace;kwargs...)
+function BlockJacobiSolver(space::FESpace;kwargs...)
   trian = get_triangulation(space)
   model = get_background_model(trian)
   ptopo = PatchTopology(model)
-  return VankaSolver(space,ptopo;kwargs...)
+  return BlockJacobiSolver(space,ptopo;kwargs...)
 end
 
-struct VankaSS{A} <: Algebra.SymbolicSetup
+struct BlockJacobiSS{A} <: Algebra.SymbolicSetup
   solver::A
 end
 
-Algebra.symbolic_setup(s::VankaSolver,mat::AbstractMatrix) = VankaSS(s)
+Algebra.symbolic_setup(s::BlockJacobiSolver,mat::AbstractMatrix) = BlockJacobiSS(s)
 
-struct VankaNS{A,B,C,D,E} <: Algebra.NumericalSetup
+struct BlockJacobiNS{A,B,C,D,E} <: Algebra.NumericalSetup
   solver::A
   matrix::B
   patch_rows::C
@@ -56,15 +56,15 @@ struct VankaNS{A,B,C,D,E} <: Algebra.NumericalSetup
   cache::E
 end
 
-function Algebra.numerical_setup(ss::VankaSS,mat::AbstractMatrix)
+function Algebra.numerical_setup(ss::BlockJacobiSS,mat::AbstractMatrix)
   solver = ss.solver
   patch_rows = solver.patch_rows
   patch_cols = solver.patch_cols
   cache = (CachedArray(eltype(mat),1), CachedArray(eltype(mat),2))
-  return VankaNS(solver, mat, patch_rows, patch_cols, cache)
+  return BlockJacobiNS(solver, mat, patch_rows, patch_cols, cache)
 end
 
-function Algebra.numerical_setup(ss::VankaSS,mat::PSparseMatrix)
+function Algebra.numerical_setup(ss::BlockJacobiSS,mat::PSparseMatrix)
   solver = ss.solver
 
   new_rows = map(SolverInterfaces.split_indices, solver.rows)
@@ -80,7 +80,7 @@ function Algebra.numerical_setup(ss::VankaSS,mat::PSparseMatrix)
   x_c = pzeros(eltype(mat),new_cols)
   b_c = pzeros(eltype(mat),new_rows)
   cache = (x_c,b_c,caches)
-  return VankaNS(solver, ghosted_mat, patch_rows, patch_cols, cache)
+  return BlockJacobiNS(solver, ghosted_mat, patch_rows, patch_cols, cache)
 end
 
 function reindex_patch_ids(patch_ids_old, ids_old, ids_new)
@@ -91,13 +91,13 @@ function reindex_patch_ids(patch_ids_old, ids_old, ids_new)
   return patch_ids_new
 end
 
-function Algebra.solve!(x::AbstractVector,ns::VankaNS,b::AbstractVector)
+function Algebra.solve!(x::AbstractVector,ns::BlockJacobiNS,b::AbstractVector)
   fill!(x, zero(eltype(x)))
   mat, patch_rows, patch_cols, cache = ns.matrix, ns.patch_rows, ns.patch_cols, ns.cache
   return solve_block_jacobi!(x, mat, b, patch_rows, patch_cols, eachindex(patch_rows), cache)
 end
 
-function Algebra.solve!(x::PVector,ns::VankaNS,b::PVector)
+function Algebra.solve!(x::PVector,ns::BlockJacobiNS,b::PVector)
   mat, patch_rows, patch_cols, caches = ns.matrix, ns.patch_rows, ns.patch_cols, ns.cache
   x_c, b_c, cache = caches
 

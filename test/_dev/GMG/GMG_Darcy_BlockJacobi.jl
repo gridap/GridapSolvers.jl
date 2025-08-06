@@ -38,7 +38,7 @@ function get_block_smoothers(tests;w=0.2,niter=5)
     Vh = get_fe_space(test)
     model = get_background_model(get_triangulation(Vh))
     ptopo = Geometry.PatchTopology(ReferenceFE{0},model)
-    solver = PatchBasedSmoothers.VankaSolver(Vh, ptopo; assembly=:star)
+    solver = PatchBasedSmoothers.BlockJacobiSolver(Vh, ptopo; assembly=:star)
     if w > 0.0
       return RichardsonSmoother(solver,niter,w)
     else

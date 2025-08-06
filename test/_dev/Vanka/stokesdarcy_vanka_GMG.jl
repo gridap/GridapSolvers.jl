@@ -121,7 +121,7 @@ l2_norm(∇⋅uh_exact,dΩh)
 l2_norm(∇⋅jh_exact,dΩh)
 
 PD = PatchDecomposition(model)
-smoother = RichardsonSmoother(VankaSolver(Xh,PD),10,0.05)
+smoother = RichardsonSmoother(BlockJacobiSolver(Xh,PD),10,0.05)
 smoother_ns = numerical_setup(symbolic_setup(smoother,Ah),Ah)
 
 function project_f2c(rh)
