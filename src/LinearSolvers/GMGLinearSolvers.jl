@@ -52,8 +52,8 @@ function GMGLinearSolver(
   pre_smoothers   = Fill(RichardsonSmoother(JacobiLinearSolver(),10),length(smatrices)-1),
   post_smoothers  = pre_smoothers,
   coarsest_solver = Gridap.Algebra.LUSolver(),
-  mode::Symbol       = :preconditioner,
-  cycle_type::Symbol = :v_cycle,
+  mode            = :preconditioner,
+  cycle_type      = :v_cycle,
   maxiter = 100, atol = 1.0e-14, rtol = 1.0e-08, verbose = false,
 )
   @check length(smatrices)-1 == length(interp) == length(restrict) == length(pre_smoothers) == length(post_smoothers)
@@ -130,8 +130,8 @@ function GMGLinearSolver(
   pre_smoothers   = Fill(RichardsonSmoother(JacobiLinearSolver(),10),num_levels(trials)-1),
   post_smoothers  = pre_smoothers,
   coarsest_solver = Gridap.Algebra.LUSolver(),
-  mode::Symbol       = :preconditioner,
-  cycle_type::Symbol = :v_cycle,
+  mode            = :preconditioner,
+  cycle_type      = :v_cycle,
   is_nonlinear    = false, 
   primal_restriction_method = :projection,
   maxiter = 100, atol = 1.0e-14, rtol = 1.0e-08, verbose = false,

@@ -9,7 +9,7 @@ using Gridap.Geometry, Gridap.FESpaces, Gridap.ReferenceFEs
 using PartitionedArrays
 using GridapDistributed
 
-using GridapSolvers.MultilevelTools
+using GridapSolvers.MultilevelTools, GridapSolvers.SolverInterfaces
 using GridapSolvers.MultilevelTools: get_cell_conformity
 
 using Gridap.Geometry: PatchTopology, get_patch_cells, get_patch_faces

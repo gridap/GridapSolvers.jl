@@ -74,11 +74,15 @@ get_level_parts(a::HierarchicalArray) = a.ranks
 get_level_parts(a::HierarchicalArray,lev) = a.ranks[lev]
 
 function matching_level_parts(a::HierarchicalArray,b::HierarchicalArray)
-  @assert num_levels(a) == num_levels(b)
+  @assert length(a) == length(b)
   return all(map(===, get_level_parts(a), get_level_parts(b)))
 end
 
-function matching_level_parts(arrays::Vararg{HierarchicalArray,N}) where N
+function matching_level_parts(a::AbstractArray,b::AbstractArray)
+  @assert length(a) == length(b)
+end
+
+function matching_level_parts(arrays::Vararg{AbstractArray,N}) where N
   a1 = first(arrays)
   return all(a -> matching_level_parts(a1,a), arrays)
 end
@@ -86,8 +90,8 @@ end
 """
     Base.map(f::Function,args::Vararg{HierarchicalArray,N}) where N
 
-  Maps a function to a set of `HierarchicalArrays`. The function is applied only in the
-  subcommunicators where the processor belongs to.
+Maps a function to a set of `HierarchicalArrays`. The function is applied only on the
+subcommunicators that the processor belongs to.
 """
 function Base.map(f,args::Vararg{HierarchicalArray,N}) where N
   @assert matching_level_parts(args...)
