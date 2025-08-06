@@ -35,6 +35,18 @@ function get_patch_smoothers(sh,biform,qdegree)
   return smoothers
 end
 
+function get_block_jacobi_smoothers(sh)
+  nlevs = num_levels(sh)
+  smoothers = map(view(sh,1:nlevs-1)) do shl
+    model = get_model(shl)
+    ptopo = Geometry.PatchTopology(ReferenceFE{0},model)
+    space = get_fe_space(shl)
+    solver = PatchBasedSmoothers.BlockJacobiSolver(space, ptopo; assembly=:star)
+    return RichardsonSmoother(solver,10,0.2)
+  end
+  return smoothers
+end
+
 function get_jacobi_smoothers(mh)
   nlevs = num_levels(mh)
   smoothers = Fill(RichardsonSmoother(JacobiLinearSolver(),10,2.0/3.0),nlevs-1)
@@ -239,16 +251,21 @@ function gmg_hdiv_driver(t,parts,mh,order,ctype)
   spaces    = tests, trials
   toc!(t,"FESpaces")
 
-  tic!(t;barrier=true)
   smoothers = get_patch_smoothers(tests,biform,qdegree)
-  toc!(t,"Patch Decomposition")
-
   tic!(t;barrier=true)
   gmg_driver_from_mats(t,parts,mh,spaces,qdegree,smoothers,biform,liform,u,ctype)
-  toc!(t,"Solve with matrices")
+  toc!(t,"Solve with matrices + patch smoothers")
   tic!(t;barrier=true)
   gmg_driver_from_weakform(t,parts,mh,spaces,qdegree,smoothers,biform,liform,u,ctype)
-  toc!(t,"Solve with weakforms")
+  toc!(t,"Solve with weakforms + patch smoothers")
+
+  smoothers = get_block_jacobi_smoothers(tests)
+  tic!(t;barrier=true)
+  gmg_driver_from_mats(t,parts,mh,spaces,qdegree,smoothers,biform,liform,u,ctype)
+  toc!(t,"Solve with matrices + block jacobi smoothers")
+  tic!(t;barrier=true)
+  gmg_driver_from_weakform(t,parts,mh,spaces,qdegree,smoothers,biform,liform,u,ctype)
+  toc!(t,"Solve with weakforms + block jacobi smoothers")
 end
 
 function gmg_multifield_driver(t,parts,mh,order,ctype)

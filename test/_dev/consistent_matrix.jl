@@ -62,19 +62,3 @@ A_main = PartitionedArrays.getany(partition(PartitionedArrays.to_trivial_partiti
 map(partition(B),partition(axes(B,1)),partition(axes(B,2))) do b, r, c
   b == A_main[r,c]
 end
-
-map(partition(B),partition(axes(B,1)),partition(axes(B,2))) do B, rows, cols
-  r_o2l = own_to_local(rows)
-  r_o2g = own_to_global(rows)
-  r_g2l = ghost_to_local(rows)
-  r_g2g = ghost_to_global(rows)
-
-  c_o2l = own_to_local(cols)
-  c_o2g = own_to_global(cols)
-  c_g2l = ghost_to_local(cols)
-  c_g2g = ghost_to_global(cols)
-
-  B[r_o2l,c_o2l] == A_main[r_o2g,c_o2g] # Yes 
-  B[r_o2l,c_g2l] == A_main[r_o2g,c_g2g] # Yes
-  B[r_g2l,c_o2l] == A_main[r_g2g,c_o2g]
-end

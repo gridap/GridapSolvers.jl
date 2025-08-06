@@ -2,6 +2,8 @@ module SolverInterfaces
 
 using LinearAlgebra
 using SparseArrays
+using SparseMatricesCSR
+using BlockArrays
 
 using Gridap
 using Gridap.Helpers
