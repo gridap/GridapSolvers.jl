@@ -56,7 +56,7 @@ function get_bilinear_form(mh_lev,biform,qdegree)
 end
 
 np = (2,1)
-parts = with_debug() do distribute
+parts = with_mpi() do distribute
   distribute(LinearIndices((prod(np),)))
 end
 
