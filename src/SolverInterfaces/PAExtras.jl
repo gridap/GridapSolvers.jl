@@ -81,8 +81,8 @@ function fetch_ghost_rows(A::PSparseMatrix,new_rows)
   mats = partition(A)
   rows = partition(axes(A,1))
   cols = partition(axes(A,2))
-  nbors_snd, nbors_rcv = assembly_neighbors(new_rows)
-  lids_rcv, lids_snd = assembly_local_indices(new_rows, nbors_snd, nbors_rcv) # Reversed caches
+  nbors_rcv, nbors_snd = assembly_neighbors(new_rows)
+  lids_rcv, lids_snd = assembly_local_indices(new_rows, nbors_rcv, nbors_snd) # Reversed caches
 
   # Prepare the data to send
   I_snd, J_snd, Jo_snd, V_snd = map(
