@@ -1,8 +1,8 @@
 
 """
-    struct PatchProlongationOperator end
+    struct BlockJacobiProlongationOperator end
 
-A `PatchProlongationOperator` is a modified prolongation operator such that given a coarse
+A `BlockJacobiProlongationOperator` is a modified prolongation operator such that given a coarse
 solution `xH`, it maps it to a fine mesh solution `xh` given by
 
 ```
@@ -12,57 +12,39 @@ xh = Ih(xH) - yh
 where `yh` is a subspace-based correction computed by solving local problems on coarse cell 
 patches within the fine mesh.
 """
-mutable struct PatchProlongationOperator{R,A,B}
-  sh    :: A
-  assem :: B
-  lhs   :: Union{Nothing,Function}
-  rhs   :: Union{Nothing,Function}
-  is_nonlinear :: Bool
-  collect_factorizations :: Bool
+mutable struct BlockJacobiProlongationOperator{R,A,B}
+  sh     :: A
+  solver :: B
   caches
 
-  function PatchProlongationOperator{R}(
-    sh,assem,lhs,rhs,is_nonlinear,collect_factorizations,caches
+  function BlockJacobiProlongationOperator{R}(
+    sh, solver::BlockJacobiSolver, caches
   ) where R
-    A, B = typeof(sh), typeof(assem)
-    new{R,A,B}(sh,assem,lhs,rhs,is_nonlinear,collect_factorizations,caches)
+    A, B = typeof(sh), typeof(solver)
+    new{R,A,B}(sh,solver,caches)
   end
 end
 
 @doc """
-    function PatchProlongationOperator(
-      lev   :: Integer,
-      sh    :: FESpaceHierarchy,
-      ptopo :: PatchTopology,
-      lhs   :: Function,
-      rhs   :: Function;
-      is_nonlinear=false,
-      collect_factorizations=false
-    )
+    BlockJacobiProlongationOperator(lev::Integer,sh::FESpaceHierarchy,solver::BlockJacobiSolver)
 
-Returns an instance of `PatchProlongationOperator` for a given level `lev` and a given 
-FESpaceHierarchy `sh`. The subspace-based correction on a solution `uH` is computed 
-by solving local problems given by 
+    function BlockJacobiProlongationOperator(lev::Integer,sh::FESpaceHierarchy,args...;kwargs...)
+      solver = BlockJacobiSolver(get_fe_space_before_redist(sh,lev),args...;kwargs...)
+      BlockJacobiProlongationOperator(lev,sh,solver)
+    end
 
-```
-  lhs(u_i,v_i) = rhs(uH,v_i)  ∀ v_i ∈ V_i
-```
+Returns an instance of `BlockJacobiProlongationOperator` for a given level `lev` and a given 
+FESpaceHierarchy `sh`.
 
-where `V_i` is a restriction of `sh[lev]` onto the patches given by the PatchTopology `ptopo`.
 """
-function PatchProlongationOperator(
-  lev,sh,ptopo::Union{<:Geometry.PatchTopology,<:GridapDistributed.DistributedPatchTopology},
-  lhs,rhs;is_nonlinear=false,collect_factorizations=false
-)
+function BlockJacobiProlongationOperator(lev,sh,args...;kwargs...)
   Vh = MultilevelTools.get_fe_space_before_redist(sh,lev)
-  assem = FESpaces.PatchAssembler(ptopo,Vh,Vh,assembly=:star)
-  PatchProlongationOperator(
-    lev,sh,assem,lhs,rhs;is_nonlinear,collect_factorizations
-  )
+  solver = BlockJacobiSolver(Vh,args...;kwargs...)
+  BlockJacobiProlongationOperator(lev,sh,solver)
 end
 
-function PatchProlongationOperator(
-  lev,sh,assem,lhs,rhs;is_nonlinear=false,collect_factorizations=false
+function BlockJacobiProlongationOperator(
+  lev,sh,solver
 )
 
   cache_refine = MultilevelTools._get_interpolation_cache(lev,sh,0,:residual)
@@ -72,7 +54,7 @@ function PatchProlongationOperator(
 
   redist = has_redistribution(sh,lev)
   R = typeof(Val(redist))
-  return PatchProlongationOperator{R}(sh,assem,lhs,rhs,is_nonlinear,collect_factorizations,caches)
+  return BlockJacobiProlongationOperator{R}(sh,assem,lhs,rhs,is_nonlinear,collect_factorizations,caches)
 end
 
 function _get_patch_cache(lev,sh,assem,lhs,rhs,is_nonlinear,collect_factorizations,cache_refine)
@@ -109,7 +91,7 @@ function _get_patch_cache(lev,sh,assem,lhs,rhs,is_nonlinear,collect_factorizatio
 end
 
 # Please make this a standard API or something
-function MultilevelTools.update_transfer_operator!(op::PatchProlongationOperator,x::Union{AbstractVector,Nothing})
+function MultilevelTools.update_transfer_operator!(op::BlockJacobiProlongationOperator,A::Union{AbstractMatrix,Nothing})
   cache_refine, cache_patch, cache_redist = op.caches
   model_h, Uh, fv_h, dv_h, UH, fv_H, dv_H = cache_refine
   uh, uH, xh, dx_h, _, _, _, _, patch_ids, _ = cache_patch
@@ -144,7 +126,7 @@ function MultilevelTools.update_transfer_operator!(op::PatchProlongationOperator
   end
 end
 
-function LinearAlgebra.mul!(y::AbstractVector,A::PatchProlongationOperator{Val{false}},x::AbstractVector)
+function LinearAlgebra.mul!(y::AbstractVector,A::BlockJacobiProlongationOperator{Val{false}},x::AbstractVector)
   cache_refine, cache_patch, cache_redist = A.caches
   model_h, Uh, fv_h, dv_h, UH, fv_H, dv_H = cache_refine
   uh, uH, _, dx_h, liform, _, patch_cols, patch_f, patch_ids, caches = cache_patch
@@ -165,7 +147,7 @@ function LinearAlgebra.mul!(y::AbstractVector,A::PatchProlongationOperator{Val{f
   return y
 end
 
-function LinearAlgebra.mul!(y::PVector,A::PatchProlongationOperator{Val{true}},x::Union{PVector,Nothing})
+function LinearAlgebra.mul!(y::PVector,A::BlockJacobiProlongationOperator{Val{true}},x::Union{PVector,Nothing})
   cache_refine, cache_patch, cache_redist = A.caches
   model_h, Uh, fv_h, dv_h, UH, fv_H, dv_H = cache_refine
   fv_h_red, dv_h_red, Uh_red, model_h_red, glue, cache_exchange = cache_redist
@@ -208,101 +190,8 @@ function setup_patch_prolongation_operators(
     else
       ptopo, lhs_i, rhs_i = nothing, nothing, nothing
     end
-    PatchProlongationOperator(
+    BlockJacobiProlongationOperator(
       lev,sh,ptopo,lhs_i,rhs_i;is_nonlinear,collect_factorizations
     )
   end
-end
-
-############################################################################################
-
-mutable struct PatchRestrictionOperator{R,A,B}
-  Ip :: A
-  caches :: B
-
-  function PatchRestrictionOperator{R}(
-    Ip::PatchProlongationOperator{R},
-    caches
-  ) where R
-    A = typeof(Ip)
-    B = typeof(caches)
-    new{R,A,B}(Ip,caches)
-  end
-end
-
-function PatchRestrictionOperator(lev,sh,Ip,qdegree;solver=LUSolver())
-  cache_refine = MultilevelTools._get_dual_projection_cache(lev,sh,qdegree,solver)
-  cache_redist = MultilevelTools._get_redistribution_cache(lev,sh,:residual,:restriction,:dual_projection,cache_refine)
-  cache_patch = Ip.caches[2]
-  caches = cache_refine, cache_patch, cache_redist
-
-  redist = has_redistribution(sh,lev)
-  R = typeof(Val(redist))
-  return PatchRestrictionOperator{R}(Ip,caches)
-end
-
-function MultilevelTools.update_transfer_operator!(op::PatchRestrictionOperator,x::Union{PVector,Nothing})
-  cache_refine, cache_patch, cache_redist = op.caches
-  op.caches = (cache_refine, op.Ip.caches[2], cache_redist)
-  return nothing
-end
-
-function setup_patch_restriction_operators(sh,patch_prolongations,qdegrees;kwargs...)
-  map(view(linear_indices(sh),1:num_levels(sh)-1)) do lev
-    qdegree = isa(qdegrees,Vector) ? qdegrees[lev] : qdegrees
-    Ip = patch_prolongations[lev]
-    PatchRestrictionOperator(lev,sh,Ip,qdegree;kwargs...)
-  end
-end
-
-function LinearAlgebra.mul!(y::AbstractVector,A::PatchRestrictionOperator{Val{false}},x::AbstractVector)
-  cache_refine, cache_patch, _ = A.caches
-  model_h, Uh, VH, Mh_ns, rh, _, assem, dΩhH = cache_refine
-  uh, uH, _, dx_h, liform, _, patch_cols, patch_f, patch_ids, caches = cache_patch
-  fv_h = get_free_dof_values(uh)
-
-  copy!(fv_h,x)
-  consistent!(fv_h) |> fetch
-  patch_b = assemble_vector(liform, A.Ip.assem, Uh)
-  solve_patch_overlapping!(
-    dx_h, patch_cols, patch_f, patch_b, patch_ids, caches
-  )
-  fv_h .= fv_h .- dx_h
-
-  solve!(rh,Mh_ns,fv_h)
-  copy!(fv_h,rh)
-  isa(y,PVector) && wait(consistent!(fv_h))
-  v = get_fe_basis(VH)
-  assemble_vector!(y,assem,collect_cell_vector(VH,∫(v⋅uh)*dΩhH))
-
-  return y
-end
-
-function LinearAlgebra.mul!(y::Union{PVector,Nothing},A::PatchRestrictionOperator{Val{true}},x::PVector)
-  cache_refine, cache_patch, cache_redist = A.caches
-  model_h, Uh, VH, Mh_ns, rh, _, assem, dΩhH = cache_refine
-  fv_h_red, dv_h_red, Uh_red, model_h_red, glue, cache_exchange = cache_redist
-  uh, uH, _, dx_h, liform, _, patch_cols, patch_f, patch_ids, caches = cache_patch
-  fv_h = isa(uh,Nothing) ? nothing : get_free_dof_values(uh)
-
-  copy!(fv_h_red,x)
-  consistent!(fv_h_red) |> fetch
-  GridapDistributed.redistribute_free_values!(cache_exchange,fv_h,Uh,fv_h_red,dv_h_red,Uh_red,model_h,glue;reverse=true)
-
-  if !isa(y,Nothing)
-    consistent!(fv_h) |> fetch
-    patch_b = assemble_vector(liform, A.Ip.assem, Uh)
-    solve_patch_overlapping!(
-      dx_h, patch_cols, patch_f, patch_b, patch_ids, caches
-    )
-    fv_h .= fv_h .- dx_h
-    
-    solve!(rh,Mh_ns,fv_h)
-    copy!(fv_h,rh)
-    consistent!(fv_h) |> fetch
-    v = get_fe_basis(VH)
-    assemble_vector!(y,assem,collect_cell_vector(VH,∫(v⋅uh)*dΩhH))
-  end
-
-  return y
 end

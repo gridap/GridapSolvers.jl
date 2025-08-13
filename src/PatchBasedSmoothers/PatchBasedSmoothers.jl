@@ -22,8 +22,12 @@ export PatchProlongationOperator, PatchRestrictionOperator
 export setup_patch_prolongation_operators, setup_patch_restriction_operators
 
 # Solvers
-include("PatchTransferOperators.jl")
-include("BlockJacobiSolvers.jl")
+
 include("PatchSolvers.jl")
+include("BlockJacobiSolvers.jl")
+
+include("CoarsePatchTopologies.jl")
+include("PatchTransferOperators.jl")
+#include("BlockJacobiTransferOperators.jl")
 
 end
