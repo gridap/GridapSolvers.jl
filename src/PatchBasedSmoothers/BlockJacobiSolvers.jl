@@ -48,7 +48,7 @@ end
 
 Algebra.symbolic_setup(s::BlockJacobiSolver,mat::AbstractMatrix) = BlockJacobiSS(s)
 
-struct BlockJacobiNS{A,B,C,D,E} <: Algebra.NumericalSetup
+mutable struct BlockJacobiNS{A,B,C,D,E} <: Algebra.NumericalSetup
   solver::A
   matrix::B
   patch_rows::C
@@ -68,8 +68,8 @@ function Algebra.numerical_setup(ss::BlockJacobiSS,mat::PSparseMatrix)
   solver = ss.solver
 
   new_rows = map(SolverInterfaces.split_indices, solver.rows)
-  ghosted_mat = SolverInterfaces.fetch_ghost_rows(mat, new_rows)
-  new_cols = partition(axes(ghosted_mat,2))
+  new_mat  = SolverInterfaces.fetch_ghost_rows(mat, new_rows)
+  new_cols = partition(axes(new_mat,2))
 
   patch_rows = reindex_patch_ids(solver.patch_rows, solver.rows, new_rows)
   patch_cols = reindex_patch_ids(solver.patch_cols, solver.cols, new_cols)
@@ -80,7 +80,28 @@ function Algebra.numerical_setup(ss::BlockJacobiSS,mat::PSparseMatrix)
   x_c = pzeros(eltype(mat),new_cols)
   b_c = pzeros(eltype(mat),new_rows)
   cache = (x_c,b_c,caches)
-  return BlockJacobiNS(solver, ghosted_mat, patch_rows, patch_cols, cache)
+  return BlockJacobiNS(solver, new_mat, patch_rows, patch_cols, cache)
+end
+
+function Algebra.numerical_setup!(ns::BlockJacobiNS,mat::AbstractMatrix)
+  ns.matrix = mat
+  return ns
+end
+
+function Algebra.numerical_setup!(ns::BlockJacobiNS,mat::PSparseMatrix)
+  x_c, b_c, caches = ns.cache
+
+  new_rows = partition(axes(b_c,1))
+  ns.matrix = SolverInterfaces.fetch_ghost_rows(mat, new_rows)
+  new_cols = partition(axes(ns.matrix,2))
+  
+  same_new_cols = PartitionedArrays.matching_local_indices(PRange(new_cols),axes(x_c,1))
+  if !same_new_cols
+    ns.patch_cols = reindex_patch_ids(ns.solver.patch_cols, ns.solver.cols, new_cols)
+    ns.cache = (pzeros(eltype(mat),new_cols),b_c,caches)
+  end
+
+  return ns
 end
 
 function reindex_patch_ids(patch_ids_old, ids_old, ids_new)
