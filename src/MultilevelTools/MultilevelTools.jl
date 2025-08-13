@@ -14,9 +14,12 @@ using Gridap.Adaptivity: get_model
 
 using PartitionedArrays, GridapDistributed
 
+using Base: unsafe_getindex
+
 using Gridap.FESpaces: BasisStyle, TestBasis, TrialBasis, SingleFieldFEBasis
 using Gridap.MultiField: MultiFieldFEBasisComponent
 
+using GridapDistributed: RedistributeGlue
 using GridapDistributed: redistribute_cell_dofs, redistribute_cell_dofs!, get_redistribute_cell_dofs_cache
 using GridapDistributed: redistribute_free_values, redistribute_free_values!, get_redistribute_free_values_cache
 using GridapDistributed: redistribute_fe_function
