@@ -1,4 +1,91 @@
 
+struct RedistributionOperator{A,B}
+  indices_to   :: A
+  indices_from :: B
+  reverse      :: Bool
+end
+
+Base.reverse(op::RedistributionOperator) = RedistributionOperator(op.indices_from, op.indices_to, !op.reverse)
+
+function RedistributionOperator(
+  model_to, space_to, space_from, glue::RedistributeGlue, reverse::Bool
+)
+  if !isnothing(space_to)
+    dof_ids_to = partition(get_free_dof_ids(space_to))
+    to_cell_to_to_lid = get_cell_dof_ids(space_to)
+  else
+    dof_ids_to, to_cell_to_to_lid = nothing, nothing, nothing
+  end
+  if !isnothing(space_from)
+    dof_ids_from = partition(get_free_dof_ids(space_from))
+    from_cell_to_from_lid = get_cell_dof_ids(space_from)
+  else
+    dof_ids_from, from_cell_to_from_lid = nothing, nothing, nothing
+  end
+  indices_from, indices_to = GridapDistributed.redistribute_indices(
+    dof_ids_from, from_cell_to_from_lid, to_cell_to_to_lid, model_to, glue; reverse,
+  )
+  return RedistributionOperator(indices_to, indices_from, reverse)
+end
+
+function RedistributionOperator(sh::FESpaceHierarchyLevel,reverse::Bool)
+  if !reverse
+    model_to = get_model(sh)
+    space_to = get_fe_space(sh)
+    space_from = get_fe_space_before_redist(sh)
+  else
+    model_to = get_model_before_redist(sh)
+    space_to = get_fe_space_before_redist(sh)
+    space_from = get_fe_space(sh)
+  end
+  glue = sh.mh_level.red_glue
+  return RedistributionOperator(model_to, space_to, space_from, glue, reverse)
+end
+
+function change_parts_indices(indices, new_parts)
+  ng = !isnothing(indices) ? map(global_length,indices) : nothing
+  l2g = !isnothing(indices) ? map(local_to_global, indices) : nothing
+  l2o = !isnothing(indices) ? map(local_to_owner, indices) : nothing
+
+  ng = emit(change_parts(ng,new_parts;default=0))
+  new_l2g = change_parts(l2g, new_parts; default=Int[])
+  new_l2o = change_parts(l2o, new_parts; default=Int32[])
+  return map(LocalIndices,ng, new_parts, new_l2g, new_l2o)
+end
+
+function redistribution_cache(x_to, x_from, indices_to, indices_from)
+  parts = linear_indices(indices_to)
+  x_ids_from = change_parts_indices(!isnothing(x_from) ? partition(axes(x_from,1)) : nothing, parts)
+  if !matching_local_indices(PRange(x_ids_from), PRange(indices_from))
+    @assert matching_own_indices(PRange(x_ids_from), PRange(indices_from))
+    x_ids_to = GridapDistributed.reindex_partition(x_ids_from, indices_from, indices_to)
+  else
+    x_ids_to = indices_to
+  end
+  T = isnothing(x_from) ? eltype(x_to) : eltype(x_from)
+  values_from = change_parts(partition, x_from, parts; default = T[])
+  values_to = change_parts(partition, x_to, parts; default = T[])
+  caches = GridapDistributed.p_vector_redistribution_cache(values_from, indices_from, indices_to)
+  return (values_to, values_from), (x_ids_to, x_ids_from), (x_to, x_from), caches
+end
+
+function redistribution_cache(x_to, op::RedistributionOperator, x_from)
+  return redistribution_cache(x_to, x_from, op.indices_to, op.indices_from)
+end
+
+function GridapDistributed.redistribute!(x_to,op::RedistributionOperator,x_from,cache)
+  values, indices, owners, caches = cache
+  @assert (x_to, x_from) == owners
+  t = GridapDistributed.redistribute!(values..., indices..., caches)
+  wait(t)
+  return x_to
+end
+
+function GridapDistributed.redistribute(x_to,op::RedistributionOperator,x_from)
+  caches = redistribution_cache(x_to, op, x_from)
+  return redistribute!(x_to,op,x_from,caches)
+end
+
 """
 """
 struct DistributedGridTransferOperator{T,R,M,A,B}
@@ -164,27 +251,28 @@ function _get_redistribution_cache(lev::Int,sh::FESpaceHierarchy,mode::Symbol,op
   end
 
   Uh_red      = get_fe_space(sh,lev)
-  model_h_red = get_model(sh,lev)
   fv_h_red    = zero_free_values(Uh_red)
-  dv_h_red    = (mode == :solution) ? get_dirichlet_dof_values(Uh_red) : zero_dirichlet_values(Uh_red)
-  glue        = sh[lev].mh_level.red_glue
 
   if (op_type == :prolongation)
     model_h, Uh, fv_h, dv_h, UH, fv_H, dv_H = cache_refine
-    cache_exchange = get_redistribute_free_values_cache(fv_h_red,Uh_red,fv_h,dv_h,Uh,model_h_red,glue;reverse=false)
+    op = RedistributionOperator(sh[lev],false)
+    cache_exchange = redistribution_cache(fv_h_red, op, fv_h)
   elseif restriction_method ∈ [:interpolation,:dof_mask]
     model_h, Uh, fv_h, dv_h, UH, fv_H, dv_H = cache_refine
-    cache_exchange = get_redistribute_free_values_cache(fv_h,Uh,fv_h_red,dv_h_red,Uh_red,model_h,glue;reverse=true)
+    op = RedistributionOperator(sh[lev],true)
+    cache_exchange = redistribution_cache(fv_h, op, fv_h_red)
   elseif restriction_method == :projection
     model_h, Uh, fv_h, dv_h, VH, AH, lH, xH, bH, bH0, assem = cache_refine
-    cache_exchange = get_redistribute_free_values_cache(fv_h,Uh,fv_h_red,dv_h_red,Uh_red,model_h,glue;reverse=true)
+    op = RedistributionOperator(sh[lev],true)
+    cache_exchange = redistribution_cache(fv_h, op, fv_h_red)
   else
     model_h, Uh, UH, Mh, rh, uh, assem, dΩhH = cache_refine
     fv_h = isa(uh,Nothing) ? nothing : get_free_dof_values(uh)
-    cache_exchange = get_redistribute_free_values_cache(fv_h,Uh,fv_h_red,dv_h_red,Uh_red,model_h,glue;reverse=true)
+    op = RedistributionOperator(sh[lev],true)
+    cache_exchange = redistribution_cache(fv_h, op, fv_h_red)
   end
 
-  cache_redist = fv_h_red, dv_h_red, Uh_red, model_h_red, glue, cache_exchange
+  cache_redist = fv_h_red, op, cache_exchange
   return cache_redist
 end
 
@@ -289,7 +377,7 @@ end
 function LinearAlgebra.mul!(y::PVector,A::DistributedGridTransferOperator{Val{:prolongation},Val{true}},x::Union{PVector,Nothing})
   cache_refine, cache_redist = A.cache
   model_h, Uh, fv_h, dv_h, UH, fv_H, dv_H = cache_refine
-  fv_h_red, dv_h_red, Uh_red, model_h_red, glue, cache_exchange = cache_redist
+  fv_h_red, op_redist, cache_exchange = cache_redist
 
   # 1 - Interpolate in coarse partition
   if !isa(x,Nothing)
@@ -299,7 +387,7 @@ function LinearAlgebra.mul!(y::PVector,A::DistributedGridTransferOperator{Val{:p
   end
 
   # 2 - Redistribute from coarse partition to fine partition
-  redistribute_free_values!(cache_exchange,fv_h_red,Uh_red,fv_h,dv_h,Uh,model_h_red,glue;reverse=false)
+  redistribute!(fv_h_red,op_redist,fv_h,cache_exchange)
   copy!(y,fv_h_red) # FE layout -> Matrix layout
 
   return y
@@ -309,12 +397,12 @@ end
 function LinearAlgebra.mul!(y::Union{PVector,Nothing},A::DistributedGridTransferOperator{Val{:restriction},Val{true},Val{:interpolation}},x::PVector)
   cache_refine, cache_redist = A.cache
   model_h, Uh, fv_h, dv_h, UH, fv_H, dv_H = cache_refine
-  fv_h_red, dv_h_red, Uh_red, model_h_red, glue, cache_exchange = cache_redist
+  fv_h_red, op_redist, cache_exchange = cache_redist
 
   # 1 - Redistribute from fine partition to coarse partition
   copy!(fv_h_red,x)
   consistent!(fv_h_red) |> fetch
-  redistribute_free_values!(cache_exchange,fv_h,Uh,fv_h_red,dv_h_red,Uh_red,model_h,glue;reverse=true)
+  redistribute!(fv_h,op_redist,fv_h_red,cache_exchange)
 
   # 2 - Interpolate in coarse partition
   if !isa(y,Nothing)
@@ -330,12 +418,12 @@ end
 function LinearAlgebra.mul!(y::Union{PVector,Nothing},A::DistributedGridTransferOperator{Val{:restriction},Val{true},Val{:projection}},x::PVector)
   cache_refine, cache_redist = A.cache
   model_h, Uh, fv_h, dv_h, VH, AH_ns, lH, xH, bH, bH0, assem = cache_refine
-  fv_h_red, dv_h_red, Uh_red, model_h_red, glue, cache_exchange = cache_redist
+  fv_h_red, op_redist, cache_exchange = cache_redist
 
   # 1 - Redistribute from fine partition to coarse partition
   copy!(fv_h_red,x)
   consistent!(fv_h_red) |> fetch
-  redistribute_free_values!(cache_exchange,fv_h,Uh,fv_h_red,dv_h_red,Uh_red,model_h,glue;reverse=true)
+  redistribute!(fv_h,op_redist,fv_h_red,cache_exchange)
 
   # 2 - Solve f2c projection coarse partition
   if !isa(y,Nothing)
@@ -356,12 +444,12 @@ end
 function LinearAlgebra.mul!(y::Union{PVector,Nothing},A::DistributedGridTransferOperator{Val{:restriction},Val{true},Val{:dof_mask}},x::PVector)
   cache_refine, cache_redist = A.cache
   model_h, Uh, fv_h, dv_h, UH, fv_H, dv_H = cache_refine
-  fv_h_red, dv_h_red, Uh_red, model_h_red, glue, cache_exchange = cache_redist
+  fv_h_red, op_redist, cache_exchange = cache_redist
 
   # 1 - Redistribute from fine partition to coarse partition
   copy!(fv_h_red,x)
   consistent!(fv_h_red) |> fetch
-  redistribute_free_values!(cache_exchange,fv_h,Uh,fv_h_red,dv_h_red,Uh_red,model_h,glue;reverse=true)
+  redistribute!(fv_h,op_redist,fv_h_red,cache_exchange)
 
   # 2 - Interpolate in coarse partition
   if !isa(y,Nothing)
@@ -405,13 +493,13 @@ end
 function LinearAlgebra.mul!(y::Union{PVector,Nothing},A::DistributedGridTransferOperator{Val{:restriction},Val{true},Val{:dual_projection}},x::PVector)
   cache_refine, cache_redist = A.cache
   model_h, Uh, VH, Mh_ns, rh, uh, assem, dΩhH = cache_refine
-  fv_h_red, dv_h_red, Uh_red, model_h_red, glue, cache_exchange = cache_redist
+  fv_h_red, op_redist, cache_exchange = cache_redist
   fv_h = isa(uh,Nothing) ? nothing : get_free_dof_values(uh)
 
   # 1 - Redistribute from fine partition to coarse partition
   copy!(fv_h_red,x)
   consistent!(fv_h_red) |> fetch
-  redistribute_free_values!(cache_exchange,fv_h,Uh,fv_h_red,dv_h_red,Uh_red,model_h,glue;reverse=true)
+  redistribute!(fv_h,op_redist,fv_h_red,cache_exchange)
 
   # 2 - Solve f2c projection coarse partition
   if !isa(y,Nothing)

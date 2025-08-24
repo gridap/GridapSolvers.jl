@@ -15,6 +15,7 @@ using GridapSolvers.MultilevelTools: get_cell_conformity
 using Gridap.Geometry: PatchTopology, get_patch_cells, get_patch_faces
 using Gridap.FESpaces: PatchAssembler
 using GridapDistributed: DistributedFESpace, DistributedPatchTopology, DistributedPatchAssembler
+using GridapDistributed: redistribute!, redistribute
 
 export PatchSolver, BlockJacobiSolver
 

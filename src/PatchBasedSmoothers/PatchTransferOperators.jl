@@ -19,13 +19,14 @@ mutable struct PatchProlongationOperator{R,A,B}
   rhs   :: Union{Nothing,Function}
   is_nonlinear :: Bool
   collect_factorizations :: Bool
+  op_redist
   caches
 
   function PatchProlongationOperator{R}(
-    sh,assem,lhs,rhs,is_nonlinear,collect_factorizations,caches
+    sh,assem,lhs,rhs,is_nonlinear,collect_factorizations,op_redist,caches
   ) where R
     A, B = typeof(sh), typeof(assem)
-    new{R,A,B}(sh,assem,lhs,rhs,is_nonlinear,collect_factorizations,caches)
+    new{R,A,B}(sh,assem,lhs,rhs,is_nonlinear,collect_factorizations,op_redist,caches)
   end
 end
 
@@ -71,8 +72,13 @@ function PatchProlongationOperator(
   caches = cache_refine, cache_patch, cache_redist
 
   redist = has_redistribution(sh,lev)
+  if redist
+    op_redist = MultilevelTools.RedistributionOperator(sh[lev],true)
+  else
+    op_redist = nothing
+  end
   R = typeof(Val(redist))
-  return PatchProlongationOperator{R}(sh,assem,lhs,rhs,is_nonlinear,collect_factorizations,caches)
+  return PatchProlongationOperator{R}(sh,assem,lhs,rhs,is_nonlinear,collect_factorizations,op_redist,caches)
 end
 
 function _get_patch_cache(lev,sh,assem,lhs,rhs,is_nonlinear,collect_factorizations,cache_refine)
@@ -119,10 +125,10 @@ function MultilevelTools.update_transfer_operator!(op::PatchProlongationOperator
   end
 
   if !isa(cache_redist,Nothing)
-    fv_h_red, dv_h_red, Uh_red, model_h_red, glue, cache_exchange = cache_redist
+    fv_h_red, op_redist, cache_exchange = cache_redist
     copy!(fv_h_red,x)
     consistent!(fv_h_red) |> fetch
-    GridapDistributed.redistribute_free_values(fv_h,Uh,fv_h_red,dv_h_red,Uh_red,model_h,glue;reverse=true)
+    redistribute(fv_h,op.op_redist,fv_h_red)
   else
     copy!(fv_h,x)
     consistent!(fv_h) |> fetch
@@ -168,7 +174,7 @@ end
 function LinearAlgebra.mul!(y::PVector,A::PatchProlongationOperator{Val{true}},x::Union{PVector,Nothing})
   cache_refine, cache_patch, cache_redist = A.caches
   model_h, Uh, fv_h, dv_h, UH, fv_H, dv_H = cache_refine
-  fv_h_red, dv_h_red, Uh_red, model_h_red, glue, cache_exchange = cache_redist
+  fv_h_red, op_redist, cache_exchange = cache_redist
   _, uH, _, dx_h, liform, _, patch_cols, patch_f, patch_ids, caches = cache_patch
 
   # 1 - Interpolate in coarse partition
@@ -186,7 +192,7 @@ function LinearAlgebra.mul!(y::PVector,A::PatchProlongationOperator{Val{true}},x
   end
 
   # 2 - Redistribute from coarse partition to fine partition
-  GridapDistributed.redistribute_free_values!(cache_exchange,fv_h_red,Uh_red,fv_h,dv_h,Uh,model_h_red,glue;reverse=false)
+  redistribute!(fv_h_red,op_redist,fv_h,cache_exchange)
   copy!(y,fv_h_red) # FE layout -> Matrix layout
 
   return y
@@ -281,13 +287,13 @@ end
 function LinearAlgebra.mul!(y::Union{PVector,Nothing},A::PatchRestrictionOperator{Val{true}},x::PVector)
   cache_refine, cache_patch, cache_redist = A.caches
   model_h, Uh, VH, Mh_ns, rh, _, assem, dΩhH = cache_refine
-  fv_h_red, dv_h_red, Uh_red, model_h_red, glue, cache_exchange = cache_redist
+  fv_h_red, op_redist, cache_exchange = cache_redist
   uh, uH, _, dx_h, liform, _, patch_cols, patch_f, patch_ids, caches = cache_patch
   fv_h = isa(uh,Nothing) ? nothing : get_free_dof_values(uh)
 
   copy!(fv_h_red,x)
   consistent!(fv_h_red) |> fetch
-  GridapDistributed.redistribute_free_values!(cache_exchange,fv_h,Uh,fv_h_red,dv_h_red,Uh_red,model_h,glue;reverse=true)
+  redistribute!(fv_h,op_redist,fv_h_red,cache_exchange)
 
   if !isa(y,Nothing)
     consistent!(fv_h) |> fetch

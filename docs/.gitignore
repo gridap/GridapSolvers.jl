@@ -2,3 +2,4 @@ Manifest.toml
 build/
 site/
 src/Examples/
+src/changelog.md

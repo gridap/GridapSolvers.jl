@@ -19,12 +19,15 @@ using Base: unsafe_getindex
 using Gridap.FESpaces: BasisStyle, TestBasis, TrialBasis, SingleFieldFEBasis
 using Gridap.MultiField: MultiFieldFEBasisComponent
 
+using GridapDistributed: redistribute!, redistribute
 using GridapDistributed: RedistributeGlue
 using GridapDistributed: redistribute_cell_dofs, redistribute_cell_dofs!, get_redistribute_cell_dofs_cache
 using GridapDistributed: redistribute_free_values, redistribute_free_values!, get_redistribute_free_values_cache
 using GridapDistributed: redistribute_fe_function
 using GridapDistributed: get_old_and_new_parts
 using GridapDistributed: i_am_in, num_parts, change_parts, generate_subparts, local_views
+
+using PartitionedArrays: matching_local_indices, matching_own_indices, matching_ghost_indices
 
 export change_parts, num_parts, i_am_in
 export generate_level_parts, generate_subparts
