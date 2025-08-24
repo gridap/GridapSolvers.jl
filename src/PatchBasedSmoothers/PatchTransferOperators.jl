@@ -56,7 +56,7 @@ function PatchProlongationOperator(
   lhs,rhs;is_nonlinear=false,collect_factorizations=false
 )
   Vh = MultilevelTools.get_fe_space_before_redist(sh,lev)
-  assem = FESpaces.PatchAssembler(ptopo,Vh,Vh,assembly=:star)
+  assem = FESpaces.PatchAssembler(ptopo,Vh,Vh,assembly=:interior)
   PatchProlongationOperator(
     lev,sh,assem,lhs,rhs;is_nonlinear,collect_factorizations
   )
