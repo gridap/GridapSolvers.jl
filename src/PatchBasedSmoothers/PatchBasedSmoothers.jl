@@ -19,7 +19,7 @@ using GridapDistributed: redistribute!, redistribute
 
 export PatchSolver, BlockJacobiSolver
 
-export PatchProlongationOperator, PatchRestrictionOperator
+export PatchProlongationOperator, PatchRestrictionOperator, BlockJacobiProlongationOperator
 export setup_patch_prolongation_operators, setup_patch_restriction_operators
 
 # Solvers
@@ -29,6 +29,6 @@ include("BlockJacobiSolvers.jl")
 
 include("CoarsePatchTopologies.jl")
 include("PatchTransferOperators.jl")
-#include("BlockJacobiTransferOperators.jl")
+include("BlockJacobiTransferOperators.jl")
 
 end

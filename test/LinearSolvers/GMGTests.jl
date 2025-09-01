@@ -54,6 +54,42 @@ function get_jacobi_smoothers(mh)
   return HierarchicalArray(smoothers,level_parts)
 end
 
+function get_smoothers(stype,mh,sh,biform,qdegree)
+  if stype == :jacobi
+    smoothers = get_jacobi_smoothers(mh)
+  elseif stype == :patch
+    smoothers = get_patch_smoothers(sh,biform,qdegree)
+  elseif stype == :block
+    smoothers = get_block_jacobi_smoothers(sh)
+  else
+    error("Unknown smoother type $stype")
+  end
+end
+
+function get_transfers(ttype,mh,sh,biform,qdegree)
+  solver = CGSolver(JacobiLinearSolver())
+  if ttype == :default
+    restrictions, prolongations = setup_transfer_operators(
+      sh, qdegree; mode=:residual, solver
+    )
+  elseif ttype == :block
+    prolongations = PatchBasedSmoothers.setup_block_jacobi_prolongation_operators(sh)
+    restrictions = setup_restriction_operators(
+      sh, qdegree; mode=:residual, solver
+    )
+  elseif ttype == :patch
+    prolongations = setup_patch_prolongation_operators(
+      sh,biform,biform,qdegree;collect_factorizations=true
+    )
+    restrictions = setup_restriction_operators(
+      sh, qdegree; mode=:residual, solver
+    )
+  else
+    error("Unknown transfer operator type $ttype")
+  end
+  return restrictions, prolongations
+end
+
 function get_bilinear_form(mh_lev,biform,qdegree)
   model = get_model(mh_lev)
   Ω = Triangulation(model)
@@ -61,12 +97,13 @@ function get_bilinear_form(mh_lev,biform,qdegree)
   return (u,v) -> biform(u,v,dΩ)
 end
 
-function gmg_driver_from_mats(t,parts,mh,spaces,qdegree,smoothers,biform,liform,u,ctype)
+function gmg_driver_from_mats(
+  t,parts,mh,spaces,biform,liform,u,qdegree;
+  ctype=:v_cycle,stype=:jacobi,ttype=:default
+)
   tests, trials = spaces
-
-  restrictions, prolongations = setup_transfer_operators(
-    trials, qdegree; mode=:residual, solver=CGSolver(JacobiLinearSolver())
-  )
+  restrictions, prolongations = get_transfers(ttype,mh,tests,biform,qdegree)
+  smoothers = get_smoothers(stype,mh,tests,biform,qdegree)
 
   smatrices, A, b = compute_hierarchy_matrices(trials,tests,biform,liform,qdegree)
   gmg = GMGLinearSolver(
@@ -106,12 +143,13 @@ function gmg_driver_from_mats(t,parts,mh,spaces,qdegree,smoothers,biform,liform,
   end
 end
 
-function gmg_driver_from_weakform(t,parts,mh,spaces,qdegree,smoothers,biform,liform,u,ctype)
+function gmg_driver_from_weakform(
+  t,parts,mh,spaces,biform,liform,u,qdegree;
+  ctype=:v_cycle,stype=:jacobi,ttype=:default
+)
   tests, trials = spaces
-
-  restrictions, prolongations = setup_transfer_operators(
-    trials, qdegree; mode=:residual, solver=CGSolver(JacobiLinearSolver())
-  )
+  restrictions, prolongations = get_transfers(ttype,mh,tests,biform,qdegree)
+  smoothers = get_smoothers(stype,mh,tests,biform,qdegree)
 
   A, b = with_level(mh,1) do _
     model = get_model(mh,1)
@@ -171,7 +209,6 @@ function gmg_poisson_driver(t,parts,mh,order,ctype)
   liform(v,dΩ)   = ∫(v*f)dΩ
   qdegree   = 2*order+1
   reffe     = ReferenceFE(lagrangian,Float64,order)
-  smoothers = get_jacobi_smoothers(mh)
 
   tests     = TestFESpace(mh,reffe,dirichlet_tags="boundary")
   trials    = TrialFESpace(tests,u)
@@ -179,10 +216,10 @@ function gmg_poisson_driver(t,parts,mh,order,ctype)
   toc!(t,"FESpaces")
 
   tic!(t;barrier=true)
-  gmg_driver_from_mats(t,parts,mh,spaces,qdegree,smoothers,biform,liform,u,ctype)
+  gmg_driver_from_mats(t,parts,mh,spaces,biform,liform,u,qdegree;ctype)
   toc!(t,"Solve with matrices")
   tic!(t;barrier=true)
-  gmg_driver_from_weakform(t,parts,mh,spaces,qdegree,smoothers,biform,liform,u,ctype)
+  gmg_driver_from_weakform(t,parts,mh,spaces,biform,liform,u,qdegree;ctype)
   toc!(t,"Solve with weakforms")
 end
 
@@ -195,7 +232,6 @@ function gmg_laplace_driver(t,parts,mh,order,ctype)
   liform(v,dΩ)   = ∫(v*f)dΩ
   qdegree   = 2*order+1
   reffe     = ReferenceFE(lagrangian,Float64,order)
-  smoothers = get_jacobi_smoothers(mh)
 
   tests     = TestFESpace(mh,reffe,dirichlet_tags="boundary")
   trials    = TrialFESpace(tests,u)
@@ -203,10 +239,10 @@ function gmg_laplace_driver(t,parts,mh,order,ctype)
   toc!(t,"FESpaces")
 
   tic!(t;barrier=true)
-  gmg_driver_from_mats(t,parts,mh,spaces,qdegree,smoothers,biform,liform,u,ctype)
+  gmg_driver_from_mats(t,parts,mh,spaces,biform,liform,u,qdegree;ctype)
   toc!(t,"Solve with matrices")
   tic!(t;barrier=true)
-  gmg_driver_from_weakform(t,parts,mh,spaces,qdegree,smoothers,biform,liform,u,ctype)
+  gmg_driver_from_weakform(t,parts,mh,spaces,biform,liform,u,qdegree;ctype)
   toc!(t,"Solve with weakforms")
 end
 
@@ -220,7 +256,6 @@ function gmg_vector_laplace_driver(t,parts,mh,order,ctype)
   liform(v,dΩ)   = ∫(v⋅f)dΩ
   qdegree   = 2*order+1
   reffe     = ReferenceFE(lagrangian,VectorValue{Dc,Float64},order)
-  smoothers = get_jacobi_smoothers(mh)
 
   tests     = TestFESpace(mh,reffe,dirichlet_tags="boundary")
   trials    = TrialFESpace(tests,u)
@@ -228,10 +263,10 @@ function gmg_vector_laplace_driver(t,parts,mh,order,ctype)
   toc!(t,"FESpaces")
 
   tic!(t;barrier=true)
-  gmg_driver_from_mats(t,parts,mh,spaces,qdegree,smoothers,biform,liform,u,ctype)
+  gmg_driver_from_mats(t,parts,mh,spaces,biform,liform,u,qdegree;ctype)
   toc!(t,"Solve with matrices")
   tic!(t;barrier=true)
-  gmg_driver_from_weakform(t,parts,mh,spaces,qdegree,smoothers,biform,liform,u,ctype)
+  gmg_driver_from_weakform(t,parts,mh,spaces,biform,liform,u,qdegree;ctype)
   toc!(t,"Solve with weakforms")
 end
 
@@ -239,8 +274,8 @@ function gmg_hdiv_driver(t,parts,mh,order,ctype)
   tic!(t;barrier=true)
   Dc   = num_cell_dims(get_model(mh,1))
   α    = 1.0
-  u(x) = (Dc==2) ? VectorValue(x[1],x[2]) : VectorValue(x[1],x[2],x[3])
-  f(x) = (Dc==2) ? VectorValue(x[1],x[2]) : VectorValue(x[1],x[2],x[3])
+  u(x) = (Dc==2) ? VectorValue(x[1],-x[2]) : VectorValue(-x[1],2*x[2],-x[3])
+  f(x) = u(x)
   biform(u,v,dΩ)  = ∫(v⋅u)dΩ + ∫(α*divergence(v)⋅divergence(u))dΩ
   liform(v,dΩ)    = ∫(v⋅f)dΩ
   qdegree   = 2*(order+1)
@@ -250,22 +285,42 @@ function gmg_hdiv_driver(t,parts,mh,order,ctype)
   trials    = TrialFESpace(tests,u)
   spaces    = tests, trials
   toc!(t,"FESpaces")
+  
+  for stype in (:patch, :block)
+    tic!(t;barrier=true)
+    gmg_driver_from_mats(t,parts,mh,spaces,biform,liform,u,qdegree;ctype,stype)
+    toc!(t,"Solve with matrices: smoother = $stype")
+    tic!(t;barrier=true)
+    gmg_driver_from_weakform(t,parts,mh,spaces,biform,liform,u,qdegree;ctype,stype)
+    toc!(t,"Solve with weakforms: smoother = $stype")
+  end
+end
 
-  smoothers = get_patch_smoothers(tests,biform,qdegree)
+function gmg_stokes_driver(t,parts,mh,order,ctype)
   tic!(t;barrier=true)
-  gmg_driver_from_mats(t,parts,mh,spaces,qdegree,smoothers,biform,liform,u,ctype)
-  toc!(t,"Solve with matrices + patch smoothers")
-  tic!(t;barrier=true)
-  gmg_driver_from_weakform(t,parts,mh,spaces,qdegree,smoothers,biform,liform,u,ctype)
-  toc!(t,"Solve with weakforms + patch smoothers")
+  Dc   = num_cell_dims(get_model(mh,1))
+  α    = 1.0
+  u(x) = (Dc==2) ? VectorValue(x[1],-x[2]) : VectorValue(-x[1],2*x[2],-x[3])
+  f(x) = -Δ(u)(x)
+  biform(u,v,dΩ)  = ∫(∇(v)⊙∇(u))dΩ + ∫(α*divergence(v)⋅divergence(u))dΩ
+  liform(v,dΩ)    = ∫(v⋅f)dΩ
+  qdegree   = 2*(order+1)
+  reffe     = ReferenceFE(lagrangian,VectorValue{Dc,Float64},order)
 
-  smoothers = get_block_jacobi_smoothers(tests)
-  tic!(t;barrier=true)
-  gmg_driver_from_mats(t,parts,mh,spaces,qdegree,smoothers,biform,liform,u,ctype)
-  toc!(t,"Solve with matrices + block jacobi smoothers")
-  tic!(t;barrier=true)
-  gmg_driver_from_weakform(t,parts,mh,spaces,qdegree,smoothers,biform,liform,u,ctype)
-  toc!(t,"Solve with weakforms + block jacobi smoothers")
+  tests     = TestFESpace(mh,reffe,dirichlet_tags="boundary")
+  trials    = TrialFESpace(tests,u)
+  spaces    = tests, trials
+  toc!(t,"FESpaces")
+
+  for stype in (:block,)
+    ttype = stype
+    tic!(t;barrier=true)
+    gmg_driver_from_mats(t,parts,mh,spaces,biform,liform,u,qdegree;ctype,stype,ttype)
+    toc!(t,"Solve with matrices: smoother = $stype, transfer = $ttype")
+    tic!(t;barrier=true)
+    gmg_driver_from_weakform(t,parts,mh,spaces,biform,liform,u,qdegree;ctype,stype,ttype)
+    toc!(t,"Solve with weakforms: smoother = $stype, transfer = $ttype")
+  end
 end
 
 function gmg_multifield_driver(t,parts,mh,order,ctype)
@@ -280,6 +335,7 @@ function gmg_multifield_driver(t,parts,mh,order,ctype)
   biform((u,j),(v_u,v_j),dΩ) = ∫(β*∇(u)⊙∇(v_u) -γ*(j×B)⋅v_u + j⋅v_j - (u×B)⋅v_j)dΩ
   liform((v_u,v_j),dΩ) = ∫(v_u⋅f)dΩ
 
+  qdegree = 2*(order+1)
   reffe_u  = ReferenceFE(lagrangian,VectorValue{Dc,Float64},order)
   tests_u  = FESpace(mh,reffe_u;dirichlet_tags="boundary");
   trials_u = TrialFESpace(tests_u);
@@ -293,16 +349,12 @@ function gmg_multifield_driver(t,parts,mh,order,ctype)
   spaces = tests, trials
   toc!(t,"FESpaces")
 
+  stype = :patch
   tic!(t;barrier=true)
-  qdegree = 2*(order+1)
-  smoothers = get_patch_smoothers(tests,biform,qdegree)
-  toc!(t,"Patch Decomposition")
-
-  tic!(t;barrier=true)
-  gmg_driver_from_mats(t,parts,mh,spaces,qdegree,smoothers,biform,liform,nothing,ctype)
+  gmg_driver_from_mats(t,parts,mh,spaces,qdegree,smoothers,biform,liform,nothing;ctype,stype)
   toc!(t,"Solve with matrices")
   tic!(t;barrier=true)
-  gmg_driver_from_weakform(t,parts,mh,spaces,qdegree,smoothers,biform,liform,nothing,ctype)
+  gmg_driver_from_weakform(t,parts,mh,spaces,qdegree,smoothers,biform,liform,nothing;ctype,stype)
   toc!(t,"Solve with weakforms")
 end
 
@@ -316,6 +368,8 @@ function main_gmg_driver(parts,mh,order,pde,ctype)
     gmg_vector_laplace_driver(t,parts,mh,order,ctype)
   elseif pde == :hdiv
     gmg_hdiv_driver(t,parts,mh,order,ctype)
+  elseif pde == :stokes
+    gmg_stokes_driver(t,parts,mh,order,ctype)
   elseif pde == :multifield
     gmg_multifield_driver(t,parts,mh,order,ctype)
   else
@@ -335,7 +389,7 @@ function main(distribute,np::Integer,nc::Tuple,np_per_level::Vector)
   mh = get_mesh_hierarchy(parts,nc,np_per_level)
   Dc = length(nc)
 
-  for pde in [:poisson,:laplace,:vector_laplace,:hdiv,:multifield]
+  for pde in [:poisson,:laplace,:vector_laplace,:hdiv,:stokes,:multifield]
     if (pde != :multifield) || (Dc == 3)
       if i_am_main(parts)
         println(repeat("=",80))

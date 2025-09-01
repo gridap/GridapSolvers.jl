@@ -194,6 +194,16 @@ function Algebra.numerical_setup(ss::GMGSymbolicSetup,mat::AbstractMatrix)
   end
   coarsest_solver_cache = gmg_coarse_solver_caches(s.coarsest_solver,smatrices,work_vectors)
 
+  nlevs = num_levels(s)
+  interp, restrict = s.interp, s.restrict
+  map(linear_indices(smatrices),smatrices) do lev, Ah
+    if lev != nlevs
+      if isa(interp[lev],BlockJacobiProlongationOperator)
+        MultilevelTools.update_transfer_operator!(interp[lev],Ah)
+      end
+    end
+  end
+
   return GMGNumericalSetup(
     s,smatrices,finest_level_cache,pre_smoothers_caches,post_smoothers_caches,coarsest_solver_cache,work_vectors,nothing
   )
@@ -215,8 +225,8 @@ function Algebra.numerical_setup(ss::GMGSymbolicSetup,mat::AbstractMatrix,x::Abs
   coarsest_solver_cache = gmg_coarse_solver_caches(s.coarsest_solver,smatrices,svectors,work_vectors)
 
   # Update transfer operators
-  interp, restrict = s.interp, s.restrict
   nlevs = num_levels(s)
+  interp, restrict = s.interp, s.restrict
   map(linear_indices(smatrices),smatrices,svectors) do lev, Ah, xh
     if lev != nlevs
       if isa(interp[lev],PatchProlongationOperator) || isa(interp[lev],MultiFieldTransferOperator)
@@ -224,6 +234,9 @@ function Algebra.numerical_setup(ss::GMGSymbolicSetup,mat::AbstractMatrix,x::Abs
       end
       if isa(restrict[lev],PatchRestrictionOperator) || isa(restrict[lev],MultiFieldTransferOperator)
         MultilevelTools.update_transfer_operator!(restrict[lev],xh)
+      end
+      if isa(interp[lev],BlockJacobiProlongationOperator)
+        MultilevelTools.update_transfer_operator!(interp[lev],Ah)
       end
     end
   end
@@ -268,6 +281,9 @@ function Algebra.numerical_setup!(
       end
       if isa(restrict[lev],PatchRestrictionOperator) || isa(restrict[lev],MultiFieldTransferOperator)
         MultilevelTools.update_transfer_operator!(restrict[lev],xh)
+      end
+      if isa(interp[lev],BlockJacobiProlongationOperator)
+        MultilevelTools.update_transfer_operator!(interp[lev],Ah)
       end
       numerical_setup!(pre_smoothers_ns[lev],Ah,xh)
       if !(s.pre_smoothers === s.post_smoothers)

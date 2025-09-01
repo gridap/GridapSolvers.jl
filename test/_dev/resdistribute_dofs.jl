@@ -37,7 +37,7 @@ function mpi_print(x, name="")
 end
 
 np = (2,1)
-ranks = with_mpi() do distribute
+ranks = with_debug() do distribute
   distribute(LinearIndices((prod(np),)))
 end
 
@@ -185,3 +185,19 @@ x_old_red = redistribute(x_old, red_old_ids_mat) |> fetch
 mpi_print(partition(x_new), "Partition New")
 mpi_print(partition(x_old_red), "Partition Old Red")
 display(map(≈,partition(x_new),partition(x_old_red)))
+
+#########################################################################################
+# CoarsePatchTopology
+
+mhl = mh[1]
+
+model_new = get_model(mhl)
+ptopo = GridapSolvers.PatchBasedSmoothers.CoarsePatchTopology(mhl)
+
+cell_to_patch = map(
+  (ptopo,model) -> map(x -> !isempty(x) ? Int(first(x)) : Int(0) ,Arrays.inverse_table(Geometry.get_patch_cells(ptopo), num_cells(model))),
+  local_views(ptopo), local_views(model_new)
+)
+map(linear_indices(cell_to_patch),local_views(model_new), cell_to_patch) do r, model, c2p
+  writevtk(Triangulation(model),"data/model_new_$r";celldata=["patches" => c2p])
+end

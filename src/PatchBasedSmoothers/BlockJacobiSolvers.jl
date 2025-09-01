@@ -164,3 +164,34 @@ function solve_block_jacobi!(
 
   return x
 end
+
+function solve_block_jacobi_projection!(
+  x,A,y,
+  patch_rows, patch_cols,
+  patch_ids = eachindex(patch_rows),
+  cache = (CachedArray(eltype(x),1), CachedArray(eltype(A),2))
+)
+  c_xk, c_Ak = cache
+
+  for patch in patch_ids
+    rows = patch_rows[patch]
+    cols = patch_cols[patch]
+    @check isequal(length(rows),length(cols)) "Block is not square"
+
+    n = length(rows)
+    setsize!(c_xk,(n,))
+    setsize!(c_Ak,(n,n))
+    Ak = c_Ak.array
+    bk = c_xk.array
+    
+    copyto!(Ak,view(A,rows,cols))
+    mul!(bk,Ak,view(y,rows))
+    f = lu!(Ak,NoPivot();check=false)
+    @check issuccess(f) "Factorization failed"
+    ldiv!(f,bk)
+    
+    x[cols] .+= bk
+  end
+
+  return x
+end
