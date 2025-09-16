@@ -24,7 +24,7 @@ function MultiField.get_block_ranges(::StaggeredFEOperator{NB,SB}) where {NB,SB}
 end
 
 # TODO: This is type piracy -> move to GridapDistributed
-MultiField.num_fields(space::DistributedFESpace) = 1
+# MultiField.num_fields(space::DistributedFESpace) = 1
 MultiField.split_fespace(space::DistributedMultiFieldFESpace) = [space...]
 
 function get_solution(op::StaggeredFEOperator{NB,SB}, xh::MultiFieldFEFunction, k) where {NB,SB}
