@@ -39,6 +39,22 @@ function get_patch_smoothers(tests,biform;w=0.2,niter=5)
   return smoothers
 end
 
+function get_block_smoothers(tests;w=0.2,niter=5)
+  nlevs = num_levels(tests)
+  smoothers = map(view(tests,1:nlevs-1)) do test
+    Vh = get_fe_space(test)
+    model = get_background_model(get_triangulation(Vh))
+    ptopo = Geometry.PatchTopology(ReferenceFE{0},model)
+    solver = PatchBasedSmoothers.BlockJacobiSolver(Vh,ptopo;assembly=:star)
+    if w > 0.0
+      return RichardsonSmoother(solver,niter,w)
+    else
+      return GMRESSolver(niter;Pl=solver,maxiter=niter)
+    end
+  end
+  return smoothers
+end
+
 function get_bilinear_form(mh_lev,biform)
   model = get_model(mh_lev)
   Ω = Triangulation(model)
@@ -98,7 +114,7 @@ Y = MultiFieldFESpace([V,Q];style=mfs)
 
 # Weak formulation
 γ = 1.e4
-α = 1.e3
+α = 1.e1
 μ = order*(order+1)
 h = 1/nx
 
@@ -118,8 +134,8 @@ function biform_u(u,v,Ω,Λ,Γ)
   h_Λ = CellField(get_array(∫(1)dΛ),Λ)
   h_Γ = CellField(get_array(∫(1)dΓ),Γ)
 
-  #c = ∫((1/γ)*∇(v)⊙∇(u) + α*(∇⋅v)*(∇⋅u) + crossB(u)⋅crossB(v))*dΩ +
-  c = ∫((1/γ)*∇(v)⊙∇(u) + α*(∇⋅v)*(∇⋅u))*dΩ +
+  c = ∫((1/γ)*∇(v)⊙∇(u) + α*(∇⋅v)*(∇⋅u) + crossB(u)⋅crossB(v))*dΩ +
+  #c = ∫((1/γ)*∇(v)⊙∇(u) + α*(∇⋅v)*(∇⋅u))*dΩ +
       ∫((μ/h_Γ)*(v⋅u) - v⋅(n_Γ⋅∇(u)) - (n_Γ⋅∇(v))⋅u )*dΓ +
       ∫(
         (μ/h_Λ)*(jump(v⊗n_Λ)⊙jump(u⊗n_Λ)) -
@@ -163,8 +179,8 @@ writevtk(Ω,"test/_dev/sol"; cellfields=["uh" => uh, "eu" => eu, "ph" => ph, "ep
 # GMG Solver for u
 biforms = map(mhl -> get_bilinear_form(mhl,biform_u),mh)
 
-smoothers = get_patch_smoothers(
-  trials_u,biform_u; w=0.2, niter=6
+smoothers = get_block_smoothers(
+  trials_u; w=0.2, niter=6
 );
 prolongations = setup_prolongation_operators(
   tests_u,qdegree;mode=:residual
@@ -179,17 +195,17 @@ gmg = GMGLinearSolver(
   pre_smoothers=smoothers,
   post_smoothers=smoothers,
   coarsest_solver=LUSolver(),
-  maxiter=10,mode=:solver,
+  maxiter=2,mode=:preconditioner,
   verbose=i_am_main(parts),
   cycle_type = :w_cycle,
 );
 gmg.log.depth = 4
 
 # Solver
-solver_u = gmg#FGMRESSolver(10,gmg;atol=1e-8,rtol=1.e-8,verbose=i_am_main(parts));
+solver_u = FGMRESSolver(10,gmg;atol=1e-8,rtol=1.e-8,verbose=i_am_main(parts));
 solver_p = LUSolver()#CGSolver(JacobiLinearSolver();maxiter=20,atol=1e-14,rtol=1.e-6,verbose=i_am_main(parts));
 solver_u.log.depth = 2
-solver_p.log.depth = 2
+#solver_p.log.depth = 2
 
 diag_blocks  = [LinearSystemBlock(),BiformBlock((p,q) -> ∫(-1.0/(α+γ)*p*q)dΩ,Q,Q)]
 bblocks = map(CartesianIndices((2,2))) do I

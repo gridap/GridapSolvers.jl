@@ -83,6 +83,10 @@ function Algebra.numerical_setup(ss::BlockJacobiSS,mat::PSparseMatrix)
   return BlockJacobiNS(solver, new_mat, patch_rows, patch_cols, cache)
 end
 
+function Algebra.numerical_setup!(ns::BlockJacobiNS,mat::AbstractMatrix,vec::AbstractVector)
+  numerical_setup!(ns,mat)
+end
+
 function Algebra.numerical_setup!(ns::BlockJacobiNS,mat::AbstractMatrix)
   ns.matrix = mat
   return ns
