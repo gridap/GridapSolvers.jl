@@ -20,7 +20,14 @@ function main(distribute,np,np_per_level)
   @test isa(mh,ModelHierarchy)
 
   reffe = ReferenceFE(lagrangian,Float64,1)
-  tests  = TestFESpace(mh,reffe)
+  sh = TestFESpace(mh,reffe)
+  @test isa(sh,FESpaceHierarchy)
+
+  th = Triangulation(mh)
+  @test isa(th,TriangulationHierarchy)
+
+  sh = FESpace(th,reffe)
+  @test isa(sh,FESpaceHierarchy)
 end
 
 end

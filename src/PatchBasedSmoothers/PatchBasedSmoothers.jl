@@ -9,32 +9,26 @@ using Gridap.Geometry, Gridap.FESpaces, Gridap.ReferenceFEs
 using PartitionedArrays
 using GridapDistributed
 
-using GridapSolvers.MultilevelTools
+using GridapSolvers.MultilevelTools, GridapSolvers.SolverInterfaces
 using GridapSolvers.MultilevelTools: get_cell_conformity
 
-export PatchDecomposition, Closure
-export PatchFESpace
-export PatchBasedLinearSolver, VankaSolver
+using Gridap.Geometry: PatchTopology, get_patch_cells, get_patch_faces
+using Gridap.FESpaces: PatchAssembler
+using GridapDistributed: DistributedFESpace, DistributedPatchTopology, DistributedPatchAssembler
+using GridapDistributed: redistribute!, redistribute
 
-export PatchProlongationOperator, PatchRestrictionOperator
+export PatchSolver, BlockJacobiSolver
+
+export PatchProlongationOperator, PatchRestrictionOperator, BlockJacobiProlongationOperator
 export setup_patch_prolongation_operators, setup_patch_restriction_operators
 
-# Geometry
-include("PatchDecompositions.jl")
-include("DistributedPatchDecompositions.jl")
-include("PatchTriangulations.jl")
-include("PatchClosures.jl")
-
-# FESpaces
-include("PatchFESpaces.jl")
-include("DistributedPatchFESpaces.jl")
-include("ZeroMeanPatchFESpaces.jl")
-include("PatchMultiFieldFESpaces.jl")
-
 # Solvers
-include("PatchBasedLinearSolvers.jl")
-include("PatchTransferOperators.jl")
-include("VankaSolvers.jl")
+
 include("PatchSolvers.jl")
+include("BlockJacobiSolvers.jl")
+
+include("CoarsePatchTopologies.jl")
+include("PatchTransferOperators.jl")
+include("BlockJacobiTransferOperators.jl")
 
 end

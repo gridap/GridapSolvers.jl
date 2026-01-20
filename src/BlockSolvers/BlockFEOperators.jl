@@ -89,32 +89,6 @@ function BlockArrays.blocks(a::MultiField.BlockSparseMatrixAssembler)
   return a.block_assemblers
 end
 
-function BlockArrays.blocks(f::MultiFieldFESpace{<:BlockMultiFieldStyle{NB,SB,P}}) where {NB,SB,P}
-  block_ranges = MultiField.get_block_ranges(NB,SB,P)
-  block_spaces = map(block_ranges) do range
-    (length(range) == 1) ? f[range[1]] : MultiFieldFESpace(f.spaces[range])
-  end
-  return block_spaces
-end
-
-function BlockArrays.blocks(f::GridapDistributed.DistributedMultiFieldFESpace{<:BlockMultiFieldStyle{NB,SB,P}}) where {NB,SB,P}
-  block_gids   = blocks(get_free_dof_ids(f))
-  block_ranges = MultiField.get_block_ranges(NB,SB,P)
-  block_spaces = map(block_ranges,block_gids) do range, gids
-    if (length(range) == 1) 
-      space = f[range[1]]
-    else
-      global_sf_spaces = f.field_fe_space[range]
-      local_sf_spaces  = to_parray_of_arrays(map(local_views,global_sf_spaces))
-      local_mf_spaces  = map(MultiFieldFESpace,local_sf_spaces)
-      vector_type = GridapDistributed._find_vector_type(local_mf_spaces,gids)
-      space = DistributedMultiFieldFESpace(global_sf_spaces,local_mf_spaces,gids,vector_type)
-    end
-    space
-  end
-  return block_spaces
-end
-
 function liform_from_blocks(ids, ranges, liforms)
   function biform(v)
     c = DomainContribution()
