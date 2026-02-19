@@ -58,7 +58,7 @@ A_vanka = Matrix(A[patch_ids,patch_ids])
 cond(A_vanka)
 x_vanka = A_vanka\randn(size(A_vanka,1))
 
-s = VankaSolver(X,PD)
+s = BlockJacobiSolver(X,PD)
 ns = numerical_setup(symbolic_setup(s,A),A)
 
 for i in 1:10

@@ -14,14 +14,20 @@ using Gridap.Adaptivity: get_model
 
 using PartitionedArrays, GridapDistributed
 
+using Base: unsafe_getindex
+
 using Gridap.FESpaces: BasisStyle, TestBasis, TrialBasis, SingleFieldFEBasis
 using Gridap.MultiField: MultiFieldFEBasisComponent
 
+using GridapDistributed: redistribute!, redistribute
+using GridapDistributed: RedistributeGlue
 using GridapDistributed: redistribute_cell_dofs, redistribute_cell_dofs!, get_redistribute_cell_dofs_cache
 using GridapDistributed: redistribute_free_values, redistribute_free_values!, get_redistribute_free_values_cache
 using GridapDistributed: redistribute_fe_function
 using GridapDistributed: get_old_and_new_parts
 using GridapDistributed: i_am_in, num_parts, change_parts, generate_subparts, local_views
+
+using PartitionedArrays: matching_local_indices, matching_own_indices, matching_ghost_indices
 
 export change_parts, num_parts, i_am_in
 export generate_level_parts, generate_subparts
@@ -36,6 +42,9 @@ export get_model, get_model_before_redist, has_refinement, has_redistribution
 export FESpaceHierarchy
 export get_fe_space, get_fe_space_before_redist
 export compute_hierarchy_matrices
+
+export TriangulationHierarchy
+export get_triangulation_before_redist
 
 export LocalProjectionMap
 
@@ -52,6 +61,7 @@ include("GridapFixes.jl")
 include("RefinementTools.jl")
 
 include("ModelHierarchies.jl")
+include("TriangulationHierarchies.jl")
 include("FESpaceHierarchies.jl")
 include("LocalProjectionMaps.jl")
 include("GridTransferOperators.jl")

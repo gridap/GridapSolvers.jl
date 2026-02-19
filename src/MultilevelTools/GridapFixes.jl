@@ -54,28 +54,12 @@ function get_cell_polytopes(trian::Triangulation)
   return expand_cell_data(polys,ctypes)
 end
 
-function get_cell_conformity(space::UnconstrainedFESpace{V,<:CellConformity}) where V
-  return space.metadata
-end
-
-function get_cell_conformity(space::UnconstrainedFESpace{V,<:NodeToDofGlue{T}}) where {V,T}
-  cell_polys = get_cell_polytopes(get_triangulation(space))
-  polys, ctypes = compress_cell_data(cell_polys)
-  reffes = map(p -> LagrangianRefFE(change_eltype(T,eltype(V)),p,1), polys)
-  cell_reffe = expand_cell_data(reffes,ctypes)
-  return CellConformity(cell_reffe,H1Conformity())
-end
-
-for ST in [:TrialFESpace,ZeroMeanFESpace,FESpaceWithConstantFixed]
+for ST in [ZeroMeanFESpace,FESpaceWithConstantFixed]
   @eval begin 
     function get_cell_conformity(space::$ST)
       return get_cell_conformity(space.space)
     end
   end
-end
-
-function get_cell_conformity(space::MultiFieldFESpace)
-  map(get_cell_conformity,space)
 end
 
 function get_cell_conformity(space::GridapDistributed.DistributedFESpace)

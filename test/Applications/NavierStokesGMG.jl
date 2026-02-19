@@ -40,16 +40,22 @@ using GridapSolvers.LinearSolvers, GridapSolvers.MultilevelTools
 using GridapSolvers.PatchBasedSmoothers, GridapSolvers.NonlinearSolvers
 using GridapSolvers.BlockSolvers: NonlinearSystemBlock, LinearSystemBlock, BiformBlock, BlockTriangularSolver
 
-function get_patch_smoothers(mh,tests,biform,patch_decompositions,qdegree;is_nonlinear=false)
-  patch_spaces = PatchFESpace(tests,patch_decompositions)
-  nlevs = num_levels(mh)
-  smoothers = map(view(tests,1:nlevs-1),patch_decompositions,patch_spaces) do tests, PD, Ph
-    Vh = get_fe_space(tests)
-    Ω  = Triangulation(PD)
+function get_patch_smoothers(sh,jac,qdegree)
+  nlevs = num_levels(sh)
+  smoothers = map(view(sh,1:nlevs-1)) do shl
+    model = get_model(shl)
+    ptopo = Geometry.PatchTopology(ReferenceFE{0},model)
+    space = get_fe_space(shl)
+    Ω  = Geometry.PatchTriangulation(model,ptopo)
     dΩ = Measure(Ω,qdegree)
-    ap = (u,du,dv) -> biform(u,du,dv,dΩ)
-    patch_smoother = PatchBasedLinearSolver(ap,Ph,Vh;is_nonlinear)
-    return RichardsonSmoother(patch_smoother,10,0.2)
+    ap = (u,du,dv) -> jac(u,du,dv,dΩ)
+    solver = PatchBasedSmoothers.PatchSolver(
+      ptopo, space, space, ap;
+      assembly = :star,
+      collect_factorizations = true,
+      is_nonlinear = true
+    )
+    return RichardsonSmoother(solver,10,0.2)
   end
   return smoothers
 end
@@ -99,7 +105,7 @@ function main(distribute,np,nc,np_per_level)
 
   Re = 10.0
   ν = 1/Re
-  α = 1.e2
+  α = 1.e3
   f = (Dc==2) ? VectorValue(1.0,1.0) : VectorValue(1.0,1.0,1.0)
   
   Π_Qh = LocalProjectionMap(divergence,reffe_p,qdegree)
@@ -126,15 +132,14 @@ function main(distribute,np,nc,np_per_level)
   op = FEOperator(res_h,jac_h,X,Y)
 
   biforms = map(mhl -> get_trilinear_form(mhl,jac_u,qdegree),mh)
-  patch_decompositions = PatchDecomposition(mh)
   smoothers = get_patch_smoothers(
-    mh,trials_u,jac_u,patch_decompositions,qdegree;is_nonlinear=true
+    trials_u,jac_u,qdegree
   )
   prolongations = setup_patch_prolongation_operators(
-    tests_u,jac_u,graddiv,qdegree;is_nonlinear=true
+    trials_u,jac_u,jac_u,qdegree;is_nonlinear=true,collect_factorizations=true
   )
-  restrictions = setup_patch_restriction_operators(
-    tests_u,prolongations,graddiv,qdegree;solver=CGSolver(JacobiLinearSolver())
+  restrictions = setup_restriction_operators(
+    tests_u,qdegree;mode=:residual,solver=CGSolver(JacobiLinearSolver())
   )
   gmg = GMGLinearSolver(
     trials_u,tests_u,biforms,
@@ -142,10 +147,16 @@ function main(distribute,np,nc,np_per_level)
     pre_smoothers=smoothers,
     post_smoothers=smoothers,
     coarsest_solver=LUSolver(),
-    maxiter=2,mode=:preconditioner,verbose=i_am_main(parts),is_nonlinear=true
+    maxiter=2,
+    mode=:preconditioner,
+    cycle_type=:f_cycle,
+    primal_restriction_method = :interpolation,
+    verbose=i_am_main(parts),
+    is_nonlinear=true,
   )
+  gmg.log.depth = 4
 
-  solver_u = gmg
+  solver_u = FGMRESSolver(20,gmg;atol=1e-8,rtol=1.e-8,verbose=i_am_main(parts))
   solver_p = CGSolver(JacobiLinearSolver();maxiter=20,atol=1e-14,rtol=1.e-6,verbose=i_am_main(parts))
   solver_u.log.depth = 3
   solver_p.log.depth = 3

@@ -13,6 +13,7 @@ struct GMGLinearSolverFromMatrices{A,B,C,D,E,F} <: Algebra.LinearSolver
   post_smoothers  :: E
   coarsest_solver :: F
   mode            :: Symbol
+  cycle_type      :: Symbol
   log             :: ConvergenceLog{Float64}
 end
 
@@ -26,7 +27,8 @@ MultilevelTools.num_levels(s::GMGLinearSolverFromMatrices) = length(s.smatrices)
       pre_smoothers   = Fill(RichardsonSmoother(JacobiLinearSolver(),10),num_levels(mh)-1),
       post_smoothers  = pre_smoothers,
       coarsest_solver = LUSolver(),
-      mode::Symbol    = :preconditioner,
+      mode            = :preconditioner,
+      cycle_type      = :v_cycle,
       maxiter = 100, atol = 1.0e-14, rtol = 1.0e-08, verbose = false,
     )
 
@@ -39,6 +41,9 @@ The solver has two modes of operation, defined by the kwarg `mode`:
 - `:solver`: The GMG solver takes a rhs `b` and returns a solution `x`.
 - `:preconditioner`: The GMG solver takes a residual `r` and returns a correction `dx`.
 
+You can also specify the GMG cycle type with the kwarg `cycle_type`, which can be one of 
+`:v_cycle`, `:w_cycle` or `:f_cycle`. The default is `:v_cycle`.
+
 """
 function GMGLinearSolver(
   smatrices::AbstractArray{<:AbstractMatrix},
@@ -47,16 +52,19 @@ function GMGLinearSolver(
   pre_smoothers   = Fill(RichardsonSmoother(JacobiLinearSolver(),10),length(smatrices)-1),
   post_smoothers  = pre_smoothers,
   coarsest_solver = Gridap.Algebra.LUSolver(),
-  mode::Symbol    = :preconditioner,
+  mode            = :preconditioner,
+  cycle_type      = :v_cycle,
   maxiter = 100, atol = 1.0e-14, rtol = 1.0e-08, verbose = false,
 )
   @check length(smatrices)-1 == length(interp) == length(restrict) == length(pre_smoothers) == length(post_smoothers)
   @check mode ∈ [:preconditioner,:solver]
+  @check cycle_type ∈ [:v_cycle,:w_cycle,:f_cycle]
   tols = SolverTolerances{Float64}(;maxiter=maxiter,atol=atol,rtol=rtol)
   log  = ConvergenceLog("GMG",tols;verbose=verbose)
 
   return GMGLinearSolverFromMatrices(
-    smatrices,interp,restrict,pre_smoothers,post_smoothers,coarsest_solver,mode,log
+    smatrices,interp,restrict,pre_smoothers,post_smoothers,coarsest_solver,
+    mode,cycle_type,log
   )
 end
 
@@ -77,6 +85,7 @@ struct GMGLinearSolverFromWeakform{A,B,C,D,E,F,G,H} <: Algebra.LinearSolver
   post_smoothers  :: G
   coarsest_solver :: H
   mode            :: Symbol
+  cycle_type      :: Symbol
   log             :: ConvergenceLog{Float64}
   is_nonlinear    :: Bool
   primal_restrictions
@@ -94,7 +103,8 @@ MultilevelTools.num_levels(s::GMGLinearSolverFromWeakform) = length(s.trials)
       pre_smoothers   = Fill(RichardsonSmoother(JacobiLinearSolver(),10),num_levels(mh)-1),
       post_smoothers  = pre_smoothers,
       coarsest_solver = Gridap.Algebra.LUSolver(),
-      mode::Symbol    = :preconditioner,
+      mode            = :preconditioner,
+      cycle_type      = :v_cycle,
       is_nonlinear    = false,
       maxiter = 100, atol = 1.0e-14, rtol = 1.0e-08, verbose = false,
     )
@@ -108,6 +118,9 @@ The solver has two modes of operation, defined by the kwarg `mode`:
 - `:solver`: The GMG solver takes a rhs `b` and returns a solution `x`.
 - `:preconditioner`: The GMG solver takes a residual `r` and returns a correction `dx`.
 
+You can also specify the GMG cycle type with the kwarg `cycle_type`, which can be one of 
+`:v_cycle`, `:w_cycle` or `:f_cycle`. The default is `:v_cycle`.
+
 """
 function GMGLinearSolver(
   trials::FESpaceHierarchy,
@@ -117,22 +130,30 @@ function GMGLinearSolver(
   pre_smoothers   = Fill(RichardsonSmoother(JacobiLinearSolver(),10),num_levels(trials)-1),
   post_smoothers  = pre_smoothers,
   coarsest_solver = Gridap.Algebra.LUSolver(),
-  mode::Symbol    = :preconditioner,
-  is_nonlinear    = false,
+  mode            = :preconditioner,
+  cycle_type      = :v_cycle,
+  is_nonlinear    = false, 
+  primal_restriction_method = :projection,
   maxiter = 100, atol = 1.0e-14, rtol = 1.0e-08, verbose = false,
 )
   @check mode ∈ [:preconditioner,:solver]
+  @check cycle_type ∈ [:v_cycle,:w_cycle,:f_cycle]
+  @check primal_restriction_method ∈ [:projection, :interpolation]
   @check matching_level_parts(trials,tests,biforms)
   tols = SolverTolerances{Float64}(;maxiter=maxiter,atol=atol,rtol=rtol)
   log  = ConvergenceLog("GMG",tols;verbose=verbose)
 
   if is_nonlinear 
-    primal_restrictions = setup_restriction_operators(trials,8;mode=:solution,solver=CGSolver(JacobiLinearSolver()))
+    primal_restrictions = setup_restriction_operators(
+      trials,8;mode=:solution,restriction_method=primal_restriction_method,
+      solver=CGSolver(JacobiLinearSolver())
+    )
   else
     primal_restrictions = nothing
   end
   return GMGLinearSolverFromWeakform(
-    trials,tests,biforms,interp,restrict,pre_smoothers,post_smoothers,coarsest_solver,mode,log,is_nonlinear,primal_restrictions
+    trials,tests,biforms,interp,restrict,pre_smoothers,post_smoothers,coarsest_solver,
+    mode,cycle_type,log,is_nonlinear,primal_restrictions
   )
 end
 
@@ -173,6 +194,16 @@ function Algebra.numerical_setup(ss::GMGSymbolicSetup,mat::AbstractMatrix)
   end
   coarsest_solver_cache = gmg_coarse_solver_caches(s.coarsest_solver,smatrices,work_vectors)
 
+  nlevs = num_levels(s)
+  interp, restrict = s.interp, s.restrict
+  map(linear_indices(smatrices),smatrices) do lev, Ah
+    if lev != nlevs
+      if isa(interp[lev],BlockJacobiProlongationOperator)
+        MultilevelTools.update_transfer_operator!(interp[lev],Ah)
+      end
+    end
+  end
+
   return GMGNumericalSetup(
     s,smatrices,finest_level_cache,pre_smoothers_caches,post_smoothers_caches,coarsest_solver_cache,work_vectors,nothing
   )
@@ -194,8 +225,8 @@ function Algebra.numerical_setup(ss::GMGSymbolicSetup,mat::AbstractMatrix,x::Abs
   coarsest_solver_cache = gmg_coarse_solver_caches(s.coarsest_solver,smatrices,svectors,work_vectors)
 
   # Update transfer operators
-  interp, restrict = s.interp, s.restrict
   nlevs = num_levels(s)
+  interp, restrict = s.interp, s.restrict
   map(linear_indices(smatrices),smatrices,svectors) do lev, Ah, xh
     if lev != nlevs
       if isa(interp[lev],PatchProlongationOperator) || isa(interp[lev],MultiFieldTransferOperator)
@@ -203,6 +234,9 @@ function Algebra.numerical_setup(ss::GMGSymbolicSetup,mat::AbstractMatrix,x::Abs
       end
       if isa(restrict[lev],PatchRestrictionOperator) || isa(restrict[lev],MultiFieldTransferOperator)
         MultilevelTools.update_transfer_operator!(restrict[lev],xh)
+      end
+      if isa(interp[lev],BlockJacobiProlongationOperator)
+        MultilevelTools.update_transfer_operator!(interp[lev],Ah)
       end
     end
   end
@@ -248,6 +282,9 @@ function Algebra.numerical_setup!(
       if isa(restrict[lev],PatchRestrictionOperator) || isa(restrict[lev],MultiFieldTransferOperator)
         MultilevelTools.update_transfer_operator!(restrict[lev],xh)
       end
+      if isa(interp[lev],BlockJacobiProlongationOperator)
+        MultilevelTools.update_transfer_operator!(interp[lev],Ah)
+      end
       numerical_setup!(pre_smoothers_ns[lev],Ah,xh)
       if !(s.pre_smoothers === s.post_smoothers)
         numerical_setup!(post_smoothers_ns[lev],Ah,xh)
@@ -278,6 +315,21 @@ function gmg_project_solutions!(
   map(linear_indices(restrictions),restrictions) do lev, R
     mul!(unsafe_getindex(svectors,lev+1),R,svectors[lev])
   end
+  return svectors
+end
+
+function gmg_project_solutions!(
+  svectors::AbstractVector{<:AbstractVector},
+  solver::GMGLinearSolverFromWeakform,
+  x::PVector
+)
+  restrictions = solver.primal_restrictions
+  copy!(svectors[1],x)
+  map(linear_indices(restrictions),restrictions) do lev, R
+    consistent!(svectors[lev]) |> wait
+    mul!(unsafe_getindex(svectors,lev+1),R,svectors[lev])
+  end
+  with_level(wait∘consistent!,svectors,length(svectors))
   return svectors
 end
 
@@ -324,7 +376,7 @@ function gmg_compute_matrices!(caches,s::GMGLinearSolverFromWeakform,mat::Abstra
   svectors = gmg_project_solutions!(svectors,s,x)
   map(linear_indices(s.trials),s.biforms,smatrices,svectors) do l, biform, matl, xl
     if l == 1
-      copyto!(matl,mat)
+      #copyto!(matl,mat)
     else
       Ul = MultilevelTools.get_fe_space(trials,l)
       Vl = MultilevelTools.get_fe_space(tests,l)
@@ -413,7 +465,7 @@ function gmg_work_vectors(smatrices::AbstractVector{<:AbstractMatrix})
   return work_vectors
 end
 
-function apply_GMG_level!(
+function gmg_v_cycle!(
   lev::Integer,xh::Union{<:AbstractVector,Nothing},rh::Union{<:AbstractVector,Nothing},ns::GMGNumericalSetup
 )
   with_level(ns.smatrices,lev) do Ah
@@ -433,7 +485,7 @@ function apply_GMG_level!(
 
       # Apply next_level
       !isa(dxH,Nothing) && fill!(dxH,0.0)
-      apply_GMG_level!(lev+1,dxH,rH,ns)
+      gmg_v_cycle!(lev+1,dxH,rH,ns)
 
       # Interpolate dxH in finer space
       mul!(dxh,interp,dxH)
@@ -449,9 +501,118 @@ function apply_GMG_level!(
   end
 end
 
+function gmg_w_cycle!(
+  lev::Integer,xh::Union{<:AbstractVector,Nothing},rh::Union{<:AbstractVector,Nothing},ns::GMGNumericalSetup
+)
+  with_level(ns.smatrices,lev) do Ah
+    if (lev == num_levels(ns.solver)) 
+      ## Coarsest level
+      solve!(xh, ns.coarsest_solver_cache, rh)
+    else
+      ## General case
+      restrict, interp = ns.solver.restrict[lev], ns.solver.interp[lev]
+      dxh, Adxh, dxH, rH = ns.work_vectors[lev]
+
+      # Pre-smooth current solution
+      solve!(xh, ns.pre_smoothers_caches[lev], rh)
+
+      # Restrict the residual
+      mul!(rH,restrict,rh)
+
+      # Apply next_level
+      !isa(dxH,Nothing) && fill!(dxH,0.0)
+      gmg_w_cycle!(lev+1,dxH,rH,ns)
+
+      # Interpolate dxH in finer space
+      mul!(dxh,interp,dxH)
+
+      # Update solution & residual
+      xh .= xh .+ dxh
+      mul!(Adxh, Ah, dxh)
+      rh .= rh .- Adxh
+
+      # Re-smooth
+      solve!(xh, ns.post_smoothers_caches[lev], rh)
+
+      # Restrict the residual again
+      mul!(rH,restrict,rh)
+
+      # Apply next_level again
+      !isa(dxH,Nothing) && fill!(dxH,0.0)
+      gmg_w_cycle!(lev+1,dxH,rH,ns)
+
+      # Interpolate dxH in finer space again
+      mul!(dxh,interp,dxH)
+
+      # Update solution & residual again
+      xh .= xh .+ dxh
+      mul!(Adxh, Ah, dxh)
+      rh .= rh .- Adxh
+
+      # Post-smooth current solution
+      solve!(xh, ns.post_smoothers_caches[lev], rh)
+    end
+  end
+end
+
+function gmg_f_cycle!(
+  lev::Integer,xh::Union{<:AbstractVector,Nothing},rh::Union{<:AbstractVector,Nothing},ns::GMGNumericalSetup
+)
+  with_level(ns.smatrices,lev) do Ah
+    if (lev == num_levels(ns.solver)) 
+      ## Coarsest level
+      solve!(xh, ns.coarsest_solver_cache, rh)
+    else
+      ## General case
+      restrict, interp = ns.solver.restrict[lev], ns.solver.interp[lev]
+      dxh, Adxh, dxH, rH = ns.work_vectors[lev]
+
+      # Pre-smooth current solution
+      solve!(xh, ns.pre_smoothers_caches[lev], rh)
+
+      # Restrict the residual
+      mul!(rH,restrict,rh)
+
+      # Apply next_level
+      !isa(dxH,Nothing) && fill!(dxH,0.0)
+      gmg_f_cycle!(lev+1,dxH,rH,ns)
+
+      # Interpolate dxH in finer space
+      mul!(dxh,interp,dxH)
+
+      # Update solution & residual
+      xh .= xh .+ dxh
+      mul!(Adxh, Ah, dxh)
+      rh .= rh .- Adxh
+
+      # Re-smooth
+      solve!(xh, ns.post_smoothers_caches[lev], rh)
+
+      # Restrict the residual again
+      mul!(rH,restrict,rh)
+
+      # Apply next_level again
+      !isa(dxH,Nothing) && fill!(dxH,0.0)
+      gmg_v_cycle!(lev+1,dxH,rH,ns)
+
+      # Interpolate dxH in finer space again
+      mul!(dxh,interp,dxH)
+
+      # Update solution & residual again
+      xh .= xh .+ dxh
+      mul!(Adxh, Ah, dxh)
+      rh .= rh .- Adxh
+
+      # Post-smooth current solution
+      solve!(xh, ns.post_smoothers_caches[lev], rh)
+    end
+  end
+end
+
 function Gridap.Algebra.solve!(x::AbstractVector,ns::GMGNumericalSetup,b::AbstractVector)
-  mode = ns.solver.mode
-  log  = ns.solver.log
+  mode  = ns.solver.mode
+  ctype = ns.solver.cycle_type
+  log   = ns.solver.log
 
   rh = ns.finest_level_cache
   if (mode == :preconditioner)
@@ -466,7 +627,15 @@ function Gridap.Algebra.solve!(x::AbstractVector,ns::GMGNumericalSetup,b::Abstra
   res  = norm(rh)
   done = init!(log,res)
   while !done
-    apply_GMG_level!(1,x,rh,ns)
+    if ctype == :v_cycle
+      gmg_v_cycle!(1,x,rh,ns)
+    elseif ctype == :w_cycle
+      gmg_w_cycle!(1,x,rh,ns)
+    elseif ctype == :f_cycle
+      gmg_f_cycle!(1,x,rh,ns)
+    else
+      @error "Unknown cycle type: $ctype"
+    end
     res  = norm(rh)
     done = update!(log,res)
   end
