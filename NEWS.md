@@ -18,6 +18,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - `GMGLinearSolver` now supports F- and W-cycles on top of the existing V-cycle. The iteration type can be now chosen through the `cycle_type` kwarg. Since PR[#94](https://github.com/gridap/GridapSolvers.jl/pull/94/files).
+- Non-preconditioned CG solver is now also available. Added Lanczos eigenvalue add-on for CG solvers to compute approximations of the . Since PR[#94](https://github.com/gridap/GridapSolvers.jl/pull/94/files).
 
 ## [0.6.1] - 2025-07-25
 
