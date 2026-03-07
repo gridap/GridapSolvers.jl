@@ -5,11 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.6.2] - 2026-03-08
+## [0.7.0] - 2025-08-30
 
-### Fixed
+### Breaking
 
-- Fixed compilation warning for `num_fields`. Since PR[#101](https://github.com/gridap/GridapSolvers.jl/pull/101).
+- Complete rework of patch-based smoothers. Since PR[#94](https://github.com/gridap/GridapSolvers.jl/pull/94/files). List of breaking changes:
+  - All the patch machinery has been removed (`PatchDecomposition`, `PatchFESpace`, `PatchTriangulation`, etc...) in favour of the new Gridap patch machinery (since Gridap v0.19).
+  - The old `PatchBasedLinearSolver` has been renamed to `PatchSolver` and now uses the new patch machinery. The constructors are similar but should be simpler and more flexible/robust. This still integrates the blocks on demand.
+  - The old `VankaSolver` has been renamed to `BlockJacobiSolver` and has been extended to distributed. It it now an alternative to `PatchSolver` where the local problems are extracted directly from the matrix instead of re-computing the local problems (and are equivalent if the patched weakform coincides with the original problem).
+
+### Added
+
+- `GMGLinearSolver` now supports F- and W-cycles on top of the existing V-cycle. The iteration type can be now chosen through the `cycle_type` kwarg. Since PR[#94](https://github.com/gridap/GridapSolvers.jl/pull/94/files).
 
 ## [0.6.1] - 2025-07-25
 
