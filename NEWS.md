@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-- Fixed compilation warning for `num_fields`. Since PR[#101](https://github.com/gridap/GridapSolvers.jl/pull/101).
+- Fixed compilation warning for `num_fields`. Since PR[#102](https://github.com/gridap/GridapSolvers.jl/pull/102).
 
 ## [0.6.1] - 2025-07-25
 
