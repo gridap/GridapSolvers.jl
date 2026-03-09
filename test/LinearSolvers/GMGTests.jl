@@ -312,8 +312,7 @@ function gmg_stokes_driver(t,parts,mh,order,ctype)
   spaces    = tests, trials
   toc!(t,"FESpaces")
 
-  for stype in (:block,)
-    ttype = stype
+  for (stype,ttype) in ((:block,:patch),)
     tic!(t;barrier=true)
     gmg_driver_from_mats(t,parts,mh,spaces,biform,liform,u,qdegree;ctype,stype,ttype)
     toc!(t,"Solve with matrices: smoother = $stype, transfer = $ttype")
@@ -351,10 +350,10 @@ function gmg_multifield_driver(t,parts,mh,order,ctype)
 
   stype = :patch
   tic!(t;barrier=true)
-  gmg_driver_from_mats(t,parts,mh,spaces,qdegree,smoothers,biform,liform,nothing;ctype,stype)
+  gmg_driver_from_mats(t,parts,mh,spaces,biform,liform,nothing,qdegree;ctype,stype)
   toc!(t,"Solve with matrices")
   tic!(t;barrier=true)
-  gmg_driver_from_weakform(t,parts,mh,spaces,qdegree,smoothers,biform,liform,nothing;ctype,stype)
+  gmg_driver_from_weakform(t,parts,mh,spaces,biform,liform,nothing,qdegree;ctype,stype)
   toc!(t,"Solve with weakforms")
 end
 

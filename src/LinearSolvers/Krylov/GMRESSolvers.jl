@@ -13,12 +13,12 @@
    - If `restart=false`, the basis size is allowed to increase. When full, the solver 
      allocates `m_add` new basis vectors.
 """
-struct GMRESSolver <: Gridap.Algebra.LinearSolver
+struct GMRESSolver{TR<:NothingOrSolver,TL<:NothingOrSolver} <: Gridap.Algebra.LinearSolver
   m       :: Int
   restart :: Bool
   m_add   :: Int
-  Pr      :: Union{Gridap.Algebra.LinearSolver,Nothing}
-  Pl      :: Union{Gridap.Algebra.LinearSolver,Nothing}
+  Pr      :: TR
+  Pl      :: TL
   log     :: ConvergenceLog{Float64}
 end
 
@@ -38,20 +38,20 @@ end
 
 AbstractTrees.children(s::GMRESSolver) = [s.Pr,s.Pl]
 
-struct GMRESSymbolicSetup <: Gridap.Algebra.SymbolicSetup
-  solver
+struct GMRESSymbolicSetup{A<:GMRESSolver} <: Gridap.Algebra.SymbolicSetup
+  solver::A
 end
 
 function Gridap.Algebra.symbolic_setup(solver::GMRESSolver, A::AbstractMatrix)
   return GMRESSymbolicSetup(solver)
 end
 
-mutable struct GMRESNumericalSetup <: Gridap.Algebra.NumericalSetup
-  solver
-  A
-  Pr_ns
-  Pl_ns
-  caches
+mutable struct GMRESNumericalSetup{A,B,C,D,E} <: Gridap.Algebra.NumericalSetup
+  solver::A
+  mat   ::B
+  Pr_ns ::C
+  Pl_ns ::D
+  caches::E
 end
 
 function get_solver_caches(solver::GMRESSolver,A::AbstractMatrix)
@@ -61,10 +61,10 @@ function get_solver_caches(solver::GMRESSolver,A::AbstractMatrix)
   zr = !isnothing(Pr) ? allocate_in_domain(A) : nothing
   zl = allocate_in_domain(A)
 
-  H = zeros(m+1,m)  # Hessenberg matrix
-  g = zeros(m+1)    # Residual vector
-  c = zeros(m)      # Gibens rotation cosines
-  s = zeros(m)      # Gibens rotation sines
+  H = zeros(m+1,m) # Hessenberg matrix
+  g = zeros(m+1)   # Residual vector
+  c = zeros(m)     # Gibens rotation cosines
+  s = zeros(m)     # Gibens rotation sines
   return (V,zr,zl,H,g,c,s)
 end
 
@@ -81,7 +81,7 @@ function expand_krylov_caches!(ns::GMRESNumericalSetup)
   m_new = m + m_add
 
   for _ in 1:m_add
-    push!(V,allocate_in_domain(ns.A))
+    push!(V,allocate_in_domain(ns.mat))
   end
   H_new = zeros(eltype(H),m_new+1,m_new); H_new[1:m+1,1:m] .= H
   g_new = zeros(eltype(g),m_new+1); g_new[1:m+1] .= g
@@ -108,13 +108,13 @@ function Gridap.Algebra.numerical_setup(ss::GMRESSymbolicSetup, A::AbstractMatri
 end
 
 function Gridap.Algebra.numerical_setup!(ns::GMRESNumericalSetup, A::AbstractMatrix)
-  if !isa(ns.Pr_ns,Nothing)
+  if !isnothing(ns.Pr_ns)
     numerical_setup!(ns.Pr_ns,A)
   end
-  if !isa(ns.Pl_ns,Nothing)
+  if !isnothing(ns.Pl_ns)
     numerical_setup!(ns.Pl_ns,A)
   end
-  ns.A = A
+  ns.mat = A
   return ns
 end
 
@@ -125,12 +125,12 @@ function Gridap.Algebra.numerical_setup!(ns::GMRESNumericalSetup, A::AbstractMat
   if !isa(ns.Pl_ns,Nothing)
     numerical_setup!(ns.Pl_ns,A,x)
   end
-  ns.A = A
+  ns.mat = A
   return ns
 end
 
 function Gridap.Algebra.solve!(x::AbstractVector,ns::GMRESNumericalSetup,b::AbstractVector)
-  solver, A, Pl, Pr, caches = ns.solver, ns.A, ns.Pl_ns, ns.Pr_ns, ns.caches
+  solver, A, Pl, Pr, caches = ns.solver, ns.mat, ns.Pl_ns, ns.Pr_ns, ns.caches
   V, zr, zl, H, g, c, s = caches
   m   = krylov_cache_length(ns)
   log = solver.log
@@ -190,7 +190,7 @@ function Gridap.Algebra.solve!(x::AbstractVector,ns::GMRESNumericalSetup,b::Abst
     end
 
     # Update solution & residual
-    if isa(Pr,Nothing)
+    if isnothing(Pr)
       for i in 1:j
         x .+= g[i] .* V[i]
       end
