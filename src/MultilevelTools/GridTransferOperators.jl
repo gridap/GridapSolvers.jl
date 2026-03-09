@@ -10,15 +10,25 @@ Base.reverse(op::RedistributionOperator) = RedistributionOperator(op.indices_fro
 function RedistributionOperator(
   model_to, space_to, space_from, glue::RedistributeGlue, reverse::Bool
 )
+  T = isnothing(space_from) ? typeof(space_to) : typeof(space_from)
+  RedistributionOperator(
+    T, model_to, space_to, space_from, glue, reverse
+  )
+end
+
+function RedistributionOperator(
+  ::Union{Type{<:DistributedSingleFieldFESpace},Type{<:DistributedMultiFieldFESpace}}, 
+  model_to, space_to, space_from, glue::RedistributeGlue, reverse::Bool
+)
   if !isnothing(space_to)
     dof_ids_to = partition(get_free_dof_ids(space_to))
-    to_cell_to_to_lid = get_cell_dof_ids(space_to)
+    to_cell_to_to_lid = _get_unified_cell_dof_ids(space_to)
   else
     dof_ids_to, to_cell_to_to_lid = nothing, nothing, nothing
   end
   if !isnothing(space_from)
     dof_ids_from = partition(get_free_dof_ids(space_from))
-    from_cell_to_from_lid = get_cell_dof_ids(space_from)
+    from_cell_to_from_lid = _get_unified_cell_dof_ids(space_from)
   else
     dof_ids_from, from_cell_to_from_lid = nothing, nothing, nothing
   end
@@ -26,6 +36,49 @@ function RedistributionOperator(
     dof_ids_from, from_cell_to_from_lid, to_cell_to_to_lid, model_to, glue; reverse,
   )
   return RedistributionOperator(indices_to, indices_from, reverse)
+end
+
+function RedistributionOperator(
+  ::Type{<:DistributedMultiFieldFESpace{<:BlockMultiFieldStyle{NB}}}, 
+  model_to, space_to, space_from, glue::RedistributeGlue, reverse::Bool
+) where NB
+  if !isnothing(space_to)
+    blocks_to = blocks(space_to)
+  else
+    blocks_to = [nothing for i in 1:NB]
+  end
+  if !isnothing(space_from)
+    blocks_from = blocks(space_from)
+  else
+    blocks_from = [nothing for i in 1:NB]
+  end
+  indices_from, indices_to = (), ()
+  for i in 1:NB
+    op_i = RedistributionOperator(
+      model_to, blocks_to[i], blocks_from[i], glue, reverse
+    )
+    indices_from = (indices_from..., op_i.indices_from)
+    indices_to = (indices_to..., op_i.indices_to)
+  end
+  return RedistributionOperator(indices_to, indices_from, reverse)
+end
+
+function _get_unified_cell_dof_ids(space::DistributedSingleFieldFESpace)
+  get_cell_dof_ids(space)
+end
+
+function _get_unified_cell_dof_ids(space::DistributedMultiFieldFESpace)
+  map(_get_unified_cell_dof_ids,local_views(space))
+end
+
+function _get_unified_cell_dof_ids(space::DistributedMultiFieldFESpace{<:BlockMultiFieldStyle})
+  map(_get_unified_cell_dof_ids,blocks(space)) |> Tuple
+end
+
+function _get_unified_cell_dof_ids(space::MultiFieldFESpace)
+  offsets = MultiField.compute_field_offsets(space) |> Tuple
+  cell_dof_ids = map(get_cell_dof_ids,space) |> Tuple
+  return Arrays.append_tables_locally(offsets, cell_dof_ids)
 end
 
 function RedistributionOperator(sh::FESpaceHierarchyLevel,reverse::Bool)
@@ -69,6 +122,16 @@ function redistribution_cache(x_to, x_from, indices_to, indices_from)
   return (values_to, values_from), (x_ids_to, x_ids_from), (x_to, x_from), caches
 end
 
+function redistribution_cache(x_to, x_from, indices_to::Tuple, indices_from::Tuple)
+  nb = length(indices_to)
+  blocks_to = isnothing(x_to) ? [nothing for i in 1:nb] : blocks(x_to)
+  blocks_from = isnothing(x_from) ? [nothing for i in 1:nb] : blocks(x_from)
+  cache = map(blocks_to, blocks_from, [indices_to...], [indices_from...]) do block_to, block_from, indices_to_i, indices_from_i
+    redistribution_cache(block_to, block_from, indices_to_i, indices_from_i)
+  end
+  return cache
+end
+
 function redistribution_cache(x_to, op::RedistributionOperator, x_from)
   return redistribution_cache(x_to, x_from, op.indices_to, op.indices_from)
 end
@@ -78,6 +141,16 @@ function GridapDistributed.redistribute!(x_to,op::RedistributionOperator,x_from,
   @assert (x_to, x_from) == owners
   t = GridapDistributed.redistribute!(values..., indices..., caches)
   wait(t)
+  return x_to
+end
+
+function GridapDistributed.redistribute!(x_to,op::RedistributionOperator,x_from,cache::Array)
+  nb = length(cache)
+  blocks_to = (isnothing(x_to) ? [nothing for i in 1:nb] : blocks(x_to)) |> Tuple
+  blocks_from = (isnothing(x_from) ? [nothing for i in 1:nb] : blocks(x_from)) |> Tuple
+  for i in 1:nb
+    GridapDistributed.redistribute!(blocks_to[i], op, blocks_from[i], cache[i])
+  end
   return x_to
 end
 
