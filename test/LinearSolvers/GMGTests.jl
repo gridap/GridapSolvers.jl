@@ -388,7 +388,18 @@ function main(distribute,np::Integer,nc::Tuple,np_per_level::Vector)
   mh = get_mesh_hierarchy(parts,nc,np_per_level)
   Dc = length(nc)
 
-  for pde in [:poisson,:laplace,:vector_laplace,:hdiv,:stokes,:multifield]
+  # Test poisson with different cycle types
+  for ctype in (:v_cycle,:w_cycle,:f_cycle)
+    if i_am_main(parts)
+      println(repeat("=",80))
+      println("Testing GMG with Dc=$(length(nc)), PDE=poisson, cycle type=$ctype")
+    end
+    order = 1
+    main_gmg_driver(parts,mh,order,:poisson,ctype)
+  end
+
+  # Test other PDEs with V-cycle
+  for pde in [:laplace,:vector_laplace,:hdiv,:stokes,:multifield]
     if (pde != :multifield) || (Dc == 3)
       if i_am_main(parts)
         println(repeat("=",80))
@@ -399,14 +410,7 @@ function main(distribute,np::Integer,nc::Tuple,np_per_level::Vector)
     end
   end
 
-  for ctype in (:v_cycle,:w_cycle,:f_cycle)
-    if i_am_main(parts)
-      println(repeat("=",80))
-      println("Testing GMG with Dc=$(length(nc)), cycle type=$ctype")
-    end
-    order = 1
-    main_gmg_driver(parts,mh,order,:poisson,ctype)
-  end
+  return true
 end
 
 end # module GMGTests

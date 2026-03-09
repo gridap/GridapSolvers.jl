@@ -66,15 +66,12 @@ end
 function _get_unified_cell_dof_ids(space::DistributedSingleFieldFESpace)
   get_cell_dof_ids(space)
 end
-
 function _get_unified_cell_dof_ids(space::DistributedMultiFieldFESpace)
   map(_get_unified_cell_dof_ids,local_views(space))
 end
-
 function _get_unified_cell_dof_ids(space::DistributedMultiFieldFESpace{<:BlockMultiFieldStyle})
   map(_get_unified_cell_dof_ids,blocks(space)) |> Tuple
 end
-
 function _get_unified_cell_dof_ids(space::MultiFieldFESpace)
   offsets = MultiField.compute_field_offsets(space) |> Tuple
   cell_dof_ids = map(get_cell_dof_ids,space) |> Tuple
@@ -323,8 +320,8 @@ function _get_redistribution_cache(lev::Int,sh::FESpaceHierarchy,mode::Symbol,op
     return cache_redist
   end
 
-  Uh_red      = get_fe_space(sh,lev)
-  fv_h_red    = zero_free_values(Uh_red)
+  Uh_red   = get_fe_space(sh,lev)
+  fv_h_red = zero_free_values(Uh_red)
 
   if (op_type == :prolongation)
     model_h, Uh, fv_h, dv_h, UH, fv_H, dv_H = cache_refine
