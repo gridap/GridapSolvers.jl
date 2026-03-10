@@ -97,22 +97,41 @@ function backward_sub!(U::AbstractArray{<:UpperTriangular},x::PVector)
 end
 
 # Smoother
-struct SymGaussSeidelSmoother <: Gridap.Algebra.LinearSolver
-  num_iters::Int
+
+"""
+    struct GaussSeidelSmoother <: Gridap.Algebra.LinearSolver
+    GaussSeidelSmoother(niter::Integer=1, ω::Real=1.0, type::Symbol=:symmetric)
+"""
+struct GaussSeidelSmoother <: Gridap.Algebra.LinearSolver
+  niter :: Int
+  ω     :: Float64
+  type  :: Symbol
+
+  function GaussSeidelSmoother(
+    niter::Integer=1, ω::Real=1.0, type::Symbol=:symmetric
+  )
+    @check type in (:symmetric, :forward, :backward) "The type must be :symmetric, :forward or :backward."
+    @check niter > 0 "The number of iterations must be a positive integer."
+    @check ω > 0.0 "The relaxation parameter must be a positive real number."
+    return new(niter,ω,type)
+  end
 end
 
-struct SymGaussSeidelSymbolicSetup <: Gridap.Algebra.SymbolicSetup
-  solver :: SymGaussSeidelSmoother
+# For backward compatibility
+SymGaussSeidelSmoother(niter::Integer=1, ω::Real=1.0) = GaussSeidelSmoother(niter,ω,:symmetric)
+
+struct GaussSeidelSymbolicSetup <: Gridap.Algebra.SymbolicSetup
+  solver :: GaussSeidelSmoother
 end
 
-function Gridap.Algebra.symbolic_setup(s::SymGaussSeidelSmoother,A::AbstractMatrix)
-  SymGaussSeidelSymbolicSetup(s)
+function Gridap.Algebra.symbolic_setup(s::GaussSeidelSmoother,A::AbstractMatrix)
+  GaussSeidelSymbolicSetup(s)
 end
 
 # Numerical setup
 
-struct SymGaussSeidelNumericalSetup{A,B,C,D} <: Gridap.Algebra.NumericalSetup
-  solver :: SymGaussSeidelSmoother
+struct GaussSeidelNumericalSetup{A,B,C,D} <: Gridap.Algebra.NumericalSetup
+  solver :: GaussSeidelSmoother
   mat    :: A
   L      :: B
   U      :: C
@@ -130,49 +149,57 @@ function _gs_decompose_matrix(A::AbstractMatrix)
   D  = DiagonalIndices(A,idx_range)
   L  = LowerTriangular(A, D)
   U  = UpperTriangular(A, D)
-  return L,U
+  return L, U
 end
 
-function _gs_decompose_matrix(A::PSparseMatrix{T,<:AbstractArray{MatType}}) where {T, MatType}
+function _gs_decompose_matrix(A::PSparseMatrix{T}) where T
   values  = partition(A)
   indices = isa(PartitionedArrays.getany(values),SparseMatrixCSC) ? partition(axes(A,2)) : partition(axes(A,1))
   L,U = map(values,indices) do A, indices
     D = DiagonalIndices(A,own_to_local(indices))
     L = LowerTriangular(A,D)
     U = UpperTriangular(A,D)
-    return L,U
+    return L, U
   end |> tuple_of_arrays
-  return L,U
+  return L, U
 end
 
-function Gridap.Algebra.numerical_setup(ss::SymGaussSeidelSymbolicSetup,A::AbstractMatrix)
+function Gridap.Algebra.numerical_setup(ss::GaussSeidelSymbolicSetup,A::AbstractMatrix)
   L, U   = _gs_decompose_matrix(A)
   caches = _gs_get_caches(A)
-  return SymGaussSeidelNumericalSetup(ss.solver,A,L,U,caches)
+  return GaussSeidelNumericalSetup(ss.solver,A,L,U,caches)
 end
 
 # Solve
 
-function Gridap.Algebra.solve!(x::AbstractVector, ns::SymGaussSeidelNumericalSetup, r::AbstractVector)
+function Gridap.Algebra.solve!(x::AbstractVector, ns::GaussSeidelNumericalSetup, r::AbstractVector)
   A, L, U, caches = ns.mat, ns.L, ns.U, ns.caches
+  niter, ω = ns.solver.niter, ns.solver.ω
   dx, Adx = caches
-  niter   = ns.solver.num_iters
+
+  forward = ns.solver.type ∈ (:forward, :symmetric)
+  backward = ns.solver.type ∈ (:backward, :symmetric)
 
   iter = 1
   while iter <= niter
-    # Forward pass
-    copy!(dx,r)
-    forward_sub!(L, dx)
-    x  .= x .+ dx
-    mul!(Adx, A, dx)
-    r  .= r .- Adx
+    
+    if forward # Forward pass
+      copy!(dx,r)
+      forward_sub!(L, dx)
+      dx .= ω .* dx
+      x  .= x .+ dx
+      mul!(Adx, A, dx)
+      r  .= r .- Adx
+    end
 
-    # Backward pass
-    copy!(dx,r)
-    backward_sub!(U, dx)
-    x  .= x .+ dx
-    mul!(Adx, A, dx)
-    r  .= r .- Adx
+    if backward # Backward pass
+      copy!(dx,r)
+      backward_sub!(U, dx)
+      dx .= ω .* dx
+      x  .= x .+ dx
+      mul!(Adx, A, dx)
+      r  .= r .- Adx
+    end
 
     iter += 1
   end
@@ -180,7 +207,7 @@ function Gridap.Algebra.solve!(x::AbstractVector, ns::SymGaussSeidelNumericalSet
   return x
 end
 
-function LinearAlgebra.ldiv!(x::AbstractVector, ns::SymGaussSeidelNumericalSetup, b::AbstractVector)
+function LinearAlgebra.ldiv!(x::AbstractVector, ns::GaussSeidelNumericalSetup, b::AbstractVector)
   fill!(x,0.0)
   aux = copy(b)
   solve!(x,ns,aux)

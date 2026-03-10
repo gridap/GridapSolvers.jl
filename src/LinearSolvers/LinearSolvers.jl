@@ -20,7 +20,7 @@ using GridapSolvers.PatchBasedSmoothers
 export LinearSolverFromSmoother
 export JacobiLinearSolver
 export RichardsonSmoother
-export SymGaussSeidelSmoother
+export GaussSeidelSmoother, SymGaussSeidelSmoother
 export GMGLinearSolver
 export BlockDiagonalSmoother
 export SchurComplementSolver

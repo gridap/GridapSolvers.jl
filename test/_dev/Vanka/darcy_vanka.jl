@@ -61,7 +61,7 @@ l2_error(ph_exact,p_exact,dΩ)
 l2_norm(∇⋅uh_exact,dΩ)
 
 PD = PatchDecomposition(model)
-P = VankaSolver(Xh,PD)
+P = BlockJacobiSolver(Xh,PD)
 P_ns = numerical_setup(symbolic_setup(P,A),A)
 
 x = zeros(num_free_dofs(Yh))
