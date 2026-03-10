@@ -40,6 +40,7 @@ such that ``|r_{k+1}| < |r_k|``.
 ```@docs
   RichardsonSmoother
   RichardsonSmoother(M::LinearSolver)
+  GaussSeidelSmoother
 ```
 
 ## Preconditioners
