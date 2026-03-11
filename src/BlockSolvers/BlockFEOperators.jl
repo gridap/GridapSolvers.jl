@@ -56,7 +56,7 @@ function BlockFEOperator(
   global_op  = FEOperator(global_res,global_jac,trial,test,assem)
 
   block_ops = map(FEOperator,res,jac,blocks(trial),blocks(test),blocks(assem))
-  return BlockFEOperator{NB,SB,P}(global_op,block_ids,block_ops,nonlinear)
+  return BlockFEOperator{NB,SB,P}(global_op,ids,block_ops,nonlinear)
 end
 
 # BlockArrays API
@@ -94,7 +94,7 @@ function liform_from_blocks(ids, ranges, liforms)
     c = DomainContribution()
     for (I,lf) in zip(ids, liforms)
       vk = v[ranges[I]]
-      c += lf(uk,vk)
+      c += lf(vk)
     end
     return c
   end

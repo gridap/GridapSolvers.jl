@@ -55,7 +55,7 @@ function is_orthogonal(N::NullSpace, v::AbstractVector; tol = 1.e-12)
 end
 
 function is_orthogonal(N::NullSpace, A::AbstractMatrix; tol = 1.e-12)
-  @assert length(v) == size(N,2)
+  @assert size(A,1) == size(N,2)
   v = allocate_in_range(A)
   for w in N.V
     mul!(v, A, w)

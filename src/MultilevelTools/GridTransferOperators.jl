@@ -24,13 +24,13 @@ function RedistributionOperator(
     dof_ids_to = partition(get_free_dof_ids(space_to))
     to_cell_to_to_lid = _get_unified_cell_dof_ids(space_to)
   else
-    dof_ids_to, to_cell_to_to_lid = nothing, nothing, nothing
+    dof_ids_to, to_cell_to_to_lid = nothing, nothing
   end
   if !isnothing(space_from)
     dof_ids_from = partition(get_free_dof_ids(space_from))
     from_cell_to_from_lid = _get_unified_cell_dof_ids(space_from)
   else
-    dof_ids_from, from_cell_to_from_lid = nothing, nothing, nothing
+    dof_ids_from, from_cell_to_from_lid = nothing, nothing
   end
   indices_from, indices_to = GridapDistributed.redistribute_indices(
     dof_ids_from, from_cell_to_from_lid, to_cell_to_to_lid, model_to, glue; reverse,

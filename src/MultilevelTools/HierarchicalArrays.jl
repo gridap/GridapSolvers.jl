@@ -122,11 +122,9 @@ function Base.map!(f,a::HierarchicalArray,args::Vararg{HierarchicalArray,N}) whe
   @assert matching_level_parts(a,args...)
   ranks  = get_level_parts(a)
   arrays = map(a -> a.array, args)
-  map(ranks, a.array, arrays...) do ranks, ai, arrays...
+  map(eachindex(a.array), ranks, arrays...) do i, ranks, arrays...
     if i_am_in(ranks)
-      ai = f(arrays...)
-    else
-      nothing
+      a.array[i] = f(arrays...)
     end
   end
   return a

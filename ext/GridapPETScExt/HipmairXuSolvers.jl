@@ -12,9 +12,10 @@ function ADS_Solver(model,tags,order;rtol=1e-8,maxits=300)
 end
 
 function get_ads_spaces(model,order,tags)
+  D = num_cell_dims(model)
   reffe_H1_sc = ReferenceFE(lagrangian,Float64,order)
   V_H1_sc = FESpace(model,reffe_H1_sc;dirichlet_tags=tags)
-  
+
   reffe_H1 = ReferenceFE(lagrangian,VectorValue{D,Float64},order)
   V_H1 = FESpace(model,reffe_H1;dirichlet_tags=tags)
   

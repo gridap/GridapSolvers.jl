@@ -144,7 +144,7 @@ end
 function own_local_values_view(::Type{<:SparseMatrixCSR{Bi}},A::PSparseMatrix, new_cols) where Bi
   rows, cols = axes(A)
   map(partition(A),partition(rows),partition(cols),new_cols) do A, rows, cols, new_cols
-    m, rowptr, colval, nzval = A.n, A.rowptr, A.colval, A.nzval
+    m, rowptr, colval, nzval = A.m, A.rowptr, A.colval, A.nzval
 
     n_new = length(new_cols)
     old_to_new_cols = GridapDistributed.find_local_to_local_map(cols, new_cols)
