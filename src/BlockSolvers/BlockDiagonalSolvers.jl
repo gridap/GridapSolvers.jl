@@ -118,7 +118,7 @@ end
 
 function Gridap.Algebra.symbolic_setup(solver::BlockDiagonalSolver,mat::AbstractBlockMatrix,x::AbstractBlockVector)
   mat_blocks   = diag(blocks(mat))
-  block_ss     = map((b,m) -> block_symbolic_setup(b,m,x),solver.blocks,solver.solvers,mat_blocks)
+  block_ss     = map((b,s,m) -> block_symbolic_setup(b,s,m,x),solver.blocks,solver.solvers,mat_blocks)
   return BlockDiagonalSolverSS(solver,block_ss)
 end
 

@@ -133,7 +133,7 @@ function Algebra.numerical_setup(ss::PatchSS{<:PatchSolverFromWeakform},mat::PSp
 end
 
 function Algebra.numerical_setup!(ns::PatchNS,mat::AbstractMatrix,vec::AbstractVector)
-  solver = nc.solver
+  solver = ns.solver
   @assert solver.is_nonlinear
   assem, trial, test = solver.assem, solver.trial, solver.test
 
@@ -197,7 +197,7 @@ function patch_solver_caches(
   patch_factorizations, caches = patch_solver_caches(
     patch_cols, patch_mats; collect_factorizations
   )
-  return patch_cols, patch_rows, patch_factorizations, caches
+  return patch_rows, patch_cols, patch_factorizations, caches
 end
 
 function patch_solver_caches(

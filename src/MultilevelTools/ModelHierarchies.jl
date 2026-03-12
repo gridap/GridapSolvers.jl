@@ -133,7 +133,7 @@ function CartesianModelHierarchy(
       model_ref  = Gridap.Adaptivity.refine(cmodel,level_nrefs[lev])
       ref_glue   = Gridap.Adaptivity.get_adaptivity_glue(model_ref)
     else
-      model_ref, ref_glue = nothing, nothing, nothing
+      model_ref, ref_glue = nothing, nothing
     end
     # Redistribution (if needed)
     if i_am_in(fparts) && (cparts !== fparts)

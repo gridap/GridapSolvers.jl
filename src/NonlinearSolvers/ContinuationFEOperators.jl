@@ -119,22 +119,42 @@ end
 
 function Algebra.allocate_residual(op::ContinuationFEOperator,u)
   switch!(op.switch, u, nothing)
-  ifelse(!has_switched(op), allocate_residual(op.op1, u), allocate_residual(op.op2, u))
+  if !has_switched(op)
+    allocate_residual(op.op1, u)
+  else
+    allocate_residual(op.op2, u)
+  end
 end
 
 function Algebra.residual!(b::AbstractVector,op::ContinuationFEOperator,u)
   switch!(op.switch, u, b)
-  ifelse(!has_switched(op), residual!(b, op.op1, u), residual!(b, op.op2, u))
+  if !has_switched(op)
+    residual!(b, op.op1, u)
+  else
+    residual!(b, op.op2, u)
+  end
 end
 
 function Algebra.allocate_jacobian(op::ContinuationFEOperator,u)
-  ifelse(!has_switched(op), allocate_jacobian(op.op1, u), allocate_jacobian(op.op2, u))
+  if !has_switched(op)
+    allocate_jacobian(op.op1, u)
+  else
+    allocate_jacobian(op.op2, u)
+  end
 end
 
 function Algebra.jacobian!(A::AbstractMatrix,op::ContinuationFEOperator,u)
   if op.reuse_caches
-    ifelse(!has_switched(op), jacobian!(A, op.op1, u), jacobian!(A, op.op2, u))
+    if !has_switched(op)
+      jacobian!(A, op.op1, u)
+    else
+      jacobian!(A, op.op2, u)
+    end
   else
-    ifelse(!has_switched(op), jacobian(op.op1, u), jacobian(op.op2, u))
+    if !has_switched(op)
+      jacobian(op.op1, u)
+    else
+      jacobian(op.op2, u)
+    end
   end
 end

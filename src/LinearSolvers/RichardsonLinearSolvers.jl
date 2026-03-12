@@ -34,11 +34,9 @@ function get_solver_caches(solver::RichardsonLinearSolver, A::AbstractMatrix)
   ω = solver.ω
   z = allocate_in_domain(A)
   r = allocate_in_domain(A)
-  α = allocate_in_domain(A)
   fill!(z,0.0)
   fill!(r,0.0)
-  fill!(α,1.0)
-  return ω, z, r, α
+  return ω, z, r
 end
 
 mutable struct RichardsonLinearNumericalSetup<:Gridap.Algebra.NumericalSetup
@@ -80,18 +78,16 @@ end
 
 function Gridap.Algebra.solve!(x::AbstractVector, ns:: RichardsonLinearNumericalSetup, b::AbstractVector)
   solver,A,Pl,caches = ns.solver,ns.A,ns.Pl_ns,ns.caches
-  ω, z, r, α = caches
+  ω, z, r = caches
   log = solver.log
-  # Relaxation parameters 
-  α .*= ω
   # residual
   r .= b
   mul!(r, A, x, -1, 1)
   done = init!(log,norm(r))
-  if !isa(ns.Pl_ns,Nothing) # Case when a preconditioner is applied
+  if !isnothing(ns.Pl_ns) # Case when a preconditioner is applied
     while !done
-      solve!(z, Pl, r) # Apply preconditioner r = PZ 
-      x .+= α.* z
+      solve!(z, Pl, r) # Apply preconditioner r = PZ
+      x .+= ω .* z
       r .= b
       mul!(r, A, x, -1, 1)
       done = update!(log,norm(r))
@@ -99,7 +95,7 @@ function Gridap.Algebra.solve!(x::AbstractVector, ns:: RichardsonLinearNumerical
     finalize!(log,norm(r))
   else    # Case when no preconditioner is applied
     while !done
-      x .+= α.* r
+      x .+= ω .* r
       r .= b
       mul!(r, A, x, -1, 1)
       done = update!(log,norm(r))
