@@ -8,7 +8,7 @@
 Richardson Iteration, with an optional left preconditioners `Pl`.
 
 The relaxation parameter (ω) can either be of type Float64 or Vector{Float64}. 
-This gives flexiblity in relaxation.  
+This gives flexibility in relaxation.  
 """
 struct RichardsonLinearSolver<:Gridap.Algebra.LinearSolver
   ω::Union{AbstractVector{Float64},Float64}
