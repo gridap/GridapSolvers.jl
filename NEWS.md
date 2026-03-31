@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-- Updated RichardsonLinearSolver to generalize the relaxation parameter input as an abstract array. Since PR[#106](https://github.com/gridap/GridapSolvers.jl/pull/106/files).
+- Updated RichardsonLinearSolver to generalize the relaxation parameter input as an abstract vector. Since PR[#106](https://github.com/gridap/GridapSolvers.jl/pull/106/files).
 
 ## [0.7.0] - 2026-03-10
 
