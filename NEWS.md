@@ -7,9 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 
-### Fixed
+## [0.7.1] - 2026-04-23
+
+### Changed
 
 - Updated `RichardsonLinearSolver` to also accept the relaxation parameter as an `AbstractVector{Float64}` (in addition to a scalar `Float64`). Since PR[#106](https://github.com/gridap/GridapSolvers.jl/pull/106/files).
+- Updated compatibility for Gridap v0.20. Since PR[#105](https://github.com/gridap/GridapSolvers.jl/pull/105).
 
 ## [0.7.0] - 2026-03-10
 
