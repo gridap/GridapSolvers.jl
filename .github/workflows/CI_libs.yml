@@ -87,7 +87,7 @@ jobs:
           make
           make install
           cd $CURR_DIR
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - uses: julia-actions/setup-julia@v3
         with:
           version: ${{ matrix.version }}
@@ -108,7 +108,7 @@ jobs:
         env:
           TESTCASE: ${{ matrix.testcase }}
       - uses: julia-actions/julia-processcoverage@v1
-      - uses: codecov/codecov-action@v6
+      - uses: codecov/codecov-action@v7
         with:
           verbose: true
           token: ${{ secrets.CODECOV_TOKEN }}
