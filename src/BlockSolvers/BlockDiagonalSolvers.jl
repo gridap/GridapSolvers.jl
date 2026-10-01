@@ -170,6 +170,7 @@ function Gridap.Algebra.solve!(x::AbstractBlockVector,ns::BlockDiagonalSolverNS,
     xi = blocks(x)[iB]
     bi = blocks(b)[iB]
     yi = blocks(y)[iB]
+    fill!(yi,zero(eltype(yi)))
     solve!(yi,bns.ns,bi)
     copy!(xi,yi)
   end
