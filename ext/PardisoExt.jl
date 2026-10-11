@@ -12,12 +12,11 @@ using Pardiso: get_nprocs
 using Pardiso: MatrixType, REAL_NONSYM
 using Pardiso: MessageLevel, MESSAGE_LEVEL_ON
 
-using Pardiso: ANALYSIS, NUM_FACT, SOLVE_ITERATIVE_REFINE, RELEASE_ALL
+using Pardiso: ANALYSIS, NUM_FACT, SOLVE_ITERATIVE_REFINE
 
 # Cannot have name `PardisoSolver` to not conflict with Pardiso.jl, and cannot have name
 # `PardisoLinearSolver` to not conflict with the function exported from GridapSolvers.jl.
-# Needs to be mutable for the finalizer
-mutable struct GridapPardisoSolver{A} <: Algebra.LinearSolver
+struct GridapPardisoSolver{A} <: Algebra.LinearSolver
   ps :: A
   verbose :: Bool
 end
@@ -50,14 +49,7 @@ function GridapSolvers.PardisoLinearSolver(;
   set_matrixtype!(ps, mtype)
   set_nprocs!(ps, nthreads)
   verbose && set_msglvl!(ps,MESSAGE_LEVEL_ON)
-  solver = GridapPardisoSolver(ps,verbose)
-  return finalizer(ps_finalize,solver)
-end
-
-function ps_finalize(solver)
-  ps = solver.ps
-  set_phase!(ps, RELEASE_ALL)
-  pardiso(ps)
+  return GridapPardisoSolver(ps,verbose)
 end
 
 struct PardisoSymbolicSetup{A} <: Algebra.SymbolicSetup

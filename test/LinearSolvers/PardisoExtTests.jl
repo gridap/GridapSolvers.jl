@@ -32,6 +32,15 @@ function main()
   Algebra.solve!(y,ns,b)
   
   @test norm(x - y) < 1e-10
+
+  ns = numerical_setup(symbolic_setup(PardisoLinearSolver(;nthreads=Threads.nthreads()),A),A)
+  ps, ps_mat = ns.solver.ps, ns.ps_mat
+  ns = nothing
+  GC.gc(); GC.gc()
+  z = allocate_in_domain(A)
+  Pardiso.set_phase!(ps, Pardiso.SOLVE_ITERATIVE_REFINE)
+  Pardiso.pardiso(ps, z, ps_mat, b)
+  @test norm(x - z) < 1e-10
 end
 
 end
