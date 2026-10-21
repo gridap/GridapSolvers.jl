@@ -26,39 +26,53 @@
 #
 # The pattern of A must be structurally symmetric (rows = cols, one FE space).
 
-struct CondensedBlockJacobiSolver{A,B} <: Algebra.LinearSolver
-  patch_ids :: A
-  block_ids :: B
+struct CondensedBlockJacobiSolver{A,B,C} <: Algebra.LinearSolver
+  rows      :: A
+  patch_ids :: B
+  block_ids :: C
   caching   :: Symbol
   function CondensedBlockJacobiSolver(
-    patch_ids::AbstractArray{<:AbstractArray{<:Integer}},
-    block_ids::AbstractArray{<:AbstractArray{<:Integer}};
+    rows,
+    patch_ids::AbstractArray{<:AbstractArray},
+    block_ids::AbstractArray{<:AbstractArray};
     caching = :all
   )
     @check caching ∈ (:none, :interior, :all) "Unknown caching $caching"
-    patch_table, block_table = Table(patch_ids), Table(block_ids)
-    A, B = typeof(patch_table), typeof(block_table)
-    new{A,B}(patch_table, block_table, caching)
+    patch_table, block_table = ids_to_table(patch_ids), ids_to_table(block_ids)
+    A, B, C = typeof(rows), typeof(patch_table), typeof(block_table)
+    new{A,B,C}(rows, patch_table, block_table, caching)
   end
 end
 
+ids_to_table(ids::AbstractArray{<:AbstractArray{<:Integer}}) = Table(ids)
+ids_to_table(ids::AbstractArray{<:AbstractArray{<:AbstractArray{<:Integer}}}) = map(Table, ids)
+
+function CondensedBlockJacobiSolver(
+  patch_ids::AbstractArray{<:AbstractArray{<:Integer}},
+  block_ids::AbstractArray{<:AbstractArray{<:Integer}};
+  kwargs...
+)
+  rows = Base.OneTo(maximum(p -> maximum(p; init = 0), patch_ids; init = 0))
+  return CondensedBlockJacobiSolver(rows, patch_ids, block_ids; kwargs...)
+end
+
 function CondensedBlockJacobiSolver(S::BlockJacobiSolver, block_ids; kwargs...)
-  @check S.patch_rows == S.patch_cols "Condensation needs square patches on one space"
-  return CondensedBlockJacobiSolver(S.patch_rows, block_ids; kwargs...)
+  @check reduce(&, map(==, S.patch_rows, S.patch_cols); init = true) "Condensation needs square patches on one space"
+  return CondensedBlockJacobiSolver(S.rows, S.patch_rows, block_ids; kwargs...)
 end
 
 # The blocks are the interior dofs of `space` in each patch of `block_ptopo`, whose patches
 # must not overlap. The default `block_ptopo` has one patch per cell.
 function CondensedBlockJacobiSolver(
-  S::BlockJacobiSolver, space::FESpace, block_ptopo::PatchTopology = cell_patch_topology(space);
+  S::BlockJacobiSolver, space::FESpace, block_ptopo = cell_patch_topology(space);
   kwargs...
 )
-  block_ids = get_patch_assembly_ids(space, block_ptopo; assembly = :interior)
+  block_ids = interior_block_ids(space, block_ptopo)
   return CondensedBlockJacobiSolver(S, block_ids; kwargs...)
 end
 
 function CondensedBlockJacobiSolver(
-  space::FESpace, ptopo::PatchTopology, block_ptopo::PatchTopology = cell_patch_topology(space);
+  space::FESpace, ptopo, block_ptopo = cell_patch_topology(space);
   caching = :all, kwargs...
 )
   S = BlockJacobiSolver(space, ptopo; kwargs...)
@@ -67,28 +81,61 @@ end
 
 cell_patch_topology(space::FESpace) = PatchTopology(get_background_model(get_triangulation(space)))
 
-# Symbolic setup, as Tables:
+interior_block_ids(space::FESpace, block_ptopo::PatchTopology) =
+  get_patch_assembly_ids(space, block_ptopo; assembly = :interior)
+
+function interior_block_ids(space::DistributedFESpace, block_ptopo::DistributedPatchTopology)
+  map(local_views(space), local_views(block_ptopo)) do space, block_ptopo
+    interior_block_ids(space, block_ptopo)
+  end
+end
+
+# Symbolic setup: the rows and the patch/block structure, which do not depend on the matrix.
+# In parallel, the rows of each part are split into own and ghost, and the ids are local to them.
+#   patch_ids      p -> dofs of patch p
+#   block_ids      k -> dofs of block k
 #   patch_blocks   p -> blocks condensed in patch p
-#   patch_B        p -> global ids of the B dofs of patch p
-#   block_gamma    k -> Γ_k, the dofs coupled to block k
-#   pb_pos, pb_loc j -> for the j-th (patch, block) pair (a data index of patch_blocks): the
-#                       positions in Γ_k of the dofs in the patch, and their local ids in B.
-struct CondensedBlockJacobiSS{A,B,C,D,E} <: Algebra.SymbolicSetup
+#   patch_B        p -> ids of the B dofs of patch p
+struct CondensedBlockJacobiSS{A,B,C,D,E,F} <: Algebra.SymbolicSetup
   solver       :: A
-  patch_blocks :: B
-  patch_B      :: C
-  block_gamma  :: D
-  pb_pos       :: E
-  pb_loc       :: E
+  rows         :: B
+  patch_ids    :: C
+  block_ids    :: D
+  patch_blocks :: E
+  patch_B      :: F
 end
 
 function Algebra.symbolic_setup(solver::CondensedBlockJacobiSolver, mat::SparseMatrixCSC)
   patch_ids, block_ids = solver.patch_ids, solver.block_ids
-  n = size(mat, 1)
+  patch_blocks, patch_B = condensation_patches(patch_ids, block_ids, size(mat, 1))
+  return CondensedBlockJacobiSS(solver, solver.rows, patch_ids, block_ids, patch_blocks, patch_B)
+end
 
-  # Block of every dof (0 if in none)
+function Algebra.symbolic_setup(solver::CondensedBlockJacobiSolver, mat::PSparseMatrix)
+  rows = map(SolverInterfaces.split_indices, solver.rows)
+  patch_ids = map(Table, reindex_patch_ids(solver.patch_ids, solver.rows, rows))
+  block_ids = map(Table, reindex_patch_ids(solver.block_ids, solver.rows, rows))
+  patch_blocks, patch_B = map(patch_ids, block_ids, rows) do patch_ids, block_ids, rows
+    condensation_patches(patch_ids, block_ids, local_length(rows))
+  end |> tuple_of_arrays
+  return CondensedBlockJacobiSS(solver, rows, patch_ids, block_ids, patch_blocks, patch_B)
+end
+
+function condensation_patches(patch_ids::Table, block_ids::Table, n)
   dof_to_block = flatten_partition(block_ids, n)
   @check count(!iszero, dof_to_block) == length(block_ids.data) "A dof is in two interior blocks"
+  patch_blocks = find_patch_blocks(patch_ids, block_ids, dof_to_block)
+  patch_B = find_patch_B(patch_ids, patch_blocks, block_ids, dof_to_block)
+  return patch_blocks, patch_B
+end
+
+# From the pattern of the matrix:
+#   block_gamma    k -> Γ_k, the dofs coupled to block k
+#   pb_pos, pb_loc j -> for the j-th (patch, block) pair (a data index of patch_blocks): the
+#                       positions in Γ_k of the dofs in the patch, and their local ids in B.
+function condensation_gamma(mat::SparseMatrixCSC, block_ids::Table, patch_blocks::Table, patch_B::Table)
+  n = size(mat, 1)
+  dof_to_block = flatten_partition(block_ids, n)
 
   # Γ_k: the dofs outside block k that A couples to it
   dof_to_nbors = Table(rowvals(mat), SparseArrays.getcolptr(mat))
@@ -98,11 +145,8 @@ function Algebra.symbolic_setup(solver::CondensedBlockJacobiSolver, mat::SparseM
     acc = SortedSet{Int32}(), post = dofs -> filter(d -> iszero(dof_to_block[d]), dofs)
   )
 
-  patch_blocks = find_patch_blocks(patch_ids, block_ids, dof_to_block)
-  patch_B = find_patch_B(patch_ids, patch_blocks, block_ids, dof_to_block)
   pb_pos, pb_loc = find_patch_gamma(patch_B, patch_blocks, block_gamma, n)
-
-  return CondensedBlockJacobiSS(solver, patch_blocks, patch_B, block_gamma, pb_pos, pb_loc)
+  return block_gamma, pb_pos, pb_loc
 end
 
 function blocks_are_uncoupled(dof_to_nbors, block_ids, dof_to_block)
@@ -315,12 +359,6 @@ struct PatchStaticCondensationArray{T,A,B,C,D,E} <: AbstractVector{T}
   end
 end
 
-function PatchStaticCondensationArray(ss::CondensedBlockJacobiSS, matrix, block_data, lids)
-  return PatchStaticCondensationArray(
-    matrix, block_data, ss.patch_blocks, ss.patch_B, ss.pb_pos, ss.pb_loc, lids
-  )
-end
-
 Base.size(a::PatchStaticCondensationArray) = (length(a.patch_B),)
 Base.IndexStyle(::Type{<:PatchStaticCondensationArray}) = IndexLinear()
 Base.getindex(a::PatchStaticCondensationArray, p::Integer) = getindex!(array_cache(a), a, p)
@@ -379,34 +417,75 @@ function Arrays.lazy_collect(a::PatchStaticCondensationArray{T,A,B,C,D,Tv}) wher
   )
 end
 
-mutable struct CondensedBlockJacobiNS{A,B,C,D,E} <: Algebra.NumericalSetup
-  ss         :: A
-  matrix     :: B
-  block_data :: C   # k -> (factor of A_kk, W_k, E_k)
-  patch_data :: D   # p -> (block data of p, factor of S_p)
-  caches     :: E
+mutable struct CondensedBlockJacobiNS{A,B,C,D,E,F,G} <: Algebra.NumericalSetup
+  ss          :: A
+  matrix      :: B
+  block_gamma :: C
+  pb_pos      :: D
+  pb_loc      :: D
+  block_data  :: E   # k -> (factor of A_kk, W_k, E_k)
+  patch_data  :: F   # p -> (block data of p, factor of S_p)
+  caches      :: G
 end
 
 # What `caching` stores: :interior collects the block data, :all also the patch data.
-function condensation_data(ss::CondensedBlockJacobiSS, mat::SparseMatrixCSC, lids)
-  caching = ss.solver.caching
-  block_data = StaticCondensationArray(mat, ss.solver.block_ids, ss.block_gamma, lids)
+function condensation_data(
+  mat::SparseMatrixCSC, caching, block_ids, block_gamma, patch_blocks, patch_B, pb_pos, pb_loc, lids
+)
+  block_data = StaticCondensationArray(mat, block_ids, block_gamma, lids)
   (caching != :none) && (block_data = Arrays.lazy_collect(block_data))
-  patch_data = PatchStaticCondensationArray(ss, mat, block_data, lids)
+  patch_data = PatchStaticCondensationArray(mat, block_data, patch_blocks, patch_B, pb_pos, pb_loc, lids)
   (caching == :all) && (patch_data = Arrays.lazy_collect(patch_data))
   return block_data, patch_data
 end
 
-# caches = (y, Ey, lids, work vectors): y_k and E_k y_k of every block, flat as block_ids and
+# (y, Ey, lids, work vectors): y_k and E_k y_k of every block, flat as block_ids and
 # block_gamma; the dof work vector of `dense_block!`; and the per-patch work vectors.
-function Algebra.numerical_setup(ss::CondensedBlockJacobiSS, mat::SparseMatrixCSC)
+function condensation_caches(mat::SparseMatrixCSC, block_ids, block_gamma)
   T = eltype(mat)
-  y  = zeros(T, length(ss.solver.block_ids.data))
-  Ey = zeros(T, length(ss.block_gamma.data))
+  y  = zeros(T, length(block_ids.data))
+  Ey = zeros(T, length(block_gamma.data))
   lids = zeros(Int32, size(mat, 1))
   work = (CachedArray(T, 1), CachedArray(T, 1), CachedArray(T, 1))
-  block_data, patch_data = condensation_data(ss, mat, lids)
-  return CondensedBlockJacobiNS(ss, mat, block_data, patch_data, (y, Ey, lids, work))
+  return y, Ey, lids, work
+end
+
+function condensation_setup(mat::SparseMatrixCSC, caching, block_ids, patch_blocks, patch_B)
+  block_gamma, pb_pos, pb_loc = condensation_gamma(mat, block_ids, patch_blocks, patch_B)
+  caches = condensation_caches(mat, block_ids, block_gamma)
+  block_data, patch_data = condensation_data(
+    mat, caching, block_ids, block_gamma, patch_blocks, patch_B, pb_pos, pb_loc, caches[3]
+  )
+  return block_gamma, pb_pos, pb_loc, block_data, patch_data, caches
+end
+
+function Algebra.numerical_setup(ss::CondensedBlockJacobiSS, mat::SparseMatrixCSC)
+  data = condensation_setup(mat, ss.solver.caching, ss.block_ids, ss.patch_blocks, ss.patch_B)
+  return CondensedBlockJacobiNS(ss, mat, data...)
+end
+
+# The local matrix over the own and ghost rows: the columns of the same dofs, in row order
+function local_square_matrices(mat::PSparseMatrix)
+  map(partition(mat), partition(axes(mat, 1)), partition(axes(mat, 2))) do A, rows, cols
+    row_to_col = GridapDistributed.find_local_to_local_map(rows, cols)
+    @check all(c -> c > 0, row_to_col) "A local row has no matching column"
+    A[:, row_to_col]
+  end
+end
+
+function Algebra.numerical_setup(ss::CondensedBlockJacobiSS, mat::PSparseMatrix)
+  caching = ss.solver.caching
+  new_mat = SolverInterfaces.fetch_ghost_rows(mat, ss.rows)
+  block_gamma, pb_pos, pb_loc, block_data, patch_data, caches = map(
+    local_square_matrices(new_mat), ss.block_ids, ss.patch_blocks, ss.patch_B
+  ) do mat, block_ids, patch_blocks, patch_B
+    condensation_setup(mat, caching, block_ids, patch_blocks, patch_B)
+  end |> tuple_of_arrays
+  x_c = pzeros(eltype(mat), ss.rows)
+  b_c = pzeros(eltype(mat), ss.rows)
+  return CondensedBlockJacobiNS(
+    ss, new_mat, block_gamma, pb_pos, pb_loc, block_data, patch_data, (x_c, b_c, caches)
+  )
 end
 
 function Algebra.numerical_setup!(ns::CondensedBlockJacobiNS, mat::AbstractMatrix, vec::AbstractVector)
@@ -414,14 +493,29 @@ function Algebra.numerical_setup!(ns::CondensedBlockJacobiNS, mat::AbstractMatri
 end
 
 function Algebra.numerical_setup!(ns::CondensedBlockJacobiNS, mat::SparseMatrixCSC)
+  ss = ns.ss
   ns.matrix = mat
-  ns.block_data, ns.patch_data = condensation_data(ns.ss, mat, ns.caches[3])
+  ns.block_data, ns.patch_data = condensation_data(
+    mat, ss.solver.caching, ss.block_ids, ns.block_gamma, ss.patch_blocks, ss.patch_B, ns.pb_pos, ns.pb_loc, ns.caches[3]
+  )
+  return ns
+end
+
+function Algebra.numerical_setup!(ns::CondensedBlockJacobiNS, mat::PSparseMatrix)
+  ss = ns.ss
+  caching = ss.solver.caching
+  _, _, caches = ns.caches
+  ns.matrix = SolverInterfaces.fetch_ghost_rows(mat, ss.rows)
+  ns.block_data, ns.patch_data = map(
+    local_square_matrices(ns.matrix), ss.block_ids, ns.block_gamma, ss.patch_blocks, ss.patch_B, ns.pb_pos, ns.pb_loc, caches
+  ) do mat, block_ids, block_gamma, patch_blocks, patch_B, pb_pos, pb_loc, caches
+    condensation_data(mat, caching, block_ids, block_gamma, patch_blocks, patch_B, pb_pos, pb_loc, caches[3])
+  end |> tuple_of_arrays
   return ns
 end
 
 # y_k = A_kk⁻¹ b_k, Ey_k = E_k y_k
-function block_solve!(y, Ey, ss::CondensedBlockJacobiSS, k, F, E, b)
-  block_ids, block_gamma = ss.solver.block_ids, ss.block_gamma
+function block_solve!(y, Ey, block_ids, block_gamma, k, F, E, b)
   I = view(block_ids, k)
   yk  = view(y, datarange(block_ids, k))
   Eyk = view(Ey, datarange(block_gamma, k))
@@ -431,19 +525,44 @@ function block_solve!(y, Ey, ss::CondensedBlockJacobiSS, k, F, E, b)
 end
 
 function Algebra.solve!(x::AbstractVector, ns::CondensedBlockJacobiNS, b::AbstractVector)
-  ss, block_data, patch_data = ns.ss, ns.block_data, ns.patch_data
-  block_ids, block_gamma = ss.solver.block_ids, ss.block_gamma
-  patch_B, patch_blocks, pb_pos, pb_loc = ss.patch_B, ss.patch_blocks, ss.pb_pos, ss.pb_loc
-  y, Ey, _, (c_xB, c_xI, c_xΓ) = ns.caches
+  ss = ns.ss
+  fill!(x, zero(eltype(x)))
+  return solve_condensed_block_jacobi!(
+    x, b, ss.block_ids, ns.block_gamma, ss.patch_blocks, ss.patch_B, ns.pb_pos, ns.pb_loc,
+    ns.block_data, ns.patch_data, ns.caches
+  )
+end
+
+function Algebra.solve!(x::PVector, ns::CondensedBlockJacobiNS, b::PVector)
+  ss = ns.ss
+  x_c, b_c, caches = ns.caches
+
+  copy!(b_c, b)
+  consistent!(b_c) |> wait
+  fill!(x_c, zero(eltype(x)))
+  map(
+    solve_condensed_block_jacobi!,
+    partition(x_c), partition(b_c), ss.block_ids, ns.block_gamma, ss.patch_blocks, ss.patch_B, ns.pb_pos, ns.pb_loc,
+    ns.block_data, ns.patch_data, caches
+  )
+  assemble!(x_c) |> wait
+  copy!(x, x_c)
+  consistent!(x) |> wait
+  return x
+end
+
+function solve_condensed_block_jacobi!(
+  x, b, block_ids, block_gamma, patch_blocks, patch_B, pb_pos, pb_loc, block_data, patch_data, caches
+)
+  y, Ey, _, (c_xB, c_xI, c_xΓ) = caches
 
   # Block solves, shared by all patches
   block_cache = array_cache(block_data)
   for k in eachindex(block_data)
     F, _, E = getindex!(block_cache, block_data, k)
-    block_solve!(y, Ey, ss, k, F, E, b)
+    block_solve!(y, Ey, block_ids, block_gamma, k, F, E, b)
   end
 
-  fill!(x, zero(eltype(x)))
   cache = array_cache(patch_data)
   for p in eachindex(patch_B)
     B, blocks = view(patch_B, p), view(patch_blocks, p)
@@ -482,12 +601,18 @@ function Algebra.solve!(x::AbstractVector, ns::CondensedBlockJacobiNS, b::Abstra
 end
 
 # Number of Float64 values held by the numerical setup (block factors, W_k, E_k, S_p factors).
-function condensation_storage(ns::CondensedBlockJacobiNS)
+condensation_storage(ns::CondensedBlockJacobiNS) = condensation_storage(ns.block_data, ns.patch_data)
+
+function condensation_storage(ns::CondensedBlockJacobiNS{A,<:PSparseMatrix}) where A
+  reduce(+, map(condensation_storage, ns.block_data, ns.patch_data); init = 0)
+end
+
+function condensation_storage(block_data, patch_data)
   n = 0
-  if !isa(ns.block_data, StaticCondensationArray)
-    n += sum(((F, W, E),) -> length(F.factors) + length(W) + length(E), ns.block_data; init = 0)
+  if !isa(block_data, StaticCondensationArray)
+    n += sum(((F, W, E),) -> length(F.factors) + length(W) + length(E), block_data; init = 0)
   end
-  patch_S = ns.patch_data.patch_S
+  patch_S = patch_data.patch_S
   if !isnothing(patch_S)
     n += sum(F -> length(F.factors), patch_S; init = 0)
   end

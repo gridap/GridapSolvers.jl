@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 
+## Added
+
+- Added CondensedBlockJacobi solver, same as the BlockJacobi solver but with condensed local problems (for high-order discretizations). Works in serial and distributed.
+
 ## [0.7.1] - 2026-04-23
 
 ### Changed
