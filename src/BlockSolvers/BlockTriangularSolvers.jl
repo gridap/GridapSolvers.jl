@@ -207,6 +207,7 @@ function Gridap.Algebra.solve!(x::AbstractBlockVector,ns::BlockTriangularSolverN
     nsi = ns.block_ns[iB].ns
     xi  = blocks(x)[iB]
     yi  = blocks(y)[iB]
+    fill!(yi,zero(eltype(yi)))
     solve!(yi,nsi,wi)
     copy!(xi,yi)
   end
@@ -235,6 +236,7 @@ function Gridap.Algebra.solve!(x::AbstractBlockVector,ns::BlockTriangularSolverN
     nsi = ns.block_ns[iB].ns
     xi  = blocks(x)[iB]
     yi  = blocks(y)[iB]
+    fill!(yi,zero(eltype(yi)))
     solve!(yi,nsi,wi)
     copy!(xi,yi) # Remove this with PA 0.4
   end

@@ -42,6 +42,14 @@ function BlockJacobiSolver(space::FESpace;kwargs...)
   return BlockJacobiSolver(space,ptopo;kwargs...)
 end
 
+function BlockJacobiSolver(s1::BlockJacobiSolver{V},s2::BlockJacobiSolver{V}) where V <: Vector
+  rows = vcat(s1.rows, s2.rows)
+  cols = vcat(s1.cols, s2.cols)
+  patch_rows = vcat(s1.patch_rows, s2.patch_rows)
+  patch_cols = vcat(s1.patch_cols, s2.patch_cols)
+  return BlockJacobiSolver(rows, cols, patch_rows, patch_cols)
+end
+
 struct BlockJacobiSS{A} <: Algebra.SymbolicSetup
   solver::A
 end
@@ -150,6 +158,7 @@ function solve_block_jacobi!(
     rows = patch_rows[patch]
     cols = patch_cols[patch]
     @check isequal(length(rows),length(cols)) "Block is not square"
+    isempty(rows) && continue
 
     n = length(rows)
     setsize!(c_xk,(n,))
@@ -181,6 +190,7 @@ function solve_block_jacobi_projection!(
     rows = patch_rows[patch]
     cols = patch_cols[patch]
     @check isequal(length(rows),length(cols)) "Block is not square"
+    isempty(rows) && continue
 
     n = length(rows)
     setsize!(c_xk,(n,))
